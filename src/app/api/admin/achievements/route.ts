@@ -21,14 +21,14 @@ export async function GET() {
 
 // Seed/upsert all achievement rules and update point rules to new values
 export async function POST(request: NextRequest) {
-  const applySecret = request.headers.get("x-apply-secret");
-  const isValidSecret = applySecret && applySecret === process.env.APPLY_SECRET;
-  if (!isValidSecret) {
-    const auth = await getAdminFromCookies();
-    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  try {
+    const applySecret = request.headers.get("x-apply-secret");
+    const isValidSecret = applySecret && applySecret === process.env.APPLY_SECRET;
+    if (!isValidSecret) {
+      const auth = await getAdminFromCookies();
+      if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    // Upsert point rules with new values
     for (const [key, rule] of Object.entries(DEFAULT_POINT_RULES)) {
       await prisma.pointRule.upsert({
         where: { key },
@@ -37,7 +37,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Upsert achievement rules
     for (const [key, rule] of Object.entries(DEFAULT_ACHIEVEMENTS)) {
       await prisma.achievementRule.upsert({
         where: { key },
@@ -46,8 +45,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const achievements = await prisma.achievementRule.findMany({ orderBy: { points: "asc" } });
-    const pointRules = await prisma.pointRule.findMany({ orderBy: { key: "asc" } });
+    const [achievements, pointRules] = await Promise.all([
+      prisma.achievementRule.findMany({ orderBy: { points: "asc" } }),
+      prisma.pointRule.findMany({ orderBy: { key: "asc" } }),
+    ]);
 
     return NextResponse.json({ success: true, achievements: achievements.length, pointRules: pointRules.length });
   } catch (error) {

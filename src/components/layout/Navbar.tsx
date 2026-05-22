@@ -63,6 +63,7 @@ export function Navbar() {
     { href: "/", label: "Inicio" },
     { href: "/fixture-live", label: "Fixture Live" },
     { href: "/ranking", label: "Ranking" },
+    { href: "/como-jugar", label: "Cómo jugar" },
     ...(user ? [{ href: "/my-predictions", label: "Mis Predicciones" }] : []),
   ];
 

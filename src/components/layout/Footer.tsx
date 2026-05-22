@@ -10,7 +10,7 @@ export function Footer() {
             <Logo size="sm" showTagline />
           </div>
           <div className="flex items-center gap-6">
-            <Link href="#" className="text-gray-500 hover:text-gray-300 text-xs uppercase tracking-wider transition-colors">
+            <Link href="/como-jugar" className="text-gray-500 hover:text-gray-300 text-xs uppercase tracking-wider transition-colors">
               Bases y condiciones
             </Link>
             <Link href="/fixture-live" className="text-gray-500 hover:text-red-400 text-xs uppercase tracking-wider transition-colors">
