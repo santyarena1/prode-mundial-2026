@@ -2,8 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 
 const sizes = {
-  sm: { width: 260, height: 104, className: "h-20 w-auto", pad: "px-1 pt-2 pb-1" },
-  md: { width: 340, height: 136, className: "h-28 w-auto", pad: "px-1 pt-3 pb-1" },
+  sm: { width: 260, height: 104, className: "h-20 w-auto", pad: "px-1 py-1" },
+  md: { width: 340, height: 136, className: "h-28 w-auto", pad: "px-1 py-2" },
   lg: { width: 280, height: 112, className: "h-20 sm:h-24 w-auto", pad: "px-4 py-2" },
   xl: { width: 360, height: 144, className: "h-28 sm:h-32 w-auto", pad: "px-6 py-3" },
   hero: { width: 400, height: 150, className: "h-[4.25rem] sm:h-20 md:h-[5.5rem] lg:h-[6.25rem] xl:h-28 w-auto", pad: "px-1 py-0" },

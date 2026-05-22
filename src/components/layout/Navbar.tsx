@@ -83,7 +83,7 @@ export function Navbar() {
           }`}
         />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-visible">
-          <div className="flex items-center justify-between h-14 sm:h-16 overflow-visible">
+          <div className="flex items-center justify-between h-24 sm:h-28 overflow-visible">
             <Logo size="sm" priority />
             <div className="hidden md:flex items-center gap-6">
               {navLinks.map((link) => (
@@ -187,7 +187,7 @@ export function Navbar() {
           } bg-gradient-to-b from-black/40 to-transparent`}
         />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-visible">
-          <div className="flex items-center justify-between min-h-[4rem] py-1.5 overflow-visible">
+          <div className="flex items-center justify-between min-h-[7rem] py-2 overflow-visible">
             <Logo size="md" showTagline priority />
 
             <div className="hidden md:flex items-center gap-6">
