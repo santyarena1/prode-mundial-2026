@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Settings, Save, RefreshCw, Trophy } from "lucide-react";
+import { Settings, Save, RefreshCw, Trophy, Gift } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -33,6 +33,7 @@ export default function AdminSettingsPage() {
   const [savingRules, setSavingRules] = useState(false);
   const [applyingRules, setApplyingRules] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
+  const [seedingDefaults, setSeedingDefaults] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -147,6 +148,20 @@ export default function AdminSettingsPage() {
       toast.error("Error de conexión");
     } finally {
       setApplyingRules(false);
+    }
+  };
+
+  const seedDefaults = async () => {
+    setSeedingDefaults(true);
+    try {
+      const res = await fetch("/api/admin/seed-defaults", { method: "POST" });
+      if (!res.ok) { toast.error("Error al seedear defaults"); return; }
+      const data = await res.json();
+      toast.success(data.message || "Defaults aplicados");
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setSeedingDefaults(false);
     }
   };
 
@@ -346,6 +361,59 @@ export default function AdminSettingsPage() {
             className="w-full"
           >
             <RefreshCw className="w-4 h-4" /> Recalcular todos los usuarios
+          </Button>
+        </Card>
+      </div>
+
+      {/* Seed premios y bonus */}
+      <div className="mt-6">
+        <Card className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Gift className="w-4 h-4 text-green-400" />
+            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400">
+              Premios y acciones de bonus por defecto
+            </h3>
+          </div>
+          <p className="text-gray-500 text-xs mb-4">
+            Crea los premios y acciones de bonus iniciales en la base de datos.
+            Solo agrega los que no existen todavía — no modifica ni borra los existentes.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 text-xs text-gray-600">
+            <div>
+              <p className="text-gray-500 font-semibold mb-1">Premios (12):</p>
+              <div className="space-y-0.5">
+                <div>• Sorteo semanal → 1.000 pts</div>
+                <div>• Cupón 5% OFF → 5.000 pts</div>
+                <div>• Cupón 10% OFF → 8.000 pts</div>
+                <div>• Envío bonificado → 12.000 pts</div>
+                <div>• Sticker pack TGS → 15.000 pts</div>
+                <div>• Mousepad gamer → 22.000 pts</div>
+                <div>• Merch sponsor → 28.000 pts</div>
+                <div>• Gift card TGS → 35.000 pts</div>
+                <div>• Mouse gamer → 50.000 pts</div>
+                <div>• Auricular gamer → 65.000 pts</div>
+                <div>• Teclado gamer → 80.000 pts</div>
+                <div>• Premio Jackpot TGS → 120.000 pts</div>
+              </div>
+            </div>
+            <div>
+              <p className="text-gray-500 font-semibold mb-1">Bonus actions (10):</p>
+              <div className="space-y-0.5">
+                <div>• Completar prode → 1.000 pts</div>
+                <div>• Seguir Instagram → 500 pts</div>
+                <div>• Seguir TikTok → 500 pts</div>
+                <div>• Suscribirse YouTube → 700 pts</div>
+                <div>• Compartir historia → 1.000 pts</div>
+                <div>• Código compra chica → 1.500 pts</div>
+                <div>• Código compra media → 3.000 pts</div>
+                <div>• Código compra grande → 6.000 pts</div>
+                <div>• Ver partido en local → 2.500 pts</div>
+                <div>• Invitar amigo validado → 1.500 pts</div>
+              </div>
+            </div>
+          </div>
+          <Button variant="primary" size="sm" loading={seedingDefaults} onClick={seedDefaults} className="w-full">
+            <Gift className="w-4 h-4" /> Crear premios y bonus por defecto
           </Button>
         </Card>
       </div>
