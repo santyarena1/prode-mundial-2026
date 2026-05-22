@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     locale: "es_AR",
     images: [
       {
-        url: "/og-image.png",
+        url: "https://prode-mundial-2026-ten-blue.vercel.app/og-image.png",
         width: 1280,
         height: 960,
         alt: "Prode Mundial Gamer 2026 - The Gamer Shop",
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Prode Mundial Gamer 2026 | The Gamer Shop",
     description: "Predecí, competí y ganá premios.",
-    images: ["/og-image.png"],
+    images: ["https://prode-mundial-2026-ten-blue.vercel.app/og-image.png"],
   },
 };
 
