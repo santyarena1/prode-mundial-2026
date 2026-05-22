@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Lock, CheckCircle2, ChevronDown, ChevronUp,
-  Trophy, Target, Users, AlertTriangle, X, Save, Gift, Search,
+  Trophy, Target, Users, AlertTriangle, X, Save, Gift, Search, Zap,
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -91,6 +91,7 @@ export default function PredictionsPage() {
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [buyingChange, setBuyingChange] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showPointsModal, setShowPointsModal] = useState(false);
 
   // Team selection modal for bracket picks
   const [selectionModal, setSelectionModal] = useState<{ phase: string; slot: string } | null>(null);
@@ -322,11 +323,21 @@ export default function PredictionsPage() {
       <Navbar />
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8">
 
-        <div className="mb-6">
-          <h1 className="text-3xl font-black uppercase text-white">
-            Mis <span className="text-red-500">Predicciones</span>
-          </h1>
-          <p className="text-gray-500 mt-1">Predecí resultados, clasificados y campeón</p>
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-black uppercase text-white">
+              Mis <span className="text-red-500">Predicciones</span>
+            </h1>
+            <p className="text-gray-500 mt-1">Predecí resultados, clasificados y campeón</p>
+          </div>
+          <button
+            onClick={() => setShowPointsModal(true)}
+            className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 rounded-xl text-yellow-400 text-xs font-bold uppercase tracking-wider transition-colors"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Puntos y logros</span>
+            <span className="sm:hidden">Pts</span>
+          </button>
         </div>
 
         {/* Disclaimer */}
@@ -768,12 +779,22 @@ export default function PredictionsPage() {
             </AnimatePresence>
           </div>
         )}
-        {/* ── LOGROS ─────────────────────────────────────────────────────────── */}
-        <AchievementsSection />
-
       </div>
 
       <Footer />
+
+      {/* ── Points & Achievements Modal ─────────────────────────────────────── */}
+      <AnimatePresence>
+        {showPointsModal && (
+          <PointsAndAchievementsModal
+            onClose={() => setShowPointsModal(false)}
+            savedMatchCount={Object.keys(savedPreds).length}
+            savedGroupCount={Object.keys(savedGroupPreds).length}
+            savedBracketCount={Object.keys(savedBracket).length}
+            hasChampionPred={Object.keys(savedBracket).some(k => k.startsWith("CHAMPION:"))}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── Team selection modal ─────────────────────────────────────────────── */}
       <AnimatePresence>
@@ -931,64 +952,186 @@ export default function PredictionsPage() {
   );
 }
 
-// ─── Achievements Section ─────────────────────────────────────────────────────
+// ─── Points & Achievements Modal ─────────────────────────────────────────────
 
 const LOGROS = [
-  { icon: "🚀", name: "Buen arranque",         condition: "Acertar 10 partidos de grupos",                pts: "1.000" },
-  { icon: "📊", name: "Especialista de grupos", condition: "Acertar 35 partidos de grupos",               pts: "3.000" },
-  { icon: "🌍", name: "Experto mundialista",    condition: "Acertar 45 partidos de grupos",               pts: "7.500" },
-  { icon: "🤖", name: "Máquina de grupos",      condition: "Acertar 55 partidos de grupos",               pts: "15.000" },
-  { icon: "👁️", name: "Ojo clínico",            condition: "Acertar 18 clasificados de grupo",            pts: "5.000" },
-  { icon: "📋", name: "Tabla perfecta",         condition: "Acertar todos los 1° y 2° exactos",           pts: "20.000" },
-  { icon: "💪", name: "Bracket fuerte",         condition: "Acertar el 70% de eliminatorias",             pts: "10.000" },
-  { icon: "🎯", name: "Bracket perfecto",       condition: "Acertar toda la llave eliminatoria",          pts: "30.000" },
-  { icon: "💫", name: "Final soñada",           condition: "Acertar campeón y subcampeón",                pts: "5.000" },
-  { icon: "🏆", name: "Prode perfecto",         condition: "Acertar todo el prode completo",              pts: "150.000" },
+  { icon: "🚀", name: "Buen arranque",          condition: "Acertar 10 partidos de grupos",       pts: "1.000",   target: 10,  type: "match" as const },
+  { icon: "📊", name: "Especialista de grupos",  condition: "Acertar 35 partidos de grupos",      pts: "3.000",   target: 35,  type: "match" as const },
+  { icon: "🌍", name: "Experto mundialista",     condition: "Acertar 45 partidos de grupos",      pts: "7.500",   target: 45,  type: "match" as const },
+  { icon: "🤖", name: "Máquina de grupos",       condition: "Acertar 55 partidos de grupos",      pts: "15.000",  target: 55,  type: "match" as const },
+  { icon: "👁️", name: "Ojo clínico",             condition: "Acertar 18 clasificados de grupo",   pts: "5.000",   target: 18,  type: "classified" as const },
+  { icon: "📋", name: "Tabla perfecta",          condition: "Acertar todos los 1° y 2° exactos", pts: "20.000",  target: 12,  type: "groups" as const },
+  { icon: "💪", name: "Bracket fuerte",          condition: "Acertar el 70% de eliminatorias",   pts: "10.000",  target: 22,  type: "bracket" as const },
+  { icon: "🎯", name: "Bracket perfecto",        condition: "Acertar toda la llave eliminatoria", pts: "30.000",  target: 31,  type: "bracket" as const },
+  { icon: "💫", name: "Final soñada",            condition: "Acertar campeón y subcampeón",       pts: "5.000",   target: 1,   type: "champion" as const },
+  { icon: "🏆", name: "Prode perfecto",          condition: "Desbloquear todos los logros",       pts: "150.000", target: 10,  type: "all" as const },
 ];
 
-function AchievementsSection() {
-  const [open, setOpen] = useState(false);
+const POINTS_TABLE = [
+  { section: "Fase de Grupos", items: [
+    { label: "Acertar ganador o perdedor",       pts: "50",    note: "" },
+    { label: "Acertar empate exacto",            pts: "80",    note: "(50 + 30 bonus)" },
+    { label: "Acertar equipo clasificado",       pts: "120",   note: "por cada clasificado" },
+    { label: "Acertar la posición exacta",       pts: "+180",  note: "extra sobre los 120" },
+  ]},
+  { section: "Eliminatorias", items: [
+    { label: "Equipo que pasa en Ronda de 32",   pts: "200",   note: "× 16 equipos" },
+    { label: "Equipo que pasa en Octavos",       pts: "350",   note: "× 8 equipos" },
+    { label: "Equipo que pasa en Cuartos",       pts: "600",   note: "× 4 equipos" },
+    { label: "Equipo que pasa en Semifinal",     pts: "1.000", note: "× 2 equipos" },
+    { label: "Acertar al subcampeón",            pts: "1.500", note: "finalista que pierde" },
+    { label: "Acertar al campeón",               pts: "3.000", note: "" },
+    { label: "Campeón + subcampeón exactos",     pts: "+5.000",note: "bonus adicional" },
+  ]},
+];
+
+function PointsAndAchievementsModal({
+  onClose, savedMatchCount, savedGroupCount, savedBracketCount, hasChampionPred,
+}: {
+  onClose: () => void;
+  savedMatchCount: number;
+  savedGroupCount: number;
+  savedBracketCount: number;
+  hasChampionPred: boolean;
+}) {
+  const [tab, setTab] = useState<"points" | "logros">("points");
+
+  const getProgress = (logro: typeof LOGROS[0]) => {
+    switch (logro.type) {
+      case "match":       return Math.min(savedMatchCount, logro.target) / logro.target;
+      case "classified":  return Math.min(savedGroupCount * 2, logro.target) / logro.target;
+      case "groups":      return Math.min(savedGroupCount, logro.target) / logro.target;
+      case "bracket":     return Math.min(savedBracketCount, logro.target) / logro.target;
+      case "champion":    return hasChampionPred ? 1 : 0;
+      case "all":         return 0;
+      default:            return 0;
+    }
+  };
+
+  const getCurrent = (logro: typeof LOGROS[0]) => {
+    switch (logro.type) {
+      case "match":      return Math.min(savedMatchCount, logro.target);
+      case "classified": return Math.min(savedGroupCount * 2, logro.target);
+      case "groups":     return Math.min(savedGroupCount, logro.target);
+      case "bracket":    return Math.min(savedBracketCount, logro.target);
+      case "champion":   return hasChampionPred ? 1 : 0;
+      case "all":        return 0;
+      default:           return 0;
+    }
+  };
+
   return (
-    <div className="mt-8 border border-[#1e1e1e] rounded-2xl overflow-hidden">
-      <button
-        onClick={() => setOpen(p => !p)}
-        className="w-full flex items-center justify-between px-5 py-4 bg-[#111] hover:bg-[#151515] transition-colors"
+    <>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/80 z-50 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, y: "100%" }} animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: "100%" }} transition={{ duration: 0.3, ease: "easeOut" }}
+        className="fixed bottom-0 left-0 right-0 z-50 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4"
       >
-        <div className="flex items-center gap-3">
-          <span className="text-xl">🎯</span>
-          <div className="text-left">
-            <p className="text-white font-black text-sm uppercase tracking-wide">Logros del Prode</p>
-            <p className="text-gray-600 text-xs">Se calculan automáticamente — puntos extra enormes</p>
+        <div className="bg-[#111] border border-[#2a2a2a] rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg flex flex-col max-h-[92vh] sm:max-h-[88vh]">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#1e1e1e] flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-yellow-400" />
+              <h2 className="text-white font-black text-lg">Puntos y Logros</h2>
+            </div>
+            <button onClick={onClose} className="text-gray-600 hover:text-gray-400 transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Sub-tabs */}
+          <div className="flex gap-1 mx-4 mt-4 mb-1 bg-[#1a1a1a] rounded-xl p-1 flex-shrink-0">
+            <button onClick={() => setTab("points")}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${tab === "points" ? "bg-red-600 text-white" : "text-gray-500 hover:text-gray-300"}`}>
+              Cuántos puntos gano
+            </button>
+            <button onClick={() => setTab("logros")}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${tab === "logros" ? "bg-red-600 text-white" : "text-gray-500 hover:text-gray-300"}`}>
+              Logros ({LOGROS.length})
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="overflow-y-auto flex-1 px-4 pb-6 pt-3">
+            {tab === "points" && (
+              <div className="space-y-5">
+                {POINTS_TABLE.map(section => (
+                  <div key={section.section}>
+                    <p className="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2">{section.section}</p>
+                    <div className="rounded-xl border border-[#1e1e1e] overflow-hidden">
+                      {section.items.map((item, i) => (
+                        <div key={item.label} className={`flex items-center justify-between px-4 py-3 gap-3 ${i !== section.items.length - 1 ? "border-b border-[#1a1a1a]" : ""}`}>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-gray-200 text-xs font-semibold">{item.label}</p>
+                            {item.note && <p className="text-gray-600 text-[10px] mt-0.5">{item.note}</p>}
+                          </div>
+                          <span className={`font-black text-sm tabular-nums flex-shrink-0 ${item.pts.startsWith("+") ? "text-green-400" : "text-yellow-400"}`}>
+                            {item.pts} pts
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <div className="bg-[#0f1a0f] border border-green-500/20 rounded-xl p-4 text-xs text-gray-500 leading-relaxed">
+                  <span className="text-green-400 font-bold">Ejemplo completo:</span> Argentina clasifica y queda 1° →
+                  120 pts (clasificado) + 180 pts (posición exacta) = <span className="text-yellow-300 font-bold">300 pts</span> solo por ese equipo.
+                </div>
+              </div>
+            )}
+
+            {tab === "logros" && (
+              <div className="space-y-3">
+                <p className="text-gray-600 text-[11px] leading-relaxed pb-1">
+                  Los logros se calculan automáticamente al finalizar el torneo.
+                  Las barras muestran predicciones cargadas hasta ahora.
+                </p>
+                {LOGROS.map(logro => {
+                  const progress = getProgress(logro);
+                  const current = getCurrent(logro);
+                  const done = progress >= 1;
+                  return (
+                    <div key={logro.name} className={`p-4 rounded-xl border transition-colors ${done ? "bg-yellow-500/5 border-yellow-500/20" : "bg-[#141414] border-[#1e1e1e]"}`}>
+                      <div className="flex items-start gap-3 mb-3">
+                        <span className="text-2xl leading-none mt-0.5">{logro.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className={`font-black text-sm ${done ? "text-yellow-300" : "text-white"}`}>{logro.name}</p>
+                            {done && <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded font-bold">✓ LISTO</span>}
+                          </div>
+                          <p className="text-gray-500 text-[11px] mt-0.5 leading-tight">{logro.condition}</p>
+                        </div>
+                        <span className="text-yellow-400 font-black text-sm tabular-nums flex-shrink-0">{logro.pts}</span>
+                      </div>
+                      {logro.type !== "all" && (
+                        <div>
+                          <div className="flex justify-between text-[10px] mb-1">
+                            <span className="text-gray-600">Progreso</span>
+                            <span className={done ? "text-yellow-400 font-bold" : "text-gray-600"}>
+                              {current}/{logro.target}
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
+                            <motion.div
+                              className={`h-full rounded-full ${done ? "bg-yellow-400" : "bg-red-500"}`}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${Math.min(progress * 100, 100)}%` }}
+                              transition={{ duration: 0.6, ease: "easeOut" }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-green-400 font-black text-xs bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-full">10 logros</span>
-          {open ? <ChevronUp className="w-4 h-4 text-gray-600" /> : <ChevronDown className="w-4 h-4 text-gray-600" />}
-        </div>
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-            <div className="px-4 pb-4 pt-3 bg-[#0c0c0c] space-y-2">
-              <p className="text-gray-600 text-[11px] pb-1">
-                Los logros se calculan automáticamente cuando termina el torneo. No hace falta reclamarlos.
-              </p>
-              {LOGROS.map(logro => (
-                <div key={logro.name} className="flex items-center gap-3 px-3 py-2.5 bg-[#111] border border-[#1a1a1a] rounded-xl">
-                  <span className="text-xl leading-none w-7 text-center flex-shrink-0">{logro.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white font-bold text-xs">{logro.name}</p>
-                    <p className="text-gray-600 text-[10px] mt-0.5 leading-tight">{logro.condition}</p>
-                  </div>
-                  <span className="text-yellow-400 font-black text-sm tabular-nums flex-shrink-0">{logro.pts} pts</span>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+      </motion.div>
+    </>
   );
 }
 
