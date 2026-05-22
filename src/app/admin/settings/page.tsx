@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Settings, Save, RefreshCw, Trophy, Gift } from "lucide-react";
+import { Settings, Save, RefreshCw, Trophy, Gift, Store } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -15,6 +15,16 @@ interface EventSettings {
   whatsappPurchaseMessage?: string;
   whatsappVenueMessage?: string;
   instagramUrl?: string;
+}
+
+interface StoreConfig {
+  name: string;
+  address: string;
+  mapsUrl: string;
+  instagram: string;
+  instagramUrl: string;
+  phone: string;
+  phoneUrl: string;
 }
 
 interface PointRule {
@@ -34,6 +44,11 @@ export default function AdminSettingsPage() {
   const [applyingRules, setApplyingRules] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
   const [seedingDefaults, setSeedingDefaults] = useState(false);
+  const [stores, setStores] = useState<[StoreConfig, StoreConfig]>([
+    { name: "", address: "", mapsUrl: "", instagram: "", instagramUrl: "", phone: "", phoneUrl: "" },
+    { name: "", address: "", mapsUrl: "", instagram: "", instagramUrl: "", phone: "", phoneUrl: "" },
+  ]);
+  const [savingStores, setSavingStores] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -59,6 +74,32 @@ export default function AdminSettingsPage() {
       if (rulesRes.ok) {
         const data = await rulesRes.json();
         setPointRules(data.pointRules || []);
+      }
+      if (settingsRes.ok) {
+        const data = await settingsRes.json();
+        const settingsArr = data.settings || [];
+        const get = (key: string) =>
+          settingsArr.find((s: { key: string; value: string }) => s.key === key)?.value ?? "";
+        setStores([
+          {
+            name: get("store_1_name"),
+            address: get("store_1_address"),
+            mapsUrl: get("store_1_maps_url"),
+            instagram: get("store_1_instagram"),
+            instagramUrl: get("store_1_instagram_url"),
+            phone: get("store_1_phone"),
+            phoneUrl: get("store_1_phone_url"),
+          },
+          {
+            name: get("store_2_name"),
+            address: get("store_2_address"),
+            mapsUrl: get("store_2_maps_url"),
+            instagram: get("store_2_instagram"),
+            instagramUrl: get("store_2_instagram_url"),
+            phone: get("store_2_phone"),
+            phoneUrl: get("store_2_phone_url"),
+          },
+        ]);
       }
       setLoading(false);
     };
@@ -177,6 +218,47 @@ export default function AdminSettingsPage() {
       toast.error("Error de conexión");
     } finally {
       setRecalculating(false);
+    }
+  };
+
+  const updateStore = (idx: 0 | 1, field: keyof StoreConfig, value: string) => {
+    setStores((prev) => {
+      const next: [StoreConfig, StoreConfig] = [{ ...prev[0] }, { ...prev[1] }];
+      next[idx] = { ...next[idx], [field]: value };
+      return next;
+    });
+  };
+
+  const saveStores = async () => {
+    setSavingStores(true);
+    try {
+      const pairs: [string, string][] = [];
+      stores.forEach((s, i) => {
+        const n = i + 1;
+        pairs.push(
+          [`store_${n}_name`, s.name],
+          [`store_${n}_address`, s.address],
+          [`store_${n}_maps_url`, s.mapsUrl],
+          [`store_${n}_instagram`, s.instagram],
+          [`store_${n}_instagram_url`, s.instagramUrl],
+          [`store_${n}_phone`, s.phone],
+          [`store_${n}_phone_url`, s.phoneUrl],
+        );
+      });
+      await Promise.all(
+        pairs.map(([key, value]) =>
+          fetch("/api/admin/settings", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key, value }),
+          })
+        )
+      );
+      toast.success("Locales guardados");
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setSavingStores(false);
     }
   };
 
@@ -424,6 +506,77 @@ export default function AdminSettingsPage() {
             <Gift className="w-4 h-4" /> Crear premios y bonus por defecto
           </Button>
         </Card>
+      </div>
+
+      {/* Store settings */}
+      <div className="mt-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Store className="w-4 h-4 text-blue-400" />
+          <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400">
+            Locales (modal &quot;Sumate ahora&quot;)
+          </h3>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {([0, 1] as const).map((idx) => (
+            <Card key={idx} className="p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-6 h-6 rounded-lg bg-red-600 flex items-center justify-center flex-shrink-0">
+                  <span className="text-white text-[10px] font-black">{idx + 1}</span>
+                </div>
+                <h4 className="text-sm font-bold text-white">Local {idx + 1}</h4>
+              </div>
+              <div className="space-y-3">
+                <Input
+                  label="Nombre"
+                  placeholder={`Local ${idx + 1}`}
+                  value={stores[idx].name}
+                  onChange={(e) => updateStore(idx, "name", e.target.value)}
+                />
+                <Input
+                  label="Dirección"
+                  placeholder="Av. Corrientes 1234, CABA"
+                  value={stores[idx].address}
+                  onChange={(e) => updateStore(idx, "address", e.target.value)}
+                />
+                <Input
+                  label="Link Google Maps"
+                  placeholder="https://maps.google.com/..."
+                  value={stores[idx].mapsUrl}
+                  onChange={(e) => updateStore(idx, "mapsUrl", e.target.value)}
+                />
+                <Input
+                  label="Instagram (texto)"
+                  placeholder="@thegamershop_oficial"
+                  value={stores[idx].instagram}
+                  onChange={(e) => updateStore(idx, "instagram", e.target.value)}
+                />
+                <Input
+                  label="Instagram (URL)"
+                  placeholder="https://www.instagram.com/thegamershop_oficial/"
+                  value={stores[idx].instagramUrl}
+                  onChange={(e) => updateStore(idx, "instagramUrl", e.target.value)}
+                />
+                <Input
+                  label="Teléfono (texto)"
+                  placeholder="+54 9 11 1234-5678"
+                  value={stores[idx].phone}
+                  onChange={(e) => updateStore(idx, "phone", e.target.value)}
+                />
+                <Input
+                  label="Teléfono (URL WhatsApp)"
+                  placeholder="https://wa.me/5491112345678"
+                  value={stores[idx].phoneUrl}
+                  onChange={(e) => updateStore(idx, "phoneUrl", e.target.value)}
+                />
+              </div>
+            </Card>
+          ))}
+        </div>
+        <div className="mt-4">
+          <Button variant="primary" size="md" loading={savingStores} onClick={saveStores} className="w-full sm:w-auto">
+            <Save className="w-4 h-4" /> Guardar locales
+          </Button>
+        </div>
       </div>
     </div>
   );

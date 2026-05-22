@@ -13,6 +13,8 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Logo } from "@/components/layout/Logo";
 import { HeroSponsors } from "@/components/home/HeroSponsors";
 import { HeroVideo } from "@/components/home/HeroVideo";
+import { WelcomeModal } from "@/components/home/WelcomeModal";
+import { AnimatePresence } from "framer-motion";
 
 interface Sponsor {
   id: string;
@@ -92,6 +94,7 @@ export default function HomePage() {
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [featuredPrizes, setFeaturedPrizes] = useState<FeaturedPrize[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -187,11 +190,11 @@ export default function HomePage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.3 }}
               >
-                <Link href="/register" className="w-full sm:w-auto">
+                <button onClick={() => setShowWelcome(true)} className="w-full sm:w-auto">
                   <Button variant="primary" size="lg" className="animate-glow w-full sm:min-w-[180px]">
                     SUMATE AHORA
                   </Button>
-                </Link>
+                </button>
                 <Link href="/fixture-live" className="w-full sm:w-auto">
                   <Button
                     variant="outline"
@@ -434,6 +437,10 @@ export default function HomePage() {
       </section>
 
       <Footer />
+
+      <AnimatePresence>
+        {showWelcome && <WelcomeModal onClose={() => setShowWelcome(false)} />}
+      </AnimatePresence>
     </div>
   );
 }
