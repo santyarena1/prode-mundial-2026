@@ -12,8 +12,10 @@ export const metadata: Metadata = {
   title: "Prode Mundial Gamer 2026 | The Gamer Shop",
   description: "Predecí los resultados del Mundial 2026, acumulá puntos y ganá premios increíbles con The Gamer Shop.",
   icons: {
-    icon: "/logo.png",
-    apple: "/logo.png",
+    icon: [
+      { url: "/logo-color.png", sizes: "any" },
+    ],
+    apple: "/logo-color.png",
   },
   openGraph: {
     title: "Prode Mundial Gamer 2026 | The Gamer Shop",
