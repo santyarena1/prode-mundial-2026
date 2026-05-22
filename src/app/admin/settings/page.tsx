@@ -58,10 +58,9 @@ export default function AdminSettingsPage() {
       ]);
       if (settingsRes.ok) {
         const data = await settingsRes.json();
-        // settings is an array of {key, value} pairs
         const settingsArr = data.settings || [];
         const get = (key: string) =>
-          settingsArr.find((s: { key: string; value: string }) => s.key === key)?.value;
+          settingsArr.find((s: { key: string; value: string }) => s.key === key)?.value ?? "";
         setEventSettings({
           eventName: get("event_name") || get("eventName") || "",
           active: get("event_active") !== "false" && get("active") !== "false",
@@ -70,16 +69,6 @@ export default function AdminSettingsPage() {
           whatsappVenueMessage: get("whatsapp_venue_message") || "",
           instagramUrl: get("instagram_url") || "",
         });
-      }
-      if (rulesRes.ok) {
-        const data = await rulesRes.json();
-        setPointRules(data.pointRules || []);
-      }
-      if (settingsRes.ok) {
-        const data = await settingsRes.json();
-        const settingsArr = data.settings || [];
-        const get = (key: string) =>
-          settingsArr.find((s: { key: string; value: string }) => s.key === key)?.value ?? "";
         setStores([
           {
             name: get("store_1_name"),
@@ -100,6 +89,10 @@ export default function AdminSettingsPage() {
             phoneUrl: get("store_2_phone_url"),
           },
         ]);
+      }
+      if (rulesRes.ok) {
+        const data = await rulesRes.json();
+        setPointRules(data.pointRules || []);
       }
       setLoading(false);
     };
