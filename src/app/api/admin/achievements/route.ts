@@ -20,14 +20,10 @@ export async function GET() {
 }
 
 // Seed/upsert all achievement rules and update point rules to new values
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
-    const applySecret = request.headers.get("x-apply-secret");
-    const isValidSecret = applySecret && applySecret === process.env.APPLY_SECRET;
-    if (!isValidSecret) {
-      const auth = await getAdminFromCookies();
-      if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await getAdminFromCookies();
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     for (const [key, rule] of Object.entries(DEFAULT_POINT_RULES)) {
       await prisma.pointRule.upsert({
