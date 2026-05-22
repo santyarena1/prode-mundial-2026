@@ -5,8 +5,12 @@ import { syncTeams, syncFixtures } from "@/lib/sync";
 
 // One-time endpoint: wipes all teams + seed matches, then re-syncs from API
 export async function POST(request: NextRequest) {
-  const auth = await getAdminFromCookies();
-  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const resetSecret = request.headers.get("x-reset-secret");
+  const isValidSecret = resetSecret && resetSecret === process.env.RESET_SECRET;
+  if (!isValidSecret) {
+    const auth = await getAdminFromCookies();
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   try {
     // 1. Delete seed/manual matches (externalId = null) with no predictions
