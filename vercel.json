@@ -1,0 +1,20 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/live",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/standings",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/topscorers",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/enrichment",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}

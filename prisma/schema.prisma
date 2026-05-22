@@ -1,0 +1,381 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id               String   @id @default(cuid())
+  firstName        String
+  lastName         String
+  phone            String   @unique
+  email            String   @unique
+  passwordHash     String?
+  instagram        String?
+  totalPoints      Int      @default(0)
+  predictionPoints Int      @default(0)
+  bonusPoints      Int      @default(0)
+  spentPoints      Int      @default(0)
+  isBlocked        Boolean  @default(false)
+  acceptedTerms    Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  predictions        Prediction[]
+  groupPredictions   GroupPrediction[]
+  bracketPredictions BracketPrediction[]
+  specialPredictions SpecialPrediction[]
+  bonuses            UserBonus[]
+  redemptions        PrizeRedemption[]
+  purchaseCodes           PurchaseCode[]
+  virtualAlbumInterests   VirtualAlbumInterest[]
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         String   @default("admin")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  auditLogs AuditLog[]
+}
+
+model WorldCupGroup {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teams            Team[]
+  matches          Match[]
+  groupPredictions GroupPrediction[]
+}
+
+model Team {
+  id         String  @id @default(cuid())
+  name       String
+  code       String  @unique
+  flagUrl    String?
+  groupId    String?
+  externalId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  group              WorldCupGroup?      @relation(fields: [groupId], references: [id])
+  homeMatches        Match[]             @relation("HomeTeam")
+  awayMatches        Match[]             @relation("AwayTeam")
+  wonMatches         Match[]             @relation("WinnerTeam")
+  groupFirsts        GroupPrediction[]   @relation("FirstTeam")
+  groupSeconds       GroupPrediction[]   @relation("SecondTeam")
+  bracketPredictions BracketPrediction[]
+}
+
+model Match {
+  id              String    @id @default(cuid())
+  externalId      String?
+  provider        String?
+  matchCode       String    @unique
+  phase           String
+  groupId         String?
+  homeTeamId      String?
+  awayTeamId      String?
+  homePlaceholder String?
+  awayPlaceholder String?
+  venue           String?
+  startDate       DateTime?
+  homeScore       Int?
+  awayScore       Int?
+  realOutcome     String?
+  winnerTeamId    String?
+  status          String    @default("scheduled")
+  lastSyncedAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  group       WorldCupGroup? @relation(fields: [groupId], references: [id])
+  homeTeam    Team?          @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam    Team?          @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  winnerTeam  Team?          @relation("WinnerTeam", fields: [winnerTeamId], references: [id])
+  predictions Prediction[]
+  events      MatchEvent[]
+}
+
+model Prediction {
+  id                    String    @id @default(cuid())
+  userId                String
+  matchId               String
+  predictedOutcome      String?
+  predictedWinnerTeamId String?
+  predictedHomeScore    Int?
+  predictedAwayScore    Int?
+  pointsEarned          Int       @default(0)
+  status                String    @default("editable")
+  lockedAt              DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id])
+  match Match @relation(fields: [matchId], references: [id])
+
+  @@unique([userId, matchId])
+}
+
+model GroupPrediction {
+  id           String    @id @default(cuid())
+  userId       String
+  groupId      String
+  firstTeamId  String?
+  secondTeamId String?
+  pointsEarned Int       @default(0)
+  isLocked     Boolean   @default(false)
+  lockedAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user       User          @relation(fields: [userId], references: [id])
+  group      WorldCupGroup @relation(fields: [groupId], references: [id])
+  firstTeam  Team?         @relation("FirstTeam", fields: [firstTeamId], references: [id])
+  secondTeam Team?         @relation("SecondTeam", fields: [secondTeamId], references: [id])
+
+  @@unique([userId, groupId])
+}
+
+model BracketPrediction {
+  id              String    @id @default(cuid())
+  userId          String
+  phase           String
+  matchSlot       String
+  predictedTeamId String?
+  pointsEarned    Int       @default(0)
+  isLocked        Boolean   @default(false)
+  lockedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user          User  @relation(fields: [userId], references: [id])
+  predictedTeam Team? @relation(fields: [predictedTeamId], references: [id])
+
+  @@unique([userId, phase, matchSlot])
+}
+
+model SpecialPrediction {
+  id             String   @id @default(cuid())
+  userId         String
+  type           String
+  predictedValue String
+  pointsEarned   Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, type])
+}
+
+model PointRule {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String
+  points    Int
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Prize {
+  id             String    @id @default(cuid())
+  name           String
+  description    String
+  imageUrl       String?
+  requiredPoints Int
+  stock          Int       @default(0)
+  sponsorId      String?
+  active         Boolean   @default(true)
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sponsor     Sponsor?         @relation(fields: [sponsorId], references: [id])
+  redemptions PrizeRedemption[]
+}
+
+model PrizeRedemption {
+  id          String   @id @default(cuid())
+  userId      String
+  prizeId     String
+  pointsSpent Int
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id])
+  prize Prize @relation(fields: [prizeId], references: [id])
+}
+
+model BonusAction {
+  id               String   @id @default(cuid())
+  name             String
+  description      String
+  points           Int
+  multiplier       Float    @default(1)
+  sponsorId        String?
+  requiresApproval Boolean  @default(true)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  sponsor     Sponsor?    @relation(fields: [sponsorId], references: [id])
+  userBonuses UserBonus[]
+}
+
+model UserBonus {
+  id            String   @id @default(cuid())
+  userId        String
+  bonusActionId String
+  status        String   @default("pending")
+  evidenceUrl   String?
+  pointsEarned  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user        User        @relation(fields: [userId], references: [id])
+  bonusAction BonusAction @relation(fields: [bonusActionId], references: [id])
+}
+
+model PurchaseCode {
+  id         String    @id @default(cuid())
+  code       String    @unique
+  type       String    @default("purchase")
+  points     Int
+  status     String    @default("available")
+  userId     String?
+  notes      String?
+  redeemedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+model VirtualAlbumInterest {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Sponsor {
+  id           String  @id @default(cuid())
+  name         String
+  logoUrl      String?
+  description  String?
+  websiteUrl   String?
+  instagramUrl String?
+  tiktokUrl    String?
+  youtubeUrl   String?
+  active       Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prizes       Prize[]
+  bonusActions BonusAction[]
+}
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SyncLog {
+  id             String   @id @default(cuid())
+  provider       String
+  action         String
+  endpoint       String?
+  status         String
+  message        String?
+  requestCount   Int      @default(0)
+  updatedMatches Int      @default(0)
+  createdAt      DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  action    String
+  entity    String
+  entityId  String?
+  createdAt DateTime @default(now())
+
+  admin AdminUser @relation(fields: [adminId], references: [id])
+}
+
+model Standing {
+  id             String   @id @default(cuid())
+  season         String
+  group          String
+  rank           Int
+  teamExternalId String
+  teamName       String
+  teamLogo       String?
+  points         Int      @default(0)
+  played         Int      @default(0)
+  won            Int      @default(0)
+  drawn          Int      @default(0)
+  lost           Int      @default(0)
+  goalsFor       Int      @default(0)
+  goalsAgainst   Int      @default(0)
+  goalsDiff      Int      @default(0)
+  form           String?
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
+
+  @@unique([season, group, teamExternalId])
+}
+
+model TopScorer {
+  id            String   @id @default(cuid())
+  season        String
+  externalId    String
+  rank          Int      @default(0)
+  name          String
+  photo         String?
+  teamName      String?
+  teamLogo      String?
+  goals         Int      @default(0)
+  assists       Int      @default(0)
+  gamesPlayed   Int      @default(0)
+  minutesPlayed Int      @default(0)
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+
+  @@unique([season, externalId])
+}
+
+model MatchEvent {
+  id         String   @id @default(cuid())
+  matchId    String
+  minute     Int?
+  extraTime  Int?
+  teamId     String?
+  teamName   String?
+  playerName String?
+  assistName String?
+  eventType  String
+  detail     String?
+  comments   String?
+  createdAt  DateTime @default(now())
+
+  match Match @relation(fields: [matchId], references: [id])
+}

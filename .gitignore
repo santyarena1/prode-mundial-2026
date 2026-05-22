@@ -39,3 +39,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
+
+# uploads de sponsors (mantener carpeta)
+/public/uploads/sponsors/*
+!/public/uploads/sponsors/.gitkeep
+.env*.local
+
+# Prisma local dev database
+prisma/dev.db
+prisma/dev.db-journal
+prisma/dev.db-shm
+prisma/dev.db-wal
