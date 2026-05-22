@@ -30,7 +30,7 @@ export function Logo({
   variant = "default",
 }: LogoProps) {
   const { width, height, className: sizeClass, pad } = sizes[size];
-  const src = variant === "hero" ? "/logo-hero.png" : "/logo.png";
+  const src = variant === "hero" ? "/logo-hero.png" : "/logo-color.jpg";
 
   const image = (
     <span className={`inline-flex items-center justify-center ${pad}`}>
@@ -40,7 +40,7 @@ export function Logo({
         width={width}
         height={height}
         unoptimized
-        className={`${sizeClass} object-contain bg-transparent ${className}`}
+        className={`${sizeClass} object-contain ${variant === "default" ? "rounded-lg" : "bg-transparent"} ${className}`}
         priority={priority}
       />
     </span>
