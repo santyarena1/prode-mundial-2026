@@ -51,11 +51,11 @@ interface Group {
 type Outcome = "home" | "away" | "draw";
 
 const ELIMINATORIAS_PHASES = [
-  { key: "ROUND_OF_32",    label: "16vos", fullLabel: "Ronda de 32",      slots: 16, icon: "⚽" },
-  { key: "ROUND_OF_16",    label: "8vos",  fullLabel: "Octavos de Final",  slots: 8,  icon: "🔥" },
-  { key: "QUARTER_FINALS", label: "4tos",  fullLabel: "Cuartos de Final",  slots: 4,  icon: "⚡" },
-  { key: "SEMI_FINALS",    label: "Semis", fullLabel: "Semifinales",        slots: 2,  icon: "🌟" },
-  { key: "CHAMPION",       label: "Final", fullLabel: "Campeón del Mundo", slots: 1,  icon: "🏆" },
+  { key: "ROUND_OF_32",    label: "16vos", fullLabel: "Ronda de 32",      slots: 16, icon: "⚽", pts: 200,  ptsLabel: "200 pts c/u" },
+  { key: "ROUND_OF_16",    label: "8vos",  fullLabel: "Octavos de Final",  slots: 8,  icon: "🔥", pts: 350,  ptsLabel: "350 pts c/u" },
+  { key: "QUARTER_FINALS", label: "4tos",  fullLabel: "Cuartos de Final",  slots: 4,  icon: "⚡", pts: 600,  ptsLabel: "600 pts c/u" },
+  { key: "SEMI_FINALS",    label: "Semis", fullLabel: "Semifinales",        slots: 2,  icon: "🌟", pts: 1000, ptsLabel: "1.000 pts c/u" },
+  { key: "CHAMPION",       label: "Final", fullLabel: "Campeón del Mundo", slots: 1,  icon: "🏆", pts: 3000, ptsLabel: "3.000 / 1.500 pts" },
 ];
 
 const formatDate = (dateStr?: string) => {
@@ -368,6 +368,29 @@ export default function PredictionsPage() {
         {/* ── PARTIDOS ─────────────────────────────────────────────────────── */}
         {activeTab === "matches" && (
           <div className="space-y-3">
+            {/* Points info */}
+            <div className="bg-[#0f1a0f] border border-green-500/20 rounded-xl p-4">
+              <p className="text-green-400 text-xs font-black uppercase tracking-widest mb-3">¿Cuántos puntos ganás?</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center gap-2 bg-[#111] border border-[#1e1e1e] rounded-lg px-3 py-2">
+                  <span className="text-lg leading-none">⚽</span>
+                  <div>
+                    <p className="text-white font-bold text-xs">Ganador / Perdedor</p>
+                    <p className="text-yellow-400 font-black text-sm">50 pts</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 bg-[#111] border border-[#1e1e1e] rounded-lg px-3 py-2">
+                  <span className="text-lg leading-none">🤝</span>
+                  <div>
+                    <p className="text-white font-bold text-xs">Empate exacto</p>
+                    <p className="text-yellow-400 font-black text-sm">80 pts</p>
+                  </div>
+                </div>
+              </div>
+              <p className="text-gray-700 text-[10px] mt-2 leading-relaxed">
+                El empate suma 80 pts (50 base + 30 bonus). Hay 48 partidos en fase de grupos.
+              </p>
+            </div>
             <div className="bg-[#161616] border border-[#222] rounded-xl p-4 mb-1">
               <p className="text-white text-sm font-bold mb-1">Plazo para predecir partidos</p>
               <p className="text-gray-500 text-xs leading-relaxed">
@@ -440,6 +463,31 @@ export default function PredictionsPage() {
         {/* ── GRUPOS ───────────────────────────────────────────────────────── */}
         {activeTab === "groups" && (
           <div className="space-y-4">
+            {/* Points info */}
+            <div className="bg-[#0f1a0f] border border-green-500/20 rounded-xl p-4">
+              <p className="text-green-400 text-xs font-black uppercase tracking-widest mb-3">¿Cuántos puntos ganás?</p>
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <div className="flex items-center gap-2 bg-[#111] border border-[#1e1e1e] rounded-lg px-3 py-2">
+                  <span className="text-lg leading-none">✅</span>
+                  <div>
+                    <p className="text-white font-bold text-xs">Equipo clasificado</p>
+                    <p className="text-yellow-400 font-black text-sm">120 pts</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 bg-[#111] border border-[#1e1e1e] rounded-lg px-3 py-2">
+                  <span className="text-lg leading-none">🥇</span>
+                  <div>
+                    <p className="text-white font-bold text-xs">Posición exacta</p>
+                    <p className="text-yellow-400 font-black text-sm">+180 pts</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-yellow-500/5 border border-yellow-500/15 rounded-lg px-3 py-2 text-xs text-yellow-300/70 leading-relaxed">
+                Ejemplo: si predecís que Argentina clasifica y queda <strong className="text-yellow-300">1°</strong> →
+                120 + 180 = <strong className="text-yellow-300">300 pts</strong> por ese equipo.
+                Hay 12 grupos con 2 clasificados c/u.
+              </div>
+            </div>
             <div className="bg-[#161616] border border-[#222] rounded-xl p-4">
               <p className="text-white text-sm font-bold mb-1">¿Cómo funciona?</p>
               <p className="text-gray-500 text-xs leading-relaxed">
@@ -653,10 +701,15 @@ export default function PredictionsPage() {
                         {currentPhase.icon}
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-white font-black text-lg leading-tight">{currentPhase.fullLabel}</h3>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-white font-black text-lg leading-tight">{currentPhase.fullLabel}</h3>
+                          <span className="bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            {currentPhase.ptsLabel}
+                          </span>
+                        </div>
                         <p className="text-gray-600 text-xs mt-0.5">
                           {currentPhase.key === "CHAMPION"
-                            ? "¿Quién va a levantar la Copa del Mundo 2026?"
+                            ? "Campeón: 3.000 pts · Subcampeón: 1.500 pts · Ambos exactos: +5.000 pts"
                             : `${savedInPhase} de ${currentPhase.slots} equipos guardados`}
                         </p>
                       </div>
@@ -715,6 +768,9 @@ export default function PredictionsPage() {
             </AnimatePresence>
           </div>
         )}
+        {/* ── LOGROS ─────────────────────────────────────────────────────────── */}
+        <AchievementsSection />
+
       </div>
 
       <Footer />
@@ -820,18 +876,33 @@ export default function PredictionsPage() {
                 </div>
                 <div className="space-y-3 mb-6">
                   {[
-                    { icon: "🏟️", title: "Partidos de Grupos", desc: "Predecí el resultado de cada partido: local (1), empate (X) o visitante (2). Tenés tiempo hasta el día anterior al partido; el día del encuentro ya no podés cargarlo." },
-                    { icon: "🥇", title: "Clasificados por Grupo", desc: "Para cada grupo, elegí qué equipo termina 1° y cuál 2°. Los dos primeros pasan a eliminatorias." },
-                    { icon: "🏆", title: "Eliminatorias", desc: "Predecí qué equipos avanzan ronda a ronda: 16vos → 8vos → 4tos → Semis → Campeón. Cada fase se desbloquea cuando terminás la anterior." },
+                    { icon: "🏟️", title: "Partidos de Grupos", pts: "50–80 pts c/u", desc: "Predecí el resultado: local (1), empate (X) o visitante (2). Ganador/perdedor: 50 pts. Empate exacto: 80 pts. ¡48 partidos para acertar!" },
+                    { icon: "🥇", title: "Clasificados por Grupo", pts: "120–300 pts c/u", desc: "Elegí qué equipo termina 1° y cuál 2° en cada grupo. 120 pts por clasificado correcto + 180 pts extra si acertás la posición exacta = 300 pts." },
+                    { icon: "🏆", title: "Eliminatorias", pts: "200 a 3.000 pts", desc: "Predecí quién avanza en cada fase. 16vos: 200 pts · 8vos: 350 · 4tos: 600 · Semis: 1.000 · Campeón: 3.000 pts." },
                   ].map(item => (
                     <div key={item.title} className="flex gap-4 p-4 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
                       <div className="w-10 h-10 rounded-xl bg-[#252525] flex items-center justify-center flex-shrink-0 text-xl">{item.icon}</div>
-                      <div>
-                        <p className="text-white font-bold text-sm">{item.title}</p>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-white font-bold text-sm">{item.title}</p>
+                          <span className="text-yellow-400 font-black text-[10px] bg-yellow-500/10 px-1.5 py-0.5 rounded">{item.pts}</span>
+                        </div>
                         <p className="text-gray-500 text-xs mt-1 leading-relaxed">{item.desc}</p>
                       </div>
                     </div>
                   ))}
+                  <div className="flex gap-4 p-4 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
+                    <div className="w-10 h-10 rounded-xl bg-[#252525] flex items-center justify-center flex-shrink-0 text-xl">🎯</div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-white font-bold text-sm">Logros automáticos</p>
+                        <span className="text-green-400 font-black text-[10px] bg-green-500/10 px-1.5 py-0.5 rounded">1.000 a 150.000 pts</span>
+                      </div>
+                      <p className="text-gray-500 text-xs mt-1 leading-relaxed">
+                        Si acertás muchos partidos o toda la llave, se desbloquean logros con puntos extra enormes. ¡Sin hacer nada especial, se calculan solos!
+                      </p>
+                    </div>
+                  </div>
                 </div>
                 <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6">
                   <div className="flex items-start gap-3">
@@ -854,6 +925,67 @@ export default function PredictionsPage() {
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── Achievements Section ─────────────────────────────────────────────────────
+
+const LOGROS = [
+  { icon: "🚀", name: "Buen arranque",         condition: "Acertar 10 partidos de grupos",                pts: "1.000" },
+  { icon: "📊", name: "Especialista de grupos", condition: "Acertar 35 partidos de grupos",               pts: "3.000" },
+  { icon: "🌍", name: "Experto mundialista",    condition: "Acertar 45 partidos de grupos",               pts: "7.500" },
+  { icon: "🤖", name: "Máquina de grupos",      condition: "Acertar 55 partidos de grupos",               pts: "15.000" },
+  { icon: "👁️", name: "Ojo clínico",            condition: "Acertar 18 clasificados de grupo",            pts: "5.000" },
+  { icon: "📋", name: "Tabla perfecta",         condition: "Acertar todos los 1° y 2° exactos",           pts: "20.000" },
+  { icon: "💪", name: "Bracket fuerte",         condition: "Acertar el 70% de eliminatorias",             pts: "10.000" },
+  { icon: "🎯", name: "Bracket perfecto",       condition: "Acertar toda la llave eliminatoria",          pts: "30.000" },
+  { icon: "💫", name: "Final soñada",           condition: "Acertar campeón y subcampeón",                pts: "5.000" },
+  { icon: "🏆", name: "Prode perfecto",         condition: "Acertar todo el prode completo",              pts: "150.000" },
+];
+
+function AchievementsSection() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-8 border border-[#1e1e1e] rounded-2xl overflow-hidden">
+      <button
+        onClick={() => setOpen(p => !p)}
+        className="w-full flex items-center justify-between px-5 py-4 bg-[#111] hover:bg-[#151515] transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-xl">🎯</span>
+          <div className="text-left">
+            <p className="text-white font-black text-sm uppercase tracking-wide">Logros del Prode</p>
+            <p className="text-gray-600 text-xs">Se calculan automáticamente — puntos extra enormes</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-green-400 font-black text-xs bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-full">10 logros</span>
+          {open ? <ChevronUp className="w-4 h-4 text-gray-600" /> : <ChevronDown className="w-4 h-4 text-gray-600" />}
+        </div>
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+            <div className="px-4 pb-4 pt-3 bg-[#0c0c0c] space-y-2">
+              <p className="text-gray-600 text-[11px] pb-1">
+                Los logros se calculan automáticamente cuando termina el torneo. No hace falta reclamarlos.
+              </p>
+              {LOGROS.map(logro => (
+                <div key={logro.name} className="flex items-center gap-3 px-3 py-2.5 bg-[#111] border border-[#1a1a1a] rounded-xl">
+                  <span className="text-xl leading-none w-7 text-center flex-shrink-0">{logro.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-bold text-xs">{logro.name}</p>
+                    <p className="text-gray-600 text-[10px] mt-0.5 leading-tight">{logro.condition}</p>
+                  </div>
+                  <span className="text-yellow-400 font-black text-sm tabular-nums flex-shrink-0">{logro.pts} pts</span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
