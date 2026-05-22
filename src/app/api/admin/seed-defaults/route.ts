@@ -52,6 +52,17 @@ export async function POST() {
       }
     }
 
+    // Remove outdated purchase code bonus actions (old 3-tier system)
+    const obsoleteNames = [
+      "Código compra chica",
+      "Código compra media",
+      "Código compra mediana",
+      "Código compra grande",
+    ];
+    const deleted = await prisma.bonusAction.deleteMany({
+      where: { name: { in: obsoleteNames } },
+    });
+
     let bonusCreated = 0;
     for (const bonus of DEFAULT_BONUS_ACTIONS) {
       const existing = await prisma.bonusAction.findFirst({ where: { name: bonus.name } });
@@ -65,7 +76,8 @@ export async function POST() {
       success: true,
       prizes: prizesCreated,
       bonusActions: bonusCreated,
-      message: `Creados: ${prizesCreated} premios nuevos, ${bonusCreated} acciones de bonus nuevas (existentes no modificados).`,
+      deletedObsolete: deleted.count,
+      message: `Creados: ${prizesCreated} premios nuevos, ${bonusCreated} bonus nuevos. Eliminados: ${deleted.count} bonus obsoletos.`,
     });
   } catch (error) {
     console.error("Seed defaults error:", error);
