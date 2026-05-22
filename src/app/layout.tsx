@@ -9,6 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://prode-mundial-2026-ten-blue.vercel.app"),
   title: "Prode Mundial Gamer 2026 | The Gamer Shop",
   description: "Predecí los resultados del Mundial 2026, acumulá puntos y ganá premios increíbles con The Gamer Shop.",
   icons: {
@@ -20,6 +21,8 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Prode Mundial Gamer 2026 | The Gamer Shop",
     description: "Predecí, competí y ganá premios. El prode gamer del Mundial 2026.",
+    url: "https://prode-mundial-2026-ten-blue.vercel.app",
+    siteName: "Prode Mundial Gamer 2026",
     type: "website",
     locale: "es_AR",
     images: [
