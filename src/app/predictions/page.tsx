@@ -886,63 +886,111 @@ export default function PredictionsPage() {
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/85 z-50 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 24 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 24 }} transition={{ duration: 0.25, ease: "easeOut" }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-              <div className="bg-[#111] border border-[#2a2a2a] rounded-2xl shadow-2xl max-w-lg w-full p-6 pointer-events-auto overflow-y-auto max-h-[90vh]">
-                <div className="text-center mb-6">
-                  <div className="text-5xl mb-3">⚽</div>
-                  <h2 className="text-white font-black text-2xl uppercase tracking-wide">¡Bienvenido al Prode!</h2>
-                  <p className="text-gray-500 text-sm mt-1">Leé cómo funciona antes de empezar</p>
+            <motion.div
+              initial={{ opacity: 0, y: "100%" }} animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: "100%" }} transition={{ duration: 0.3, ease: "easeOut" }}
+              className="fixed bottom-0 left-0 right-0 z-50 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4"
+            >
+              <div className="bg-[#111] border border-[#2a2a2a] rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md flex flex-col max-h-[92vh] sm:max-h-[88vh]">
+
+                {/* Handle bar (mobile) */}
+                <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
+                  <div className="w-10 h-1 bg-[#333] rounded-full" />
                 </div>
-                <div className="space-y-3 mb-6">
-                  {[
-                    { icon: "🏟️", title: "Partidos de Grupos", pts: "150–250 pts c/u", desc: "Predecí el resultado: local (1), empate (X) o visitante (2). Ganador/perdedor: 150 pts. Empate exacto: 250 pts. ¡48 partidos para acertar!" },
-                    { icon: "🥇", title: "Clasificados por Grupo", pts: "400–1.000 pts c/u", desc: "Elegí qué equipo termina 1° y cuál 2° en cada grupo. 400 pts por clasificado correcto + 600 pts extra si acertás la posición exacta = 1.000 pts." },
-                    { icon: "🏆", title: "Eliminatorias", pts: "700 a 10.000 pts", desc: "Predecí quién avanza en cada fase. 16vos: 700 pts · 8vos: 1.200 · 4tos: 2.000 · Semis: 3.500 · Campeón: 10.000 pts." },
-                  ].map(item => (
-                    <div key={item.title} className="flex gap-4 p-4 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
-                      <div className="w-10 h-10 rounded-xl bg-[#252525] flex items-center justify-center flex-shrink-0 text-xl">{item.icon}</div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
+
+                {/* Header */}
+                <div className="text-center px-5 pt-3 pb-4 flex-shrink-0">
+                  <div className="text-4xl mb-2">⚽</div>
+                  <h2 className="text-white font-black text-xl uppercase tracking-wide">¡Bienvenido al Prode!</h2>
+                  <p className="text-gray-500 text-sm mt-1">Así se ganan puntos</p>
+                </div>
+
+                {/* Scrollable content */}
+                <div className="overflow-y-auto flex-1 px-4 pb-2">
+                  {/* Cards */}
+                  <div className="space-y-2 mb-4">
+                    {[
+                      {
+                        icon: "🏟️",
+                        title: "Partidos de grupos",
+                        rows: [
+                          { label: "Acertar ganador o perdedor", pts: "150 pts" },
+                          { label: "Acertar empate exacto",       pts: "250 pts" },
+                        ],
+                        note: "48 partidos en fase de grupos",
+                      },
+                      {
+                        icon: "🥇",
+                        title: "Clasificados por grupo",
+                        rows: [
+                          { label: "Equipo que clasifica",        pts: "400 pts" },
+                          { label: "Posición exacta (1° o 2°)",   pts: "+600 pts" },
+                        ],
+                        note: "Máximo 1.000 pts por equipo · 12 grupos",
+                      },
+                      {
+                        icon: "🏆",
+                        title: "Eliminatorias",
+                        rows: [
+                          { label: "Ronda de 32",  pts: "700 pts" },
+                          { label: "Octavos",      pts: "1.200 pts" },
+                          { label: "Cuartos",      pts: "2.000 pts" },
+                          { label: "Semifinal",    pts: "3.500 pts" },
+                          { label: "Campeón 🏆",   pts: "10.000 pts" },
+                        ],
+                        note: null,
+                      },
+                    ].map(item => (
+                      <div key={item.title} className="bg-[#1a1a1a] border border-[#252525] rounded-2xl overflow-hidden">
+                        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[#252525]">
+                          <span className="text-xl leading-none">{item.icon}</span>
                           <p className="text-white font-bold text-sm">{item.title}</p>
-                          <span className="text-yellow-400 font-black text-[10px] bg-yellow-500/10 px-1.5 py-0.5 rounded">{item.pts}</span>
                         </div>
-                        <p className="text-gray-500 text-xs mt-1 leading-relaxed">{item.desc}</p>
+                        <div className="px-4 py-2.5 space-y-2">
+                          {item.rows.map(row => (
+                            <div key={row.label} className="flex items-center justify-between gap-3">
+                              <span className="text-gray-400 text-sm">{row.label}</span>
+                              <span className="text-yellow-400 font-black text-sm tabular-nums shrink-0">{row.pts}</span>
+                            </div>
+                          ))}
+                          {item.note && (
+                            <p className="text-gray-700 text-xs pt-1 border-t border-[#252525]">{item.note}</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  <div className="flex gap-4 p-4 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
-                    <div className="w-10 h-10 rounded-xl bg-[#252525] flex items-center justify-center flex-shrink-0 text-xl">🎯</div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
+                    ))}
+
+                    {/* Logros */}
+                    <div className="bg-[#0f1a0f] border border-green-500/15 rounded-2xl px-4 py-3 flex items-center gap-3">
+                      <span className="text-2xl leading-none flex-shrink-0">🎯</span>
+                      <div className="flex-1 min-w-0">
                         <p className="text-white font-bold text-sm">Logros automáticos</p>
-                        <span className="text-green-400 font-black text-[10px] bg-green-500/10 px-1.5 py-0.5 rounded">2.000 a 250.000 pts</span>
+                        <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">
+                          Si acertás muchos partidos o la llave entera, se suman logros con puntos extra enormes (hasta 250.000 pts).
+                        </p>
                       </div>
-                      <p className="text-gray-500 text-xs mt-1 leading-relaxed">
-                        Si acertás muchos partidos o toda la llave, se desbloquean logros con puntos extra enormes. ¡Sin hacer nada especial, se calculan solos!
-                      </p>
                     </div>
                   </div>
-                </div>
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6">
-                  <div className="flex items-start gap-3">
+
+                  {/* Warning */}
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl px-4 py-3 flex items-start gap-3 mb-4">
                     <Lock className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-amber-300 text-sm font-bold">Las predicciones se bloquean al confirmar</p>
-                      <p className="text-amber-500/80 text-xs mt-1 leading-relaxed">
-                        Una vez confirmadas no podés cambiarlas. Para modificarlas necesitás canjear un{" "}
-                        <strong className="text-amber-400">Cambio de predicción ({changeCost} pts)</strong>.
-                      </p>
-                    </div>
+                    <p className="text-amber-300/90 text-sm leading-relaxed">
+                      Las predicciones se <strong className="text-amber-300">bloquean al confirmar</strong>.
+                      Para cambiarlas canjear un <strong className="text-amber-300">Cambio ({changeCost} pts)</strong>.
+                    </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => { sessionStorage.setItem("pred_onboarding_seen", "1"); setShowOnboarding(false); }}
-                  className="w-full py-3.5 px-6 bg-red-600 hover:bg-red-500 active:scale-95 text-white font-black text-sm uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-red-500/20"
-                >
-                  ¡Entendido, a predecir! ⚽
-                </button>
+
+                {/* CTA */}
+                <div className="px-4 pb-6 pt-2 flex-shrink-0">
+                  <button
+                    onClick={() => { sessionStorage.setItem("pred_onboarding_seen", "1"); setShowOnboarding(false); }}
+                    className="w-full py-4 px-6 bg-red-600 hover:bg-red-500 active:scale-95 text-white font-black text-base uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-red-500/20"
+                  >
+                    ¡A predecir! ⚽
+                  </button>
+                </div>
               </div>
             </motion.div>
           </>
