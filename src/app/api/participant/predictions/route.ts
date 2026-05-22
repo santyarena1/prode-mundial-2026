@@ -45,7 +45,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Validation error", details: parsed.error.issues }, { status: 400 });
     }
 
-    const { matchId, ...rest } = parsed.data;
+    const { matchId, predictedHomeScore, predictedAwayScore, ...rest } = parsed.data;
+
+    // Infer outcome from scores when in hardcore mode
+    let predictedOutcome = rest.predictedOutcome;
+    if (predictedHomeScore !== undefined && predictedAwayScore !== undefined && !predictedOutcome) {
+      if (predictedHomeScore > predictedAwayScore) predictedOutcome = "home";
+      else if (predictedAwayScore > predictedHomeScore) predictedOutcome = "away";
+      else predictedOutcome = "draw";
+    }
 
     const match = await prisma.match.findUnique({ where: { id: matchId } });
     if (!match) return NextResponse.json({ error: "Partido no encontrado" }, { status: 404 });
@@ -69,8 +77,8 @@ export async function POST(request: NextRequest) {
 
     const prediction = await prisma.prediction.upsert({
       where: { userId_matchId: { userId: auth.userId, matchId } },
-      update: { ...rest, status: "locked", lockedAt: now },
-      create: { userId: auth.userId, matchId, ...rest, status: "locked", lockedAt: now },
+      update: { ...rest, predictedOutcome, predictedHomeScore, predictedAwayScore, status: "locked", lockedAt: now },
+      create: { userId: auth.userId, matchId, ...rest, predictedOutcome, predictedHomeScore, predictedAwayScore, status: "locked", lockedAt: now },
     });
 
     return NextResponse.json({ prediction });

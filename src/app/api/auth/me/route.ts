@@ -18,6 +18,7 @@ export async function GET() {
         email: true,
         phone: true,
         instagram: true,
+        hardcoreMode: true,
         totalPoints: true,
         predictionPoints: true,
         bonusPoints: true,

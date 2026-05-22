@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Lock, CheckCircle2, ChevronDown, ChevronUp,
-  Trophy, Target, Users, AlertTriangle, X, Save, Gift, Search, Zap,
+  Trophy, Target, Users, AlertTriangle, X, Save, Gift, Search, Zap, Flame,
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -93,6 +93,11 @@ export default function PredictionsPage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showPointsModal, setShowPointsModal] = useState(false);
 
+  const [hardcoreMode, setHardcoreMode] = useState(false);
+  const [togglingHardcore, setTogglingHardcore] = useState(false);
+  const [pendingScores, setPendingScores] = useState<Record<string, { home?: number; away?: number }>>({});
+  const [savedScores, setSavedScores] = useState<Record<string, { home: number; away: number }>>({});
+
   // Team selection modal for bracket picks
   const [selectionModal, setSelectionModal] = useState<{ phase: string; slot: string } | null>(null);
 
@@ -100,6 +105,8 @@ export default function PredictionsPage() {
     const init = async () => {
       const meRes = await apiFetch("/api/auth/me");
       if (!meRes.ok) { router.replace("/login"); return; }
+      const meData = await meRes.json();
+      if (meData.user?.hardcoreMode) setHardcoreMode(true);
 
       const [groupsRes, predRes, groupPredRes, bracketRes, changeRes] = await Promise.all([
         fetch("/api/public/groups"),
@@ -128,9 +135,16 @@ export default function PredictionsPage() {
 
       if (predRes.ok) {
         const data = await predRes.json();
-        for (const p of data.predictions || [])
+        const scores: Record<string, { home: number; away: number }> = {};
+        for (const p of data.predictions || []) {
           if (p.predictedOutcome && p.status === "locked") sp[p.matchId] = p.predictedOutcome;
+          if (p.predictedHomeScore !== null && p.predictedHomeScore !== undefined &&
+              p.predictedAwayScore !== null && p.predictedAwayScore !== undefined) {
+            scores[p.matchId] = { home: p.predictedHomeScore, away: p.predictedAwayScore };
+          }
+        }
         setSavedPreds(sp);
+        setSavedScores(scores);
       }
 
       if (groupPredRes.ok) {
@@ -209,24 +223,44 @@ export default function PredictionsPage() {
     setSavingGroup(prev => ({ ...prev, [groupId]: true }));
     let ok = 0;
     for (const match of matches) {
-      const outcome = pendingPreds[match.id];
-      if (!outcome || savedPreds[match.id]) continue;
+      if (savedPreds[match.id]) continue;
       if (!isMatchPredictionWindowOpen(match.startDate)) continue;
-      try {
-        const res = await apiFetch("/api/participant/predictions", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ matchId: match.id, predictedOutcome: outcome }),
-        });
-        if (res.ok) {
-          setSavedPreds(prev => ({ ...prev, [match.id]: outcome }));
-          setPendingPreds(prev => { const n = { ...prev }; delete n[match.id]; return n; });
-          ok++;
-        } else { const d = await res.json(); toast.error(d.error || "Error"); }
-      } catch { toast.error("Error de conexión"); }
+
+      if (hardcoreMode) {
+        const score = pendingScores[match.id];
+        if (score?.home === undefined || score?.away === undefined) continue;
+        try {
+          const res = await apiFetch("/api/participant/predictions", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ matchId: match.id, predictedHomeScore: score.home, predictedAwayScore: score.away }),
+          });
+          if (res.ok) {
+            const outcome = score.home > score.away ? "home" : score.away > score.home ? "away" : "draw";
+            setSavedPreds(prev => ({ ...prev, [match.id]: outcome as Outcome }));
+            setSavedScores(prev => ({ ...prev, [match.id]: { home: score.home!, away: score.away! } }));
+            setPendingScores(prev => { const n = { ...prev }; delete n[match.id]; return n; });
+            ok++;
+          } else { const d = await res.json(); toast.error(d.error || "Error"); }
+        } catch { toast.error("Error de conexión"); }
+      } else {
+        const outcome = pendingPreds[match.id];
+        if (!outcome) continue;
+        try {
+          const res = await apiFetch("/api/participant/predictions", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ matchId: match.id, predictedOutcome: outcome }),
+          });
+          if (res.ok) {
+            setSavedPreds(prev => ({ ...prev, [match.id]: outcome }));
+            setPendingPreds(prev => { const n = { ...prev }; delete n[match.id]; return n; });
+            ok++;
+          } else { const d = await res.json(); toast.error(d.error || "Error"); }
+        } catch { toast.error("Error de conexión"); }
+      }
     }
     if (ok > 0) toast.success(`${ok} predicción${ok > 1 ? "es" : ""} confirmada${ok > 1 ? "s" : ""} ✓`);
     setSavingGroup(prev => ({ ...prev, [groupId]: false }));
-  }, [pendingPreds, savedPreds]);
+  }, [pendingPreds, pendingScores, savedPreds, hardcoreMode]);
 
   const handleToggleGroupTeam = useCallback((groupId: string, teamId: string) => {
     if (savedGroupPreds[groupId]) return;
@@ -289,6 +323,30 @@ export default function PredictionsPage() {
     setSavingBracket(false);
   }, [pendingBracket, savedBracket, activeElimTab]);
 
+  const handleToggleHardcore = useCallback(async () => {
+    setTogglingHardcore(true);
+    try {
+      const newVal = !hardcoreMode;
+      const res = await apiFetch("/api/participant/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hardcoreMode: newVal }),
+      });
+      if (!res.ok) { toast.error("Error al cambiar modo"); return; }
+      setHardcoreMode(newVal);
+      toast.success(newVal ? "🔥 Modo Hardcore activado" : "Modo normal activado");
+    } catch { toast.error("Error de conexión"); }
+    finally { setTogglingHardcore(false); }
+  }, [hardcoreMode]);
+
+  const handlePickScore = useCallback((matchId: string, side: "home" | "away", value: number) => {
+    if (savedPreds[matchId]) return;
+    setPendingScores(prev => ({
+      ...prev,
+      [matchId]: { ...prev[matchId], [side]: value },
+    }));
+  }, [savedPreds]);
+
   const handleBuyChange = useCallback(async () => {
     setBuyingChange(true);
     try {
@@ -330,15 +388,43 @@ export default function PredictionsPage() {
             </h1>
             <p className="text-gray-500 mt-1">Predecí resultados, clasificados y campeón</p>
           </div>
-          <button
-            onClick={() => setShowPointsModal(true)}
-            className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 rounded-xl text-yellow-400 text-xs font-bold uppercase tracking-wider transition-colors"
-          >
-            <Zap className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Puntos y logros</span>
-            <span className="sm:hidden">Pts</span>
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={handleToggleHardcore}
+              disabled={togglingHardcore}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all ${
+                hardcoreMode
+                  ? "bg-orange-500/20 border-orange-500/50 text-orange-400 hover:bg-orange-500/30"
+                  : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-500 hover:border-[#3a3a3a] hover:text-gray-300"
+              }`}
+            >
+              <Flame className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{hardcoreMode ? "Hardcore ON" : "Hardcore"}</span>
+            </button>
+            <button
+              onClick={() => setShowPointsModal(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 rounded-xl text-yellow-400 text-xs font-bold uppercase tracking-wider transition-colors"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Puntos y logros</span>
+              <span className="sm:hidden">Pts</span>
+            </button>
+          </div>
         </div>
+
+        {/* Hardcore banner */}
+        {hardcoreMode && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+            className="mb-5 bg-orange-500/10 border border-orange-500/25 rounded-xl px-4 py-3 flex items-center gap-3">
+            <Flame className="w-4 h-4 text-orange-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-orange-300 text-sm font-bold">Modo Hardcore activo</p>
+              <p className="text-orange-500/70 text-xs mt-0.5">
+                Predecí el marcador exacto de cada partido. Si acertás, sumás <span className="text-orange-300 font-bold">+150 pts extra</span> por encima del resultado.
+              </p>
+            </div>
+          </motion.div>
+        )}
 
         {/* Disclaimer */}
         <div className="mb-5 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex gap-3 items-start">
@@ -400,6 +486,7 @@ export default function PredictionsPage() {
               </div>
               <p className="text-gray-700 text-[10px] mt-2 leading-relaxed">
                 El empate suma 250 pts (150 base + 100 bonus). Hay 48 partidos en fase de grupos.
+                {hardcoreMode && <span className="text-orange-700"> · Modo Hardcore: +150 pts extra por marcador exacto.</span>}
               </p>
             </div>
             <div className="bg-[#161616] border border-[#222] rounded-xl p-4 mb-1">
@@ -412,7 +499,14 @@ export default function PredictionsPage() {
             </div>
             {groups.length === 0 && <div className="p-8 text-center text-gray-500">No hay partidos disponibles aún.</div>}
             {groups.map(group => {
-              const pendingCount = group.matches.filter(m => pendingPreds[m.id] && !savedPreds[m.id]).length;
+              const pendingCount = group.matches.filter(m => {
+                if (savedPreds[m.id]) return false;
+                if (hardcoreMode) {
+                  const s = pendingScores[m.id];
+                  return s?.home !== undefined && s?.away !== undefined;
+                }
+                return !!pendingPreds[m.id];
+              }).length;
               const savedCount = group.matches.filter(m => savedPreds[m.id]).length;
               const allSaved = savedCount === group.matches.length;
               return (
@@ -449,7 +543,16 @@ export default function PredictionsPage() {
                         <div className="px-4 pb-4 space-y-2 border-t border-[#1a1a1a] pt-3">
                           {group.matches.map((match, idx) => (
                             <motion.div key={match.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
-                              <MatchCard match={match} saved={savedPreds[match.id]} pending={pendingPreds[match.id]} onPick={handlePickMatch} />
+                              <MatchCard
+                                match={match}
+                                saved={savedPreds[match.id]}
+                                pending={pendingPreds[match.id]}
+                                hardcoreMode={hardcoreMode}
+                                pendingScore={pendingScores[match.id]}
+                                savedScore={savedScores[match.id]}
+                                onPick={handlePickMatch}
+                                onPickScore={handlePickScore}
+                              />
                             </motion.div>
                           ))}
                           {pendingCount > 0 && (
@@ -1023,6 +1126,7 @@ const POINTS_TABLE = [
   { section: "Partidos de grupos", items: [
     { label: "Acertar ganador o perdedor",        pts: "150",    note: "48 partidos en grupos" },
     { label: "Acertar empate exacto",             pts: "250",    note: "(150 + 100 bonus empate)" },
+    { label: "🔥 Bonus marcador exacto (Hardcore)", pts: "+150", note: "se suma al resultado acertado" },
   ]},
   { section: "Clasificados de grupo", items: [
     { label: "Acertar equipo clasificado",        pts: "400",    note: "por cada clasificado" },
@@ -1192,9 +1296,17 @@ function PointsAndAchievementsModal({
 
 // ─── Match Card ───────────────────────────────────────────────────────────────
 
-function MatchCard({ match, saved, pending, onPick }: {
-  match: Match; saved?: Outcome; pending?: Outcome;
+function MatchCard({
+  match, saved, pending, hardcoreMode, pendingScore, savedScore, onPick, onPickScore,
+}: {
+  match: Match;
+  saved?: Outcome;
+  pending?: Outcome;
+  hardcoreMode: boolean;
+  pendingScore?: { home?: number; away?: number };
+  savedScore?: { home: number; away: number };
   onPick: (matchId: string, outcome: Outcome) => void;
+  onPickScore: (matchId: string, side: "home" | "away", value: number) => void;
 }) {
   const isLocked = !!saved;
   const matchStarted = match.status === "live" || match.status === "finished";
@@ -1204,24 +1316,32 @@ function MatchCard({ match, saved, pending, onPick }: {
   const isReadOnly = matchStarted || isLocked || !windowOpen || match.status !== "scheduled";
   const homeName = match.homeTeam?.name || match.homePlaceholder || "TBD";
   const awayName = match.awayTeam?.name || match.awayPlaceholder || "TBD";
+  const homeCode = match.homeTeam?.code || "LOC";
+  const awayCode = match.awayTeam?.code || "VIS";
 
-  const outcomes: { key: Outcome; short: string; label: string }[] = [
-    { key: "home", short: "1", label: "Local"  },
-    { key: "draw", short: "X", label: "Empate" },
-    { key: "away", short: "2", label: "Visita" },
-  ];
+  const hasPendingScore = pendingScore?.home !== undefined && pendingScore?.away !== undefined;
+  const inferredOutcome = hasPendingScore
+    ? pendingScore!.home! > pendingScore!.away! ? "home"
+    : pendingScore!.away! > pendingScore!.home! ? "away"
+    : "draw"
+    : null;
+
   const pendingColors: Record<Outcome, string> = {
     home: "bg-red-600/30 border-red-500/60 text-red-300",
     draw: "bg-amber-500/30 border-amber-500/60 text-amber-300",
     away: "bg-blue-600/30 border-blue-500/60 text-blue-300",
   };
+  const outcomeLabel: Record<Outcome, string> = {
+    home: `Gana ${homeCode}`, draw: "Empate", away: `Gana ${awayCode}`,
+  };
 
   return (
     <div className={`rounded-xl border overflow-hidden transition-all ${
       isLocked ? "border-green-500/20 bg-[#0d110d]" :
-      pending  ? "border-amber-500/20 bg-amber-500/5" :
+      (pending || hasPendingScore) ? "border-amber-500/20 bg-amber-500/5" :
       "border-[#1d1d1d] bg-[#141414]"
     }`}>
+      {/* Teams row */}
       <div className="flex items-center gap-2 px-4 py-3">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {match.homeTeam?.flagUrl
@@ -1252,40 +1372,108 @@ function MatchCard({ match, saved, pending, onPick }: {
           }
         </div>
       </div>
+
       {deadlineHint && !isLocked && (
         <p className="px-4 -mt-1 pb-1 text-[10px] text-gray-600 text-center">{deadlineHint}</p>
       )}
       {closedReason && !isLocked && !matchStarted && (
         <p className="px-4 pb-2 text-[10px] text-red-400/80 text-center">{closedReason}</p>
       )}
-      <div className="px-4 pb-3 flex gap-1.5">
-        {outcomes.map(o => {
-          const isSelected = (saved || pending) === o.key;
-          if (isReadOnly) {
-            return (
-              <div key={o.key} className={`flex-1 py-2 rounded-lg text-center border ${
-                isSelected ? "bg-green-600/20 border-green-500/40 text-green-400" : "bg-[#111] border-[#1a1a1a] text-gray-800"
-              }`}>
-                <span className="block text-[10px] font-black">{o.short}</span>
-                <span className="block text-[8px] uppercase tracking-wider mt-0.5 opacity-75">{o.label}</span>
-                {isSelected && isLocked && <Lock className="w-2 h-2 mx-auto mt-0.5 opacity-50" />}
-                {isSelected && !isLocked && !windowOpen && (
-                  <Lock className="w-2 h-2 mx-auto mt-0.5 opacity-50 text-red-400/60" />
-                )}
+
+      {/* ── HARDCORE: score inputs ── */}
+      {hardcoreMode ? (
+        <div className="px-4 pb-3">
+          {isLocked && savedScore ? (
+            <div className="flex items-center justify-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 text-[10px] font-bold uppercase">{homeCode}</span>
+                <div className="w-10 h-9 rounded-lg bg-green-600/15 border border-green-500/30 flex items-center justify-center">
+                  <span className="text-green-400 font-black text-lg">{savedScore.home}</span>
+                </div>
               </div>
+              <span className="text-gray-700 font-black text-sm">—</span>
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-9 rounded-lg bg-green-600/15 border border-green-500/30 flex items-center justify-center">
+                  <span className="text-green-400 font-black text-lg">{savedScore.away}</span>
+                </div>
+                <span className="text-gray-500 text-[10px] font-bold uppercase">{awayCode}</span>
+              </div>
+              <Lock className="w-3 h-3 text-green-700 ml-1" />
+            </div>
+          ) : isReadOnly ? (
+            <div className="flex items-center justify-center gap-2 py-1">
+              <span className="text-gray-700 text-xs">Sin predicción de marcador</span>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 text-[10px] font-bold uppercase">{homeCode}</span>
+                  <input
+                    type="number" min={0} max={30}
+                    value={pendingScore?.home ?? ""}
+                    onChange={e => onPickScore(match.id, "home", Math.max(0, Math.min(30, parseInt(e.target.value) || 0)))}
+                    placeholder="0"
+                    className="w-12 h-10 rounded-lg bg-[#1a1a1a] border border-[#333] text-white text-center font-black text-lg focus:outline-none focus:border-orange-500/70 transition-colors"
+                  />
+                </div>
+                <span className="text-gray-700 font-black text-sm">—</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" min={0} max={30}
+                    value={pendingScore?.away ?? ""}
+                    onChange={e => onPickScore(match.id, "away", Math.max(0, Math.min(30, parseInt(e.target.value) || 0)))}
+                    placeholder="0"
+                    className="w-12 h-10 rounded-lg bg-[#1a1a1a] border border-[#333] text-white text-center font-black text-lg focus:outline-none focus:border-orange-500/70 transition-colors"
+                  />
+                  <span className="text-gray-500 text-[10px] font-bold uppercase">{awayCode}</span>
+                </div>
+              </div>
+              {inferredOutcome && (
+                <p className={`text-center text-[10px] font-bold mt-1.5 ${
+                  inferredOutcome === "draw" ? "text-amber-500/80" :
+                  inferredOutcome === "home" ? "text-red-400/80" : "text-blue-400/80"
+                }`}>
+                  → {outcomeLabel[inferredOutcome]}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      ) : (
+        /* ── NORMAL: outcome buttons ── */
+        <div className="px-4 pb-3 flex gap-1.5">
+          {(["home", "draw", "away"] as Outcome[]).map(key => {
+            const isSelected = (saved || pending) === key;
+            const labels: Record<Outcome, { short: string; label: string }> = {
+              home: { short: homeCode, label: "Local" },
+              draw: { short: "EMP", label: "Empate" },
+              away: { short: awayCode, label: "Visita" },
+            };
+            const l = labels[key];
+            if (isReadOnly) {
+              return (
+                <div key={key} className={`flex-1 py-2 rounded-lg text-center border ${
+                  isSelected ? "bg-green-600/20 border-green-500/40 text-green-400" : "bg-[#111] border-[#1a1a1a] text-gray-800"
+                }`}>
+                  <span className="block text-[10px] font-black">{l.short}</span>
+                  <span className="block text-[8px] uppercase tracking-wider mt-0.5 opacity-75">{l.label}</span>
+                  {isSelected && isLocked && <Lock className="w-2 h-2 mx-auto mt-0.5 opacity-50" />}
+                </div>
+              );
+            }
+            return (
+              <motion.button key={key} whileTap={{ scale: 0.92 }} onClick={() => onPick(match.id, key)}
+                className={`flex-1 py-2.5 rounded-lg text-center border transition-all ${
+                  pending === key ? pendingColors[key] : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-500 hover:border-[#3a3a3a] hover:text-gray-300"
+                }`}>
+                <span className="block text-xs font-black">{l.short}</span>
+                <span className="block text-[8px] uppercase tracking-wider mt-0.5 font-medium opacity-75">{l.label}</span>
+              </motion.button>
             );
-          }
-          return (
-            <motion.button key={o.key} whileTap={{ scale: 0.92 }} onClick={() => onPick(match.id, o.key)}
-              className={`flex-1 py-2.5 rounded-lg text-center border transition-all ${
-                pending === o.key ? pendingColors[o.key] : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-500 hover:border-[#3a3a3a] hover:text-gray-300"
-              }`}>
-              <span className="block text-xs font-black">{o.short}</span>
-              <span className="block text-[8px] uppercase tracking-wider mt-0.5 font-medium opacity-75">{o.label}</span>
-            </motion.button>
-          );
-        })}
-      </div>
+          })}
+        </div>
+      )}
     </div>
   );
 }

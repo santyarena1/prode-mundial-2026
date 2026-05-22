@@ -21,6 +21,7 @@ model User {
   bonusPoints       Int      @default(0)
   achievementPoints Int      @default(0)
   spentPoints       Int      @default(0)
+  hardcoreMode      Boolean  @default(false)
   isBlocked         Boolean  @default(false)
   acceptedTerms     Boolean  @default(false)
   registrationIp    String?

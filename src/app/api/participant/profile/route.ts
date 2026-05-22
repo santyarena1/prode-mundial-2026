@@ -9,6 +9,7 @@ const updateSchema = z.object({
     .max(64)
     .optional()
     .transform((v) => (v === undefined ? undefined : v.trim() || null)),
+  hardcoreMode: z.boolean().optional(),
 });
 
 export async function PATCH(request: NextRequest) {
@@ -24,14 +25,18 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
     }
 
-    const { instagram } = parsed.data;
-    if (instagram === undefined) {
+    const { instagram, hardcoreMode } = parsed.data;
+    if (instagram === undefined && hardcoreMode === undefined) {
       return NextResponse.json({ error: "Nada para actualizar" }, { status: 400 });
     }
 
+    const data: Record<string, unknown> = {};
+    if (instagram !== undefined) data.instagram = instagram;
+    if (hardcoreMode !== undefined) data.hardcoreMode = hardcoreMode;
+
     const user = await prisma.user.update({
       where: { id: auth.userId },
-      data: { instagram },
+      data,
       select: {
         id: true,
         firstName: true,
@@ -39,6 +44,7 @@ export async function PATCH(request: NextRequest) {
         email: true,
         phone: true,
         instagram: true,
+        hardcoreMode: true,
         totalPoints: true,
         predictionPoints: true,
         bonusPoints: true,
