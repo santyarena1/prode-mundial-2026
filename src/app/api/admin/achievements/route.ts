@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getAdminFromCookies } from "@/lib/cookies";
 import { DEFAULT_ACHIEVEMENTS, DEFAULT_POINT_RULES } from "@/lib/points";
@@ -20,10 +20,13 @@ export async function GET() {
 }
 
 // Seed/upsert all achievement rules and update point rules to new values
-export async function POST() {
-  try {
+export async function POST(request: NextRequest) {
+  const applySecret = request.headers.get("x-apply-secret");
+  const isValidSecret = applySecret && applySecret === process.env.APPLY_SECRET;
+  if (!isValidSecret) {
     const auth = await getAdminFromCookies();
     if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
     // Upsert point rules with new values
     for (const [key, rule] of Object.entries(DEFAULT_POINT_RULES)) {
