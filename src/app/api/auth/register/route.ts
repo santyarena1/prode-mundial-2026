@@ -18,6 +18,17 @@ const registerSchema = z.object({
   }),
 });
 
+function getClientIp(request: NextRequest): string {
+  return (
+    request.headers.get("x-real-ip") ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown"
+  );
+}
+
+const MAX_ACCOUNTS_PER_IP = 3;
+const RATE_WINDOW_HOURS = 24;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -30,11 +41,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const ip = getClientIp(request);
+
+    // Rate limit: max MAX_ACCOUNTS_PER_IP registrations per IP in RATE_WINDOW_HOURS
+    if (ip !== "unknown") {
+      const since = new Date(Date.now() - RATE_WINDOW_HOURS * 60 * 60 * 1000);
+      const recentCount = await prisma.user.count({
+        where: { registrationIp: ip, createdAt: { gte: since } },
+      });
+      if (recentCount >= MAX_ACCOUNTS_PER_IP) {
+        return NextResponse.json(
+          { error: `Límite de registros alcanzado. Máximo ${MAX_ACCOUNTS_PER_IP} cuentas por red en ${RATE_WINDOW_HOURS}h.` },
+          { status: 429 }
+        );
+      }
+    }
+
     const { firstName, lastName, instagram, acceptedTerms, password } = parsed.data;
     const email = parsed.data.email.trim().toLowerCase();
     const phone = parsed.data.phone.trim();
 
-    // Check uniqueness
     const existingEmail = await prisma.user.findUnique({ where: { email } });
     if (existingEmail) {
       return NextResponse.json({ error: "Email already registered" }, { status: 409 });
@@ -56,10 +82,10 @@ export async function POST(request: NextRequest) {
         passwordHash,
         instagram: instagram || null,
         acceptedTerms,
+        registrationIp: ip !== "unknown" ? ip : null,
       },
     });
 
-    // Send welcome email — fire and forget (don't block registration if it fails)
     sendWelcomeEmail({ firstName: user.firstName, lastName: user.lastName, email: user.email })
       .catch((err) => console.error("[email] Failed to send welcome email:", err));
 
