@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import toast from "react-hot-toast";
-import { Plus, Trash2, CheckCircle2, XCircle, Star, Edit2, X } from "lucide-react";
+import { Plus, Trash2, CheckCircle2, XCircle, Star, Edit2, X, Upload, ImageOff } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -45,6 +45,99 @@ const emptyForm = {
   name: "", description: "", imageUrl: "", requiredPoints: "", stock: "",
   prizeType: "physical", featured: false, sortOrder: "0", maxPerUser: "", maxTotal: "",
 };
+
+function ImageUploader({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/admin/prizes/upload-image", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || "Error al subir"); return; }
+      onChange(data.url);
+      toast.success("Imagen subida");
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  };
+
+  const removeImage = async () => {
+    if (value?.includes("blob.vercel-storage.com")) {
+      await fetch("/api/admin/prizes/upload-image", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: value }),
+      });
+    }
+    onChange("");
+  };
+
+  return (
+    <div className="sm:col-span-2">
+      <label className="text-gray-500 text-xs uppercase tracking-wider mb-1 block">Imagen</label>
+      {value ? (
+        <div className="relative inline-flex group">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={value} alt="Premio" className="h-28 w-auto max-w-full object-contain rounded-xl bg-[#1a1a1a] border border-[#333] p-2" />
+          <button
+            type="button"
+            onClick={removeImage}
+            className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <X className="w-3.5 h-3.5 text-white" />
+          </button>
+        </div>
+      ) : (
+        <div
+          onDrop={handleDrop}
+          onDragOver={e => e.preventDefault()}
+          onClick={() => inputRef.current?.click()}
+          className="flex flex-col items-center justify-center gap-2 h-24 border-2 border-dashed border-[#333] hover:border-red-500/50 rounded-xl cursor-pointer transition-colors bg-[#1a1a1a] hover:bg-[#1e1e1e]"
+        >
+          {uploading ? (
+            <div className="flex items-center gap-2 text-gray-400 text-xs">
+              <div className="w-4 h-4 border-2 border-gray-600 border-t-red-500 rounded-full animate-spin" />
+              Subiendo...
+            </div>
+          ) : (
+            <>
+              <Upload className="w-5 h-5 text-gray-600" />
+              <p className="text-gray-600 text-xs text-center">
+                Arrastrá o hacé clic para subir<br />
+                <span className="text-gray-700">JPG, PNG, WebP · máx. 3 MB</span>
+              </p>
+            </>
+          )}
+        </div>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
+      />
+    </div>
+  );
+}
 
 export default function AdminPrizesPage() {
   const [prizes, setPrizes] = useState<Prize[]>([]);
@@ -228,8 +321,8 @@ export default function AdminPrizesPage() {
             <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">Nuevo premio</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <Input placeholder="Nombre" value={newPrize.name} onChange={e => setNewPrize(p => ({ ...p, name: e.target.value }))} />
-              <Input placeholder="URL imagen" value={newPrize.imageUrl} onChange={e => setNewPrize(p => ({ ...p, imageUrl: e.target.value }))} />
-              <Input placeholder="Descripción" value={newPrize.description} onChange={e => setNewPrize(p => ({ ...p, description: e.target.value }))} className="sm:col-span-2" />
+              <Input placeholder="Descripción" value={newPrize.description} onChange={e => setNewPrize(p => ({ ...p, description: e.target.value }))} />
+              <ImageUploader value={newPrize.imageUrl} onChange={url => setNewPrize(p => ({ ...p, imageUrl: url }))} />
               <Input type="number" placeholder="Puntos requeridos" value={newPrize.requiredPoints} onChange={e => setNewPrize(p => ({ ...p, requiredPoints: e.target.value }))} />
               <Input type="number" placeholder="Stock" value={newPrize.stock} onChange={e => setNewPrize(p => ({ ...p, stock: e.target.value }))} />
               <div className="flex flex-col gap-1">
@@ -277,14 +370,13 @@ export default function AdminPrizesPage() {
                       onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
                     />
                     <Input
-                      placeholder="URL imagen"
-                      defaultValue={p.imageUrl || ""}
-                      onChange={e => setEditForm(f => ({ ...f, imageUrl: e.target.value }))}
-                    />
-                    <Input
                       placeholder="Descripción"
                       defaultValue={p.description}
                       onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                    />
+                    <ImageUploader
+                      value={editForm.imageUrl !== undefined ? editForm.imageUrl : (p.imageUrl || "")}
+                      onChange={url => setEditForm(f => ({ ...f, imageUrl: url }))}
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <Input type="number" placeholder="Puntos" defaultValue={p.requiredPoints} onChange={e => setEditForm(f => ({ ...f, requiredPoints: e.target.value }))} />
@@ -331,9 +423,13 @@ export default function AdminPrizesPage() {
                         </button>
                       </div>
                     </div>
-                    {p.imageUrl && (
+                    {p.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.imageUrl} alt={p.name} className="w-full h-24 object-contain rounded-lg bg-[#1a1a1a] mb-2" />
+                      <img src={p.imageUrl} alt={p.name} className="w-full h-24 object-contain rounded-lg bg-[#1a1a1a] mb-2 p-1" />
+                    ) : (
+                      <div className="w-full h-16 rounded-lg bg-[#1a1a1a] mb-2 flex items-center justify-center">
+                        <ImageOff className="w-5 h-5 text-gray-700" />
+                      </div>
                     )}
                     <p className="text-gray-500 text-xs mb-3 line-clamp-2">{p.description}</p>
                     <div className="flex items-center justify-between mb-1">
