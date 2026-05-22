@@ -2,21 +2,35 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Plus, Trash2, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, Trash2, CheckCircle2, XCircle, Star, Edit2, X } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingScreen } from "@/components/ui/LoadingSpinner";
 
+const PRIZE_TYPES = [
+  { value: "physical", label: "Físico" },
+  { value: "digital", label: "Digital" },
+  { value: "coupon", label: "Cupón" },
+  { value: "raffle", label: "Sorteo" },
+  { value: "ranking", label: "Ranking" },
+  { value: "jackpot", label: "Jackpot" },
+];
+
 interface Prize {
   id: string;
   name: string;
   description: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
   requiredPoints: number;
   stock: number;
   active: boolean;
+  featured: boolean;
+  sortOrder: number;
+  prizeType: string;
+  maxPerUser?: number | null;
+  maxTotal?: number | null;
 }
 
 interface Redemption {
@@ -27,20 +41,21 @@ interface Redemption {
   prize: { name: string; requiredPoints: number };
 }
 
+const emptyForm = {
+  name: "", description: "", imageUrl: "", requiredPoints: "", stock: "",
+  prizeType: "physical", featured: false, sortOrder: "0", maxPerUser: "", maxTotal: "",
+};
+
 export default function AdminPrizesPage() {
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"prizes" | "redemptions">("prizes");
-  const [newPrize, setNewPrize] = useState({
-    name: "",
-    description: "",
-    imageUrl: "",
-    requiredPoints: "",
-    stock: "",
-  });
+  const [newPrize, setNewPrize] = useState(emptyForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Partial<typeof emptyForm & { active: boolean }>>({});
   const [creating, setCreating] = useState(false);
-  const [updating, setUpdating] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const init = async () => {
@@ -55,9 +70,15 @@ export default function AdminPrizesPage() {
     init();
   }, []);
 
+  const featuredCount = prizes.filter(p => p.featured).length;
+
   const createPrize = async () => {
     if (!newPrize.name || !newPrize.description || !newPrize.requiredPoints) {
       toast.error("Nombre, descripción y puntos son requeridos");
+      return;
+    }
+    if (newPrize.featured && featuredCount >= 3) {
+      toast.error("Ya hay 3 premios destacados en el home. Quitá uno antes.");
       return;
     }
     setCreating(true);
@@ -72,12 +93,17 @@ export default function AdminPrizesPage() {
           requiredPoints: parseInt(newPrize.requiredPoints),
           stock: parseInt(newPrize.stock) || 0,
           active: true,
+          featured: newPrize.featured,
+          sortOrder: parseInt(newPrize.sortOrder) || 0,
+          prizeType: newPrize.prizeType,
+          maxPerUser: newPrize.maxPerUser ? parseInt(newPrize.maxPerUser) : null,
+          maxTotal: newPrize.maxTotal ? parseInt(newPrize.maxTotal) : null,
         }),
       });
       if (!res.ok) { toast.error("Error al crear premio"); return; }
       const data = await res.json();
-      setPrizes((prev) => [...prev, data.prize]);
-      setNewPrize({ name: "", description: "", imageUrl: "", requiredPoints: "", stock: "" });
+      setPrizes(prev => [...prev, data.prize]);
+      setNewPrize(emptyForm);
       toast.success("Premio creado");
     } catch {
       toast.error("Error de conexión");
@@ -90,12 +116,68 @@ export default function AdminPrizesPage() {
     if (!confirm("¿Eliminar este premio?")) return;
     const res = await fetch(`/api/admin/prizes/${id}`, { method: "DELETE" });
     if (!res.ok) { toast.error("Error al eliminar"); return; }
-    setPrizes((prev) => prev.filter((p) => p.id !== id));
+    setPrizes(prev => prev.filter(p => p.id !== id));
     toast.success("Premio eliminado");
   };
 
+  const toggleFeatured = async (prize: Prize) => {
+    const newFeatured = !prize.featured;
+    if (newFeatured && featuredCount >= 3) {
+      toast.error("Máximo 3 premios destacados en home. Quitá uno primero.");
+      return;
+    }
+    setSaving(prev => ({ ...prev, [prize.id]: true }));
+    try {
+      const res = await fetch(`/api/admin/prizes/${prize.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ featured: newFeatured }),
+      });
+      if (!res.ok) { toast.error("Error"); return; }
+      setPrizes(prev => prev.map(p => p.id === prize.id ? { ...p, featured: newFeatured } : p));
+      toast.success(newFeatured ? "Destacado en home" : "Quitado del home");
+    } finally {
+      setSaving(prev => ({ ...prev, [prize.id]: false }));
+    }
+  };
+
+  const saveEdit = async (id: string) => {
+    if (editForm.featured && !prizes.find(p => p.id === id)?.featured && featuredCount >= 3) {
+      toast.error("Máximo 3 premios destacados en home.");
+      return;
+    }
+    setSaving(prev => ({ ...prev, [id]: true }));
+    try {
+      const body: Record<string, unknown> = {};
+      if (editForm.name !== undefined) body.name = editForm.name;
+      if (editForm.description !== undefined) body.description = editForm.description;
+      if (editForm.imageUrl !== undefined) body.imageUrl = editForm.imageUrl || undefined;
+      if (editForm.requiredPoints !== undefined) body.requiredPoints = parseInt(editForm.requiredPoints as string) || 0;
+      if (editForm.stock !== undefined) body.stock = parseInt(editForm.stock as string) || 0;
+      if (editForm.prizeType !== undefined) body.prizeType = editForm.prizeType;
+      if (editForm.sortOrder !== undefined) body.sortOrder = parseInt(editForm.sortOrder as string) || 0;
+      if (editForm.featured !== undefined) body.featured = editForm.featured;
+      if (editForm.active !== undefined) body.active = editForm.active;
+      if (editForm.maxPerUser !== undefined) body.maxPerUser = editForm.maxPerUser ? parseInt(editForm.maxPerUser as string) : null;
+      if (editForm.maxTotal !== undefined) body.maxTotal = editForm.maxTotal ? parseInt(editForm.maxTotal as string) : null;
+
+      const res = await fetch(`/api/admin/prizes/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) { toast.error("Error al guardar"); return; }
+      const data = await res.json();
+      setPrizes(prev => prev.map(p => p.id === id ? data.prize : p));
+      setEditingId(null);
+      toast.success("Premio actualizado");
+    } finally {
+      setSaving(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
   const updateRedemption = async (id: string, status: "approved" | "rejected") => {
-    setUpdating((prev) => ({ ...prev, [id]: true }));
+    setSaving(prev => ({ ...prev, [id]: true }));
     try {
       const res = await fetch(`/api/admin/redemptions/${id}`, {
         method: "PUT",
@@ -103,30 +185,30 @@ export default function AdminPrizesPage() {
         body: JSON.stringify({ status }),
       });
       if (!res.ok) { toast.error("Error al actualizar"); return; }
-      setRedemptions((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+      setRedemptions(prev => prev.map(r => r.id === id ? { ...r, status } : r));
       toast.success(status === "approved" ? "Canje aprobado" : "Canje rechazado");
-    } catch {
-      toast.error("Error de conexión");
     } finally {
-      setUpdating((prev) => ({ ...prev, [id]: false }));
+      setSaving(prev => ({ ...prev, [id]: false }));
     }
   };
 
   if (loading) return <LoadingScreen />;
 
-  const pending = redemptions.filter((r) => r.status === "pending");
+  const pending = redemptions.filter(r => r.status === "pending");
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-black uppercase text-white">Premios</h1>
-          <p className="text-gray-500 text-sm">{prizes.length} premios · {pending.length} canjes pendientes</p>
+          <p className="text-gray-500 text-sm">
+            {prizes.length} premios · {featuredCount}/3 en home · {pending.length} canjes pendientes
+          </p>
         </div>
       </div>
 
       <div className="flex gap-1 bg-[#111] border border-[#222] rounded-xl p-1 mb-6 max-w-xs">
-        {(["prizes", "redemptions"] as const).map((tab) => (
+        {(["prizes", "redemptions"] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -141,35 +223,141 @@ export default function AdminPrizesPage() {
 
       {activeTab === "prizes" && (
         <div className="space-y-4">
+          {/* Create form */}
           <Card className="p-5">
             <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">Nuevo premio</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-              <Input placeholder="Nombre" value={newPrize.name} onChange={(e) => setNewPrize((p) => ({ ...p, name: e.target.value }))} />
-              <Input placeholder="URL imagen" value={newPrize.imageUrl} onChange={(e) => setNewPrize((p) => ({ ...p, imageUrl: e.target.value }))} />
-              <Input placeholder="Descripción" value={newPrize.description} onChange={(e) => setNewPrize((p) => ({ ...p, description: e.target.value }))} className="sm:col-span-2" />
-              <Input type="number" placeholder="Puntos requeridos" value={newPrize.requiredPoints} onChange={(e) => setNewPrize((p) => ({ ...p, requiredPoints: e.target.value }))} />
-              <Input type="number" placeholder="Stock disponible" value={newPrize.stock} onChange={(e) => setNewPrize((p) => ({ ...p, stock: e.target.value }))} />
+              <Input placeholder="Nombre" value={newPrize.name} onChange={e => setNewPrize(p => ({ ...p, name: e.target.value }))} />
+              <Input placeholder="URL imagen" value={newPrize.imageUrl} onChange={e => setNewPrize(p => ({ ...p, imageUrl: e.target.value }))} />
+              <Input placeholder="Descripción" value={newPrize.description} onChange={e => setNewPrize(p => ({ ...p, description: e.target.value }))} className="sm:col-span-2" />
+              <Input type="number" placeholder="Puntos requeridos" value={newPrize.requiredPoints} onChange={e => setNewPrize(p => ({ ...p, requiredPoints: e.target.value }))} />
+              <Input type="number" placeholder="Stock" value={newPrize.stock} onChange={e => setNewPrize(p => ({ ...p, stock: e.target.value }))} />
+              <div className="flex flex-col gap-1">
+                <label className="text-gray-500 text-xs uppercase tracking-wider">Tipo</label>
+                <select
+                  value={newPrize.prizeType}
+                  onChange={e => setNewPrize(p => ({ ...p, prizeType: e.target.value }))}
+                  className="bg-[#1a1a1a] border border-[#333] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500"
+                >
+                  {PRIZE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              <Input type="number" placeholder="Orden (0=primero)" value={newPrize.sortOrder} onChange={e => setNewPrize(p => ({ ...p, sortOrder: e.target.value }))} />
+              <Input type="number" placeholder="Máx. canjes por usuario" value={newPrize.maxPerUser} onChange={e => setNewPrize(p => ({ ...p, maxPerUser: e.target.value }))} />
+              <Input type="number" placeholder="Máx. canjes total" value={newPrize.maxTotal} onChange={e => setNewPrize(p => ({ ...p, maxTotal: e.target.value }))} />
+            </div>
+            <div className="flex items-center gap-4 mb-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={newPrize.featured}
+                  onChange={e => setNewPrize(p => ({ ...p, featured: e.target.checked }))}
+                  className="w-4 h-4 accent-yellow-400"
+                />
+                <span className="text-gray-300 text-sm flex items-center gap-1">
+                  <Star className="w-3 h-3 text-yellow-400" /> Destacado en home
+                  {featuredCount >= 3 && <span className="text-red-400 text-xs">(máx. 3)</span>}
+                </span>
+              </label>
             </div>
             <Button variant="primary" size="sm" loading={creating} onClick={createPrize}>
               <Plus className="w-4 h-4" /> Crear premio
             </Button>
           </Card>
 
+          {/* Prize list */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {prizes.map((p) => (
-              <Card key={p.id} className="p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-white font-bold text-sm">{p.name}</h3>
-                  <button onClick={() => deletePrize(p.id)} className="text-gray-600 hover:text-red-400">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-                <p className="text-gray-500 text-xs mb-3 line-clamp-2">{p.description}</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-yellow-400 font-bold text-sm">{p.requiredPoints} pts</span>
-                  <Badge variant={p.active ? "success" : "default"}>{p.active ? "Activo" : "Inactivo"}</Badge>
-                </div>
-                <div className="text-gray-600 text-xs mt-1">Stock: {p.stock}</div>
+            {prizes.map(p => (
+              <Card key={p.id} className={`p-4 ${p.featured ? "border-yellow-500/30" : ""}`}>
+                {editingId === p.id ? (
+                  <div className="space-y-2">
+                    <Input
+                      placeholder="Nombre"
+                      defaultValue={p.name}
+                      onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="URL imagen"
+                      defaultValue={p.imageUrl || ""}
+                      onChange={e => setEditForm(f => ({ ...f, imageUrl: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Descripción"
+                      defaultValue={p.description}
+                      onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input type="number" placeholder="Puntos" defaultValue={p.requiredPoints} onChange={e => setEditForm(f => ({ ...f, requiredPoints: e.target.value }))} />
+                      <Input type="number" placeholder="Stock" defaultValue={p.stock} onChange={e => setEditForm(f => ({ ...f, stock: e.target.value }))} />
+                      <Input type="number" placeholder="Orden" defaultValue={p.sortOrder} onChange={e => setEditForm(f => ({ ...f, sortOrder: e.target.value }))} />
+                      <select
+                        defaultValue={p.prizeType}
+                        onChange={e => setEditForm(f => ({ ...f, prizeType: e.target.value }))}
+                        className="bg-[#1a1a1a] border border-[#333] text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-red-500"
+                      >
+                        {PRIZE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex gap-3 text-xs text-gray-400">
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <input type="checkbox" defaultChecked={p.featured} onChange={e => setEditForm(f => ({ ...f, featured: e.target.checked }))} className="accent-yellow-400" />
+                        <Star className="w-3 h-3 text-yellow-400" /> Home
+                      </label>
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <input type="checkbox" defaultChecked={p.active} onChange={e => setEditForm(f => ({ ...f, active: e.target.checked }))} className="accent-green-500" />
+                        Activo
+                      </label>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="primary" size="sm" loading={saving[p.id]} onClick={() => saveEdit(p.id)}>Guardar</Button>
+                      <Button variant="secondary" size="sm" onClick={() => { setEditingId(null); setEditForm({}); }}>
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        {p.featured && <Star className="w-3.5 h-3.5 text-yellow-400 shrink-0" />}
+                        <h3 className="text-white font-bold text-sm line-clamp-1">{p.name}</h3>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                        <button onClick={() => { setEditingId(p.id); setEditForm({}); }} className="text-gray-600 hover:text-blue-400">
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => deletePrize(p.id)} className="text-gray-600 hover:text-red-400">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    {p.imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.imageUrl} alt={p.name} className="w-full h-24 object-contain rounded-lg bg-[#1a1a1a] mb-2" />
+                    )}
+                    <p className="text-gray-500 text-xs mb-3 line-clamp-2">{p.description}</p>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-yellow-400 font-bold text-sm">{p.requiredPoints.toLocaleString()} pts</span>
+                      <Badge variant={p.active ? "success" : "default"}>{p.active ? "Activo" : "Inactivo"}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-gray-600">
+                      <span>Stock: {p.stock}</span>
+                      <span className="capitalize">{p.prizeType}</span>
+                    </div>
+                    <button
+                      onClick={() => toggleFeatured(p)}
+                      disabled={saving[p.id]}
+                      className={`mt-2 w-full py-1 rounded text-xs font-bold transition-colors ${
+                        p.featured
+                          ? "bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20"
+                          : "bg-[#1a1a1a] text-gray-500 hover:text-yellow-400"
+                      }`}
+                    >
+                      <Star className="w-3 h-3 inline mr-1" />
+                      {p.featured ? "Quitár del home" : "Destacar en home"}
+                    </button>
+                  </>
+                )}
               </Card>
             ))}
           </div>
@@ -183,7 +371,7 @@ export default function AdminPrizesPage() {
               <p className="text-gray-500">No hay canjes registrados</p>
             </Card>
           )}
-          {redemptions.map((r) => (
+          {redemptions.map(r => (
             <Card key={r.id} className="p-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
@@ -203,21 +391,10 @@ export default function AdminPrizesPage() {
                   </Badge>
                   {r.status === "pending" && (
                     <>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        loading={updating[r.id]}
-                        onClick={() => updateRedemption(r.id, "approved")}
-                        className="bg-green-600 hover:bg-green-500"
-                      >
+                      <Button variant="primary" size="sm" loading={saving[r.id]} onClick={() => updateRedemption(r.id, "approved")} className="bg-green-600 hover:bg-green-500">
                         <CheckCircle2 className="w-3 h-3" /> Aprobar
                       </Button>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        loading={updating[r.id]}
-                        onClick={() => updateRedemption(r.id, "rejected")}
-                      >
+                      <Button variant="danger" size="sm" loading={saving[r.id]} onClick={() => updateRedemption(r.id, "rejected")}>
                         <XCircle className="w-3 h-3" /> Rechazar
                       </Button>
                     </>

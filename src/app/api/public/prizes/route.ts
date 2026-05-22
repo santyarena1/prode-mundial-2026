@@ -6,7 +6,7 @@ export async function GET() {
     const prizes = await prisma.prize.findMany({
       where: { active: true },
       include: { sponsor: true },
-      orderBy: { requiredPoints: "asc" },
+      orderBy: [{ sortOrder: "asc" }, { requiredPoints: "asc" }],
     });
 
     return NextResponse.json({ prizes });

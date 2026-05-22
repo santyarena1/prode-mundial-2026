@@ -34,6 +34,24 @@ interface RankingUser {
   totalPoints: number;
 }
 
+interface FeaturedPrize {
+  id: string;
+  name: string;
+  description: string;
+  imageUrl?: string | null;
+  requiredPoints: number;
+  prizeType: string;
+}
+
+const PRIZE_TYPE_TAG: Record<string, string> = {
+  raffle: "SORTEO",
+  jackpot: "JACKPOT",
+  ranking: "RANKING",
+  digital: "DIGITAL",
+  coupon: "CUPÓN",
+  physical: "FÍSICO",
+};
+
 const steps = [
   {
     icon: <Users className="w-8 h-8" />,
@@ -61,12 +79,6 @@ const steps = [
   },
 ];
 
-const prizes = [
-  { name: "Headset Gaming Pro", points: 500, tag: "TOP" },
-  { name: "Mousepad XL Gamer", points: 200, tag: "POPULAR" },
-  { name: "Gift Card $5000", points: 300, tag: "HOT" },
-];
-
 const positionBadgeVariant = (pos: number): "gold" | "silver" | "bronze" | "position" => {
   if (pos === 1) return "gold";
   if (pos === 2) return "silver";
@@ -78,15 +90,17 @@ export default function HomePage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [ranking, setRanking] = useState<RankingUser[]>([]);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+  const [featuredPrizes, setFeaturedPrizes] = useState<FeaturedPrize[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, rankingRes, sponsorsRes] = await Promise.all([
+        const [statsRes, rankingRes, sponsorsRes, prizesRes] = await Promise.all([
           fetch("/api/public/stats"),
           fetch("/api/public/ranking"),
           fetch("/api/public/sponsors"),
+          fetch("/api/public/prizes/featured"),
         ]);
         if (statsRes.ok) setStats(await statsRes.json());
         if (rankingRes.ok) {
@@ -96,6 +110,10 @@ export default function HomePage() {
         if (sponsorsRes.ok) {
           const data = await sponsorsRes.json();
           setSponsors(data.sponsors || []);
+        }
+        if (prizesRes.ok) {
+          const data = await prizesRes.json();
+          setFeaturedPrizes(data.prizes || []);
         }
       } catch {
         // ignore
@@ -290,7 +308,45 @@ export default function HomePage() {
           </motion.div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-            {prizes.map((prize, i) => (
+            {featuredPrizes.map((prize, i) => (
+              <motion.div
+                key={prize.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+              >
+                <Link href="/prizes">
+                  <div className="glow-border rounded-xl p-6 bg-[#111] hover:bg-[#151515] transition-colors cursor-pointer h-full">
+                    <div className="flex justify-between items-start mb-4">
+                      <span className="bg-red-600/20 text-red-400 text-xs font-bold px-2 py-0.5 rounded">
+                        {PRIZE_TYPE_TAG[prize.prizeType] ?? "PREMIO"}
+                      </span>
+                      <Gift className="w-5 h-5 text-red-500/50" />
+                    </div>
+                    {prize.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={prize.imageUrl}
+                        alt={prize.name}
+                        className="w-full h-28 object-contain rounded-lg mb-4 bg-[#1a1a1a]"
+                      />
+                    ) : (
+                      <div className="w-full h-28 bg-[#1a1a1a] rounded-lg mb-4 flex items-center justify-center">
+                        <span className="text-4xl">🎁</span>
+                      </div>
+                    )}
+                    <h3 className="text-white font-bold mb-1 line-clamp-2">{prize.name}</h3>
+                    <p className="text-gray-500 text-xs mb-3 line-clamp-2">{prize.description}</p>
+                    <div className="flex items-center gap-1 text-yellow-400">
+                      <Star className="w-4 h-4 fill-yellow-400" />
+                      <span className="font-bold">{prize.requiredPoints.toLocaleString()} puntos</span>
+                    </div>
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+            {featuredPrizes.length === 0 && [0, 1, 2].map(i => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -298,21 +354,9 @@ export default function HomePage() {
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
               >
-                <div className="glow-border rounded-xl p-6 bg-[#111] hover:bg-[#151515] transition-colors">
-                  <div className="flex justify-between items-start mb-4">
-                    <span className="bg-red-600/20 text-red-400 text-xs font-bold px-2 py-0.5 rounded">
-                      {prize.tag}
-                    </span>
-                    <Gift className="w-5 h-5 text-red-500/50" />
-                  </div>
-                  <div className="w-full h-28 bg-[#1a1a1a] rounded-lg mb-4 flex items-center justify-center">
-                    <span className="text-4xl">🎁</span>
-                  </div>
-                  <h3 className="text-white font-bold mb-2">{prize.name}</h3>
-                  <div className="flex items-center gap-1 text-yellow-400">
-                    <Star className="w-4 h-4 fill-yellow-400" />
-                    <span className="font-bold">{prize.points} puntos</span>
-                  </div>
+                <div className="glow-border rounded-xl p-6 bg-[#111] h-full flex flex-col items-center justify-center min-h-[200px]">
+                  <Gift className="w-10 h-10 text-gray-700 mb-3" />
+                  <p className="text-gray-600 text-sm">Premio por definir</p>
                 </div>
               </motion.div>
             ))}

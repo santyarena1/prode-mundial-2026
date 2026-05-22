@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Settings, Save } from "lucide-react";
+import { Settings, Save, RefreshCw, Trophy } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -31,6 +31,8 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingRules, setSavingRules] = useState(false);
+  const [applyingRules, setApplyingRules] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -130,6 +132,37 @@ export default function AdminSettingsPage() {
 
   const updateRule = (id: string, points: number) => {
     setPointRules((prev) => prev.map((r) => (r.id === id ? { ...r, points } : r)));
+  };
+
+  const applyNewRules = async () => {
+    setApplyingRules(true);
+    try {
+      const res = await fetch("/api/admin/achievements", { method: "POST" });
+      if (!res.ok) { toast.error("Error al aplicar reglas"); return; }
+      const data = await res.json();
+      toast.success(`Reglas aplicadas: ${data.pointRules} puntos, ${data.achievements} logros`);
+      const rulesRes = await fetch("/api/admin/settings/point-rules");
+      if (rulesRes.ok) setPointRules((await rulesRes.json()).pointRules || []);
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setApplyingRules(false);
+    }
+  };
+
+  const recalculateAll = async () => {
+    if (!confirm("¿Recalcular puntos de TODOS los usuarios? Puede tardar varios segundos.")) return;
+    setRecalculating(true);
+    try {
+      const res = await fetch("/api/admin/ranking", { method: "POST" });
+      if (!res.ok) { toast.error("Error al recalcular"); return; }
+      const data = await res.json();
+      toast.success(`Recalculado: ${data.processed}/${data.total} usuarios${data.errors > 0 ? ` (${data.errors} errores)` : ""}`);
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setRecalculating(false);
+    }
   };
 
   if (loading) return <LoadingScreen />;
@@ -256,6 +289,64 @@ export default function AdminSettingsPage() {
               <Save className="w-4 h-4" /> Guardar reglas
             </Button>
           )}
+        </Card>
+      </div>
+      {/* Achievements & Recalculate */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
+        <Card className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Trophy className="w-4 h-4 text-yellow-400" />
+            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400">
+              Sistema de logros
+            </h3>
+          </div>
+          <p className="text-gray-500 text-xs mb-4">
+            Aplica los nuevos valores de puntos y crea los logros en la base de datos.
+            Seguro ejecutarlo múltiples veces (upsert).
+          </p>
+          <div className="text-xs text-gray-600 space-y-1 mb-4">
+            <div>• Buen arranque: 10 aciertos → 1.000 pts</div>
+            <div>• Especialista de grupos: 35 → 3.000 pts</div>
+            <div>• Experto mundialista: 45 → 7.500 pts</div>
+            <div>• Máquina de grupos: 55 → 15.000 pts</div>
+            <div>• Ojo clínico: 18 clasificados → 5.000 pts</div>
+            <div>• Tabla perfecta → 20.000 pts</div>
+            <div>• Bracket fuerte 70% → 10.000 pts</div>
+            <div>• Bracket perfecto → 30.000 pts</div>
+            <div>• Final soñada → 5.000 pts</div>
+            <div>• Prode perfecto → 150.000 pts</div>
+          </div>
+          <Button variant="primary" size="sm" loading={applyingRules} onClick={applyNewRules} className="w-full">
+            <Trophy className="w-4 h-4" /> Aplicar reglas y logros
+          </Button>
+        </Card>
+
+        <Card className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <RefreshCw className="w-4 h-4 text-red-400" />
+            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400">
+              Recalcular puntos
+            </h3>
+          </div>
+          <p className="text-gray-500 text-xs mb-4">
+            Recalcula los puntos de TODOS los usuarios desde cero, incluyendo predicciones,
+            clasificados, bracket, logros y bonus. Es idempotente: puede correrse múltiples veces.
+          </p>
+          <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg p-3 mb-4">
+            <p className="text-yellow-400 text-xs">
+              Ejecutá primero &quot;Aplicar reglas y logros&quot; para asegurarte de que los
+              AchievementRules estén creados en la base de datos.
+            </p>
+          </div>
+          <Button
+            variant="danger"
+            size="sm"
+            loading={recalculating}
+            onClick={recalculateAll}
+            className="w-full"
+          >
+            <RefreshCw className="w-4 h-4" /> Recalcular todos los usuarios
+          </Button>
         </Card>
       </div>
     </div>

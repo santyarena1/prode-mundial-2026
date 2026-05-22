@@ -11,6 +11,11 @@ const createPrizeSchema = z.object({
   stock: z.number().int().min(0),
   sponsorId: z.string().optional(),
   active: z.boolean().optional(),
+  featured: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+  prizeType: z.string().optional(),
+  maxPerUser: z.number().int().optional().nullable(),
+  maxTotal: z.number().int().optional().nullable(),
   expiresAt: z.string().optional(),
 });
 
@@ -21,7 +26,7 @@ export async function GET() {
 
     const prizes = await prisma.prize.findMany({
       include: { sponsor: true },
-      orderBy: { requiredPoints: "asc" },
+      orderBy: [{ sortOrder: "asc" }, { requiredPoints: "asc" }],
     });
 
     return NextResponse.json({ prizes });

@@ -11,6 +11,11 @@ const updatePrizeSchema = z.object({
   stock: z.number().int().min(0).optional(),
   sponsorId: z.string().optional(),
   active: z.boolean().optional(),
+  featured: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+  prizeType: z.string().optional(),
+  maxPerUser: z.number().int().optional().nullable(),
+  maxTotal: z.number().int().optional().nullable(),
   expiresAt: z.string().optional(),
 });
 
