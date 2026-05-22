@@ -899,7 +899,7 @@ function MatchCard({ match, saved, pending, onPick }: {
             ? <img src={match.homeTeam.flagUrl} alt="" className="w-7 h-5 object-cover rounded shadow-md flex-shrink-0" />
             : <div className="w-7 h-5 bg-[#2a2a2a] rounded flex-shrink-0" />
           }
-          <span className="text-white text-xs font-bold truncate">{homeName}</span>
+          <span className="text-white text-xs font-bold leading-tight line-clamp-2 break-words">{homeName}</span>
         </div>
         <div className="flex flex-col items-center flex-shrink-0 min-w-[72px]">
           {matchStarted && match.homeScore !== undefined
@@ -914,7 +914,7 @@ function MatchCard({ match, saved, pending, onPick }: {
           }
         </div>
         <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-          <span className="text-white text-xs font-bold truncate text-right">{awayName}</span>
+          <span className="text-white text-xs font-bold leading-tight line-clamp-2 break-words text-right">{awayName}</span>
           {match.awayTeam?.flagUrl
             // eslint-disable-next-line @next/next/no-img-element
             ? <img src={match.awayTeam.flagUrl} alt="" className="w-7 h-5 object-cover rounded shadow-md flex-shrink-0" />

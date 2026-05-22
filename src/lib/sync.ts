@@ -107,6 +107,18 @@ export async function syncFixtures(): Promise<{ success: boolean; message: strin
     const fixtures = await provider.getFixtures();
     let count = 0;
 
+    // Remove seed/manual matches (no externalId) that have no user predictions.
+    // This prevents duplicate fixtures when switching from hardcoded seed to real API data.
+    const seedMatchIds = await prisma.match.findMany({
+      where: { externalId: null },
+      select: { id: true, predictions: { select: { id: true }, take: 1 } },
+    });
+    const safeToDelete = seedMatchIds.filter((m) => m.predictions.length === 0).map((m) => m.id);
+    if (safeToDelete.length > 0) {
+      await prisma.matchEvent.deleteMany({ where: { matchId: { in: safeToDelete } } });
+      await prisma.match.deleteMany({ where: { id: { in: safeToDelete } } });
+    }
+
     for (const f of fixtures) {
       // Resolve teams by externalId
       const homeTeam = f.homeTeamExternalId

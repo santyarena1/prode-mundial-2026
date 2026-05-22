@@ -86,8 +86,8 @@ export default function RankingPage() {
                 <div className="w-12 h-12 bg-gray-700/30 border border-gray-600/50 rounded-full flex items-center justify-center mx-auto mb-2 text-sm font-bold text-gray-300">
                   {ranking[1].firstName[0]}{ranking[1].lastName[0]}
                 </div>
-                <div className="text-white font-bold text-xs truncate">{ranking[1].firstName}</div>
-                <div className="text-gray-500 text-xs truncate">{ranking[1].lastName}</div>
+                <div className="text-white font-bold text-xs leading-tight break-all line-clamp-1">{ranking[1].firstName}</div>
+                <div className="text-gray-500 text-[10px] leading-tight break-all line-clamp-1">{ranking[1].lastName}</div>
                 <div className="text-gray-300 font-black text-lg mt-1">{ranking[1].totalPoints}</div>
                 <div className="text-gray-600 text-xs">pts</div>
               </Card>
@@ -104,8 +104,8 @@ export default function RankingPage() {
                 <div className="w-14 h-14 bg-yellow-600/20 border border-yellow-500/50 rounded-full flex items-center justify-center mx-auto mb-2 text-base font-bold text-yellow-300">
                   {ranking[0].firstName[0]}{ranking[0].lastName[0]}
                 </div>
-                <div className="text-white font-bold text-sm truncate">{ranking[0].firstName}</div>
-                <div className="text-gray-400 text-xs truncate">{ranking[0].lastName}</div>
+                <div className="text-white font-bold text-sm leading-tight break-all line-clamp-1">{ranking[0].firstName}</div>
+                <div className="text-gray-400 text-xs leading-tight break-all line-clamp-1">{ranking[0].lastName}</div>
                 <div className="text-yellow-400 font-black text-2xl mt-1">{ranking[0].totalPoints}</div>
                 <div className="text-gray-500 text-xs">pts</div>
               </Card>
@@ -123,8 +123,8 @@ export default function RankingPage() {
                 <div className="w-12 h-12 bg-orange-900/20 border border-orange-600/30 rounded-full flex items-center justify-center mx-auto mb-2 text-sm font-bold text-orange-400">
                   {ranking[2].firstName[0]}{ranking[2].lastName[0]}
                 </div>
-                <div className="text-white font-bold text-xs truncate">{ranking[2].firstName}</div>
-                <div className="text-gray-500 text-xs truncate">{ranking[2].lastName}</div>
+                <div className="text-white font-bold text-xs leading-tight break-all line-clamp-1">{ranking[2].firstName}</div>
+                <div className="text-gray-500 text-[10px] leading-tight break-all line-clamp-1">{ranking[2].lastName}</div>
                 <div className="text-orange-400 font-black text-lg mt-1">{ranking[2].totalPoints}</div>
                 <div className="text-gray-600 text-xs">pts</div>
               </Card>

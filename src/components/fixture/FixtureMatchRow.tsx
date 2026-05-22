@@ -58,7 +58,7 @@ function HomeTeam({
     <div className="flex items-center gap-2 sm:gap-3 min-w-0 justify-self-start w-full">
       <TeamFlag team={team} />
       <div className="min-w-0 text-left">
-        <p className="text-white font-bold text-sm sm:text-base truncate">{name}</p>
+        <p className="text-white font-bold text-sm sm:text-base leading-tight break-words line-clamp-2">{name}</p>
         {team?.code && (
           <p className="text-gray-600 text-[10px] uppercase tracking-wider">{team.code}</p>
         )}
@@ -80,7 +80,7 @@ function AwayTeam({
     <div className="flex items-center gap-2 sm:gap-3 min-w-0 justify-self-end w-full flex-row-reverse">
       <TeamFlag team={team} />
       <div className="min-w-0 text-right">
-        <p className="text-white font-bold text-sm sm:text-base truncate">{name}</p>
+        <p className="text-white font-bold text-sm sm:text-base leading-tight break-words line-clamp-2">{name}</p>
         {team?.code && (
           <p className="text-gray-600 text-[10px] uppercase tracking-wider">{team.code}</p>
         )}
