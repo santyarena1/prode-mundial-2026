@@ -84,7 +84,7 @@ export function Navbar() {
         />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-visible">
           <div className="flex items-center justify-between h-14 sm:h-16 overflow-visible">
-            <Logo size="sm" variant="hero" priority />
+            <Logo size="sm" priority />
             <div className="hidden md:flex items-center gap-6">
               {navLinks.map((link) => (
                 <Link
@@ -188,7 +188,7 @@ export function Navbar() {
         />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-visible">
           <div className="flex items-center justify-between min-h-[4rem] py-1.5 overflow-visible">
-            <Logo size="md" variant="hero" showTagline priority />
+            <Logo size="md" showTagline priority />
 
             <div className="hidden md:flex items-center gap-6">
               {navLinks.map((link) => (
