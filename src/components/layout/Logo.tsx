@@ -40,7 +40,7 @@ export function Logo({
         width={width}
         height={height}
         unoptimized
-        className={`${sizeClass} object-contain ${variant === "default" ? "rounded-lg" : "bg-transparent"} ${className}`}
+        className={`${sizeClass} object-contain ${variant === "default" ? "[mix-blend-mode:screen]" : "bg-transparent"} ${className}`}
         priority={priority}
       />
     </span>
