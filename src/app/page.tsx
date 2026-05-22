@@ -415,7 +415,7 @@ export default function HomePage() {
                 {user.firstName[0]}{user.lastName[0]}
               </div>
               <div className="flex-1">
-                <div className="text-white font-semibold">{user.firstName} {user.lastName}</div>
+                <div className="text-white font-semibold">{user.firstName} <span className="blur-sm select-none">{user.lastName}</span></div>
               </div>
               <div className="flex items-center gap-1 text-yellow-400 font-black">
                 <Medal className="w-4 h-4" />
