@@ -51,11 +51,11 @@ interface Group {
 type Outcome = "home" | "away" | "draw";
 
 const ELIMINATORIAS_PHASES = [
-  { key: "ROUND_OF_32",    label: "16vos", fullLabel: "Ronda de 32",      slots: 16, icon: "⚽", pts: 200,  ptsLabel: "200 pts c/u" },
-  { key: "ROUND_OF_16",    label: "8vos",  fullLabel: "Octavos de Final",  slots: 8,  icon: "🔥", pts: 350,  ptsLabel: "350 pts c/u" },
-  { key: "QUARTER_FINALS", label: "4tos",  fullLabel: "Cuartos de Final",  slots: 4,  icon: "⚡", pts: 600,  ptsLabel: "600 pts c/u" },
-  { key: "SEMI_FINALS",    label: "Semis", fullLabel: "Semifinales",        slots: 2,  icon: "🌟", pts: 1000, ptsLabel: "1.000 pts c/u" },
-  { key: "CHAMPION",       label: "Final", fullLabel: "Campeón del Mundo", slots: 1,  icon: "🏆", pts: 3000, ptsLabel: "3.000 / 1.500 pts" },
+  { key: "ROUND_OF_32",    label: "16vos", fullLabel: "Ronda de 32",      slots: 16, icon: "⚽", pts: 700,   ptsLabel: "700 pts c/u" },
+  { key: "ROUND_OF_16",    label: "8vos",  fullLabel: "Octavos de Final",  slots: 8,  icon: "🔥", pts: 1200,  ptsLabel: "1.200 pts c/u" },
+  { key: "QUARTER_FINALS", label: "4tos",  fullLabel: "Cuartos de Final",  slots: 4,  icon: "⚡", pts: 2000,  ptsLabel: "2.000 pts c/u" },
+  { key: "SEMI_FINALS",    label: "Semis", fullLabel: "Semifinales",        slots: 2,  icon: "🌟", pts: 3500,  ptsLabel: "3.500 pts c/u" },
+  { key: "CHAMPION",       label: "Final", fullLabel: "Campeón del Mundo", slots: 1,  icon: "🏆", pts: 10000, ptsLabel: "10.000 / 5.000 pts" },
 ];
 
 const formatDate = (dateStr?: string) => {
@@ -387,19 +387,19 @@ export default function PredictionsPage() {
                   <span className="text-lg leading-none">⚽</span>
                   <div>
                     <p className="text-white font-bold text-xs">Ganador / Perdedor</p>
-                    <p className="text-yellow-400 font-black text-sm">50 pts</p>
+                    <p className="text-yellow-400 font-black text-sm">150 pts</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 bg-[#111] border border-[#1e1e1e] rounded-lg px-3 py-2">
                   <span className="text-lg leading-none">🤝</span>
                   <div>
                     <p className="text-white font-bold text-xs">Empate exacto</p>
-                    <p className="text-yellow-400 font-black text-sm">80 pts</p>
+                    <p className="text-yellow-400 font-black text-sm">250 pts</p>
                   </div>
                 </div>
               </div>
               <p className="text-gray-700 text-[10px] mt-2 leading-relaxed">
-                El empate suma 80 pts (50 base + 30 bonus). Hay 48 partidos en fase de grupos.
+                El empate suma 250 pts (150 base + 100 bonus). Hay 48 partidos en fase de grupos.
               </p>
             </div>
             <div className="bg-[#161616] border border-[#222] rounded-xl p-4 mb-1">
@@ -482,20 +482,20 @@ export default function PredictionsPage() {
                   <span className="text-lg leading-none">✅</span>
                   <div>
                     <p className="text-white font-bold text-xs">Equipo clasificado</p>
-                    <p className="text-yellow-400 font-black text-sm">120 pts</p>
+                    <p className="text-yellow-400 font-black text-sm">400 pts</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 bg-[#111] border border-[#1e1e1e] rounded-lg px-3 py-2">
                   <span className="text-lg leading-none">🥇</span>
                   <div>
                     <p className="text-white font-bold text-xs">Posición exacta</p>
-                    <p className="text-yellow-400 font-black text-sm">+180 pts</p>
+                    <p className="text-yellow-400 font-black text-sm">+600 pts</p>
                   </div>
                 </div>
               </div>
               <div className="bg-yellow-500/5 border border-yellow-500/15 rounded-lg px-3 py-2 text-xs text-yellow-300/70 leading-relaxed">
                 Ejemplo: si predecís que Argentina clasifica y queda <strong className="text-yellow-300">1°</strong> →
-                120 + 180 = <strong className="text-yellow-300">300 pts</strong> por ese equipo.
+                400 + 600 = <strong className="text-yellow-300">1.000 pts</strong> por ese equipo.
                 Hay 12 grupos con 2 clasificados c/u.
               </div>
             </div>
@@ -720,7 +720,7 @@ export default function PredictionsPage() {
                         </div>
                         <p className="text-gray-600 text-xs mt-0.5">
                           {currentPhase.key === "CHAMPION"
-                            ? "Campeón: 3.000 pts · Subcampeón: 1.500 pts · Ambos exactos: +5.000 pts"
+                            ? "Campeón: 10.000 pts · Subcampeón: 5.000 pts · Ambos exactos: +15.000 pts"
                             : `${savedInPhase} de ${currentPhase.slots} equipos guardados`}
                         </p>
                       </div>
@@ -897,9 +897,9 @@ export default function PredictionsPage() {
                 </div>
                 <div className="space-y-3 mb-6">
                   {[
-                    { icon: "🏟️", title: "Partidos de Grupos", pts: "50–80 pts c/u", desc: "Predecí el resultado: local (1), empate (X) o visitante (2). Ganador/perdedor: 50 pts. Empate exacto: 80 pts. ¡48 partidos para acertar!" },
-                    { icon: "🥇", title: "Clasificados por Grupo", pts: "120–300 pts c/u", desc: "Elegí qué equipo termina 1° y cuál 2° en cada grupo. 120 pts por clasificado correcto + 180 pts extra si acertás la posición exacta = 300 pts." },
-                    { icon: "🏆", title: "Eliminatorias", pts: "200 a 3.000 pts", desc: "Predecí quién avanza en cada fase. 16vos: 200 pts · 8vos: 350 · 4tos: 600 · Semis: 1.000 · Campeón: 3.000 pts." },
+                    { icon: "🏟️", title: "Partidos de Grupos", pts: "150–250 pts c/u", desc: "Predecí el resultado: local (1), empate (X) o visitante (2). Ganador/perdedor: 150 pts. Empate exacto: 250 pts. ¡48 partidos para acertar!" },
+                    { icon: "🥇", title: "Clasificados por Grupo", pts: "400–1.000 pts c/u", desc: "Elegí qué equipo termina 1° y cuál 2° en cada grupo. 400 pts por clasificado correcto + 600 pts extra si acertás la posición exacta = 1.000 pts." },
+                    { icon: "🏆", title: "Eliminatorias", pts: "700 a 10.000 pts", desc: "Predecí quién avanza en cada fase. 16vos: 700 pts · 8vos: 1.200 · 4tos: 2.000 · Semis: 3.500 · Campeón: 10.000 pts." },
                   ].map(item => (
                     <div key={item.title} className="flex gap-4 p-4 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
                       <div className="w-10 h-10 rounded-xl bg-[#252525] flex items-center justify-center flex-shrink-0 text-xl">{item.icon}</div>
@@ -917,7 +917,7 @@ export default function PredictionsPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-white font-bold text-sm">Logros automáticos</p>
-                        <span className="text-green-400 font-black text-[10px] bg-green-500/10 px-1.5 py-0.5 rounded">1.000 a 150.000 pts</span>
+                        <span className="text-green-400 font-black text-[10px] bg-green-500/10 px-1.5 py-0.5 rounded">2.000 a 250.000 pts</span>
                       </div>
                       <p className="text-gray-500 text-xs mt-1 leading-relaxed">
                         Si acertás muchos partidos o toda la llave, se desbloquean logros con puntos extra enormes. ¡Sin hacer nada especial, se calculan solos!
@@ -955,33 +955,40 @@ export default function PredictionsPage() {
 // ─── Points & Achievements Modal ─────────────────────────────────────────────
 
 const LOGROS = [
-  { icon: "🚀", name: "Buen arranque",          condition: "Acertar 10 partidos de grupos",       pts: "1.000",   target: 10,  type: "match" as const },
-  { icon: "📊", name: "Especialista de grupos",  condition: "Acertar 35 partidos de grupos",      pts: "3.000",   target: 35,  type: "match" as const },
-  { icon: "🌍", name: "Experto mundialista",     condition: "Acertar 45 partidos de grupos",      pts: "7.500",   target: 45,  type: "match" as const },
-  { icon: "🤖", name: "Máquina de grupos",       condition: "Acertar 55 partidos de grupos",      pts: "15.000",  target: 55,  type: "match" as const },
-  { icon: "👁️", name: "Ojo clínico",             condition: "Acertar 18 clasificados de grupo",   pts: "5.000",   target: 18,  type: "classified" as const },
-  { icon: "📋", name: "Tabla perfecta",          condition: "Acertar todos los 1° y 2° exactos", pts: "20.000",  target: 12,  type: "groups" as const },
-  { icon: "💪", name: "Bracket fuerte",          condition: "Acertar el 70% de eliminatorias",   pts: "10.000",  target: 22,  type: "bracket" as const },
-  { icon: "🎯", name: "Bracket perfecto",        condition: "Acertar toda la llave eliminatoria", pts: "30.000",  target: 31,  type: "bracket" as const },
-  { icon: "💫", name: "Final soñada",            condition: "Acertar campeón y subcampeón",       pts: "5.000",   target: 1,   type: "champion" as const },
-  { icon: "🏆", name: "Prode perfecto",          condition: "Desbloquear todos los logros",       pts: "150.000", target: 10,  type: "all" as const },
+  { icon: "🚀", name: "Buen arranque",              condition: "Acertar 10 partidos de grupos",            pts: "2.000",   target: 10,  type: "match" as const },
+  { icon: "🔥", name: "Racha de aciertos",          condition: "Acertar 25 partidos de grupos",            pts: "6.000",   target: 25,  type: "match" as const },
+  { icon: "📊", name: "Especialista de grupos",     condition: "Acertar 40 partidos de grupos",            pts: "15.000",  target: 40,  type: "match" as const },
+  { icon: "🤖", name: "Máquina de grupos",          condition: "Acertar 55 partidos de grupos",            pts: "35.000",  target: 55,  type: "match" as const },
+  { icon: "🦅", name: "Ojo de halcón",              condition: "Acertar 12 clasificados de grupo",         pts: "5.000",   target: 12,  type: "classified" as const },
+  { icon: "👁️", name: "Ojo clínico",               condition: "Acertar 18 clasificados de grupo",         pts: "12.000",  target: 18,  type: "classified" as const },
+  { icon: "✅", name: "Todos clasificados",         condition: "Acertar los 24 clasificados",              pts: "30.000",  target: 24,  type: "classified" as const },
+  { icon: "📋", name: "Tabla perfecta",             condition: "Acertar todos los 1° y 2° exactos",        pts: "50.000",  target: 12,  type: "groups" as const },
+  { icon: "💪", name: "Bracket fuerte",             condition: "Acertar el 70% de eliminatorias",          pts: "20.000",  target: 22,  type: "bracket" as const },
+  { icon: "🎯", name: "Bracket perfecto",           condition: "Acertar toda la llave eliminatoria",       pts: "60.000",  target: 31,  type: "bracket" as const },
+  { icon: "🌍", name: "Fase de grupos excelente",   condition: "40+ partidos + 18+ clasificados correctos", pts: "35.000", target: 1,   type: "champion" as const },
+  { icon: "⭐", name: "Fase de grupos perfecta",    condition: "55 partidos + tabla exacta completa",       pts: "80.000", target: 1,   type: "champion" as const },
+  { icon: "🔮", name: "Prode casi perfecto",        condition: "Fase excelente + bracket fuerte",           pts: "120.000",target: 1,   type: "champion" as const },
+  { icon: "🏆", name: "Prode perfecto",             condition: "Desbloquear todos los logros",              pts: "250.000",target: 14,  type: "all" as const },
 ];
 
 const POINTS_TABLE = [
-  { section: "Fase de Grupos", items: [
-    { label: "Acertar ganador o perdedor",       pts: "50",    note: "" },
-    { label: "Acertar empate exacto",            pts: "80",    note: "(50 + 30 bonus)" },
-    { label: "Acertar equipo clasificado",       pts: "120",   note: "por cada clasificado" },
-    { label: "Acertar la posición exacta",       pts: "+180",  note: "extra sobre los 120" },
+  { section: "Partidos de grupos", items: [
+    { label: "Acertar ganador o perdedor",        pts: "150",    note: "48 partidos en grupos" },
+    { label: "Acertar empate exacto",             pts: "250",    note: "(150 + 100 bonus empate)" },
+  ]},
+  { section: "Clasificados de grupo", items: [
+    { label: "Acertar equipo clasificado",        pts: "400",    note: "por cada clasificado" },
+    { label: "Acertar la posición exacta",        pts: "+600",   note: "extra si acertás 1° o 2° exacto" },
+    { label: "Ejemplo: Argentina 1° exacto",      pts: "1.000",  note: "400 + 600 = 1.000 pts" },
   ]},
   { section: "Eliminatorias", items: [
-    { label: "Equipo que pasa en Ronda de 32",   pts: "200",   note: "× 16 equipos" },
-    { label: "Equipo que pasa en Octavos",       pts: "350",   note: "× 8 equipos" },
-    { label: "Equipo que pasa en Cuartos",       pts: "600",   note: "× 4 equipos" },
-    { label: "Equipo que pasa en Semifinal",     pts: "1.000", note: "× 2 equipos" },
-    { label: "Acertar al subcampeón",            pts: "1.500", note: "finalista que pierde" },
-    { label: "Acertar al campeón",               pts: "3.000", note: "" },
-    { label: "Campeón + subcampeón exactos",     pts: "+5.000",note: "bonus adicional" },
+    { label: "Equipo que pasa en Ronda de 32",    pts: "700",    note: "× 16 equipos" },
+    { label: "Equipo que pasa en Octavos",        pts: "1.200",  note: "× 8 equipos" },
+    { label: "Equipo que pasa en Cuartos",        pts: "2.000",  note: "× 4 equipos" },
+    { label: "Equipo que pasa en Semifinal",      pts: "3.500",  note: "× 2 equipos" },
+    { label: "Acertar al subcampeón (finalista)", pts: "5.000",  note: "" },
+    { label: "Acertar al campeón",                pts: "10.000", note: "" },
+    { label: "Campeón + subcampeón exactos",      pts: "+15.000",note: "bonus adicional" },
   ]},
 ];
 

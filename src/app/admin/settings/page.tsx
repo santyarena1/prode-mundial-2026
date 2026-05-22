@@ -320,16 +320,20 @@ export default function AdminSettingsPage() {
             Seguro ejecutarlo múltiples veces (upsert).
           </p>
           <div className="text-xs text-gray-600 space-y-1 mb-4">
-            <div>• Buen arranque: 10 aciertos → 1.000 pts</div>
-            <div>• Especialista de grupos: 35 → 3.000 pts</div>
-            <div>• Experto mundialista: 45 → 7.500 pts</div>
-            <div>• Máquina de grupos: 55 → 15.000 pts</div>
-            <div>• Ojo clínico: 18 clasificados → 5.000 pts</div>
-            <div>• Tabla perfecta → 20.000 pts</div>
-            <div>• Bracket fuerte 70% → 10.000 pts</div>
-            <div>• Bracket perfecto → 30.000 pts</div>
-            <div>• Final soñada → 5.000 pts</div>
-            <div>• Prode perfecto → 150.000 pts</div>
+            <div>• Buen arranque: 10 aciertos → 2.000 pts</div>
+            <div>• Racha de aciertos: 25 → 6.000 pts</div>
+            <div>• Especialista de grupos: 40 → 15.000 pts</div>
+            <div>• Máquina de grupos: 55 → 35.000 pts</div>
+            <div>• Ojo de halcón: 12 clasificados → 5.000 pts</div>
+            <div>• Ojo clínico: 18 clasificados → 12.000 pts</div>
+            <div>• Todos clasificados: 24 → 30.000 pts</div>
+            <div>• Tabla perfecta → 50.000 pts</div>
+            <div>• Bracket fuerte 70% → 20.000 pts</div>
+            <div>• Bracket perfecto → 60.000 pts</div>
+            <div>• Fase de grupos excelente → 35.000 pts</div>
+            <div>• Fase de grupos perfecta → 80.000 pts</div>
+            <div>• Prode casi perfecto → 120.000 pts</div>
+            <div>• Prode perfecto → 250.000 pts</div>
           </div>
           <Button variant="primary" size="sm" loading={applyingRules} onClick={applyNewRules} className="w-full">
             <Trophy className="w-4 h-4" /> Aplicar reglas y logros
@@ -380,39 +384,39 @@ export default function AdminSettingsPage() {
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 text-xs text-gray-600">
             <div>
-              <p className="text-gray-500 font-semibold mb-1">Premios (15):</p>
+              <p className="text-gray-500 font-semibold mb-1">Premios (16):</p>
               <div className="space-y-0.5">
                 <div>• Sorteo semanal → 1.000 pts</div>
+                <div>• Cupón chico → 3.000 pts</div>
                 <div>• Cupón 5% OFF → 5.000 pts</div>
-                <div>• Cupón 10% OFF → 8.000 pts</div>
-                <div>• Envío bonificado → 12.000 pts</div>
+                <div>• Cupón 10% OFF → 10.000 pts</div>
                 <div>• Sticker pack TGS → 15.000 pts</div>
-                <div>• Mousepad gamer → 22.000 pts</div>
-                <div>• Merch sponsor → 28.000 pts</div>
+                <div>• Envío bonificado → 18.000 pts</div>
+                <div>• Mousepad gamer → 25.000 pts</div>
                 <div>• Gift card TGS → 35.000 pts</div>
-                <div>• Mouse gamer → 50.000 pts</div>
-                <div>• Auricular gamer → 65.000 pts</div>
-                <div>• Teclado gamer → 80.000 pts</div>
-                <div>• Gift card importante → 90.000 pts</div>
-                <div>• Periférico gamer sponsor → 110.000 pts</div>
-                <div>• Combo gamer sponsor → 130.000 pts</div>
-                <div>• Gran premio mundialero TGS → 150.000 pts</div>
+                <div>• Merch sponsor → 50.000 pts</div>
+                <div>• Mouse gamer → 75.000 pts</div>
+                <div>• Auricular gamer → 95.000 pts</div>
+                <div>• Teclado gamer → 120.000 pts</div>
+                <div>• Gift card importante → 150.000 pts</div>
+                <div>• Periférico gamer sponsor → 180.000 pts</div>
+                <div>• Combo gamer sponsor → 220.000 pts</div>
+                <div>• Gran premio mundialero TGS → 250.000 pts</div>
               </div>
             </div>
             <div>
-              <p className="text-gray-500 font-semibold mb-1">Bonus actions (11):</p>
+              <p className="text-gray-500 font-semibold mb-1">Bonus actions (10):</p>
               <div className="space-y-0.5">
-                <div>• Completar prode → 1.000 pts</div>
-                <div>• Seguir Instagram → 500 pts</div>
-                <div>• Seguir TikTok → 500 pts</div>
-                <div>• Suscribirse YouTube → 700 pts</div>
-                <div>• Compartir historia → 1.000 pts</div>
-                <div>• Seguir sponsor → 700 pts</div>
-                <div>• Código compra chica → 1.500 pts</div>
-                <div>• Código compra media → 3.000 pts</div>
-                <div>• Código compra grande → 6.000 pts</div>
-                <div>• Ver partido en local → 2.500 pts</div>
-                <div>• Invitar amigo validado → 1.500 pts</div>
+                <div>• Registrarse y completar perfil → 300 pts</div>
+                <div>• Completar todo el prode → 1.500 pts</div>
+                <div>• Seguir Instagram TGS → 300 pts</div>
+                <div>• Seguir TikTok TGS → 300 pts</div>
+                <div>• Suscribirse YouTube TGS → 400 pts</div>
+                <div>• Compartir historia etiquetando TGS → 700 pts</div>
+                <div>• Seguir sponsor del Prode → 400 pts</div>
+                <div>• Invitar amigo validado → 1.000 pts</div>
+                <div>• Ver partido en el local TGS → 1.500 pts</div>
+                <div>• Código de compra → $150 = 1 pt (fórmula)</div>
               </div>
             </div>
           </div>

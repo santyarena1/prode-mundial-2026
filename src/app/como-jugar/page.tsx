@@ -108,21 +108,22 @@ export default function ComoJugarPage() {
         <Section title="3. Sistema de puntos — Fase de grupos">
           <Card className="p-5">
             <p className="text-gray-500 text-xs mb-4">Cada predicción acertada suma puntos automáticamente.</p>
-            <Rule pts="50" label="Acertar resultado (ganador o perdedor)" />
-            <Rule pts="80" label="Acertar empate exacto (+30 de bonus)" />
-            <Rule pts="120" label="Acertar equipo clasificado del grupo" />
-            <Rule pts="300" label="Acertar 1° o 2° posición exacta (+180 extra)" />
+            <Rule pts="150" label="Acertar resultado (ganador o perdedor)" />
+            <Rule pts="250" label="Acertar empate exacto (150 + 100 bonus)" />
+            <Rule pts="400" label="Acertar equipo clasificado del grupo" />
+            <Rule pts="1.000" label="Acertar 1° o 2° posición exacta (400 + 600 extra)" />
           </Card>
         </Section>
 
         <Section title="4. Sistema de puntos — Eliminatorias">
           <Card className="p-5">
-            <Rule pts="200"  label="Acertar equipo que pasa en Ronda de 32" />
-            <Rule pts="350"  label="Acertar equipo que pasa en Octavos" />
-            <Rule pts="600"  label="Acertar equipo que pasa en Cuartos" />
-            <Rule pts="1.000" label="Acertar equipo que pasa en Semifinal" />
-            <Rule pts="1.500" label="Acertar finalista (subcampeón)" />
-            <Rule pts="3.000" label="Acertar al campeón" />
+            <Rule pts="700"    label="Acertar equipo que pasa en Ronda de 32" />
+            <Rule pts="1.200"  label="Acertar equipo que pasa en Octavos" />
+            <Rule pts="2.000"  label="Acertar equipo que pasa en Cuartos" />
+            <Rule pts="3.500"  label="Acertar equipo que pasa en Semifinal" />
+            <Rule pts="5.000"  label="Acertar finalista (subcampeón)" />
+            <Rule pts="10.000" label="Acertar al campeón" />
+            <Rule pts="+15.000" label="Bonus: campeón + subcampeón exactos" />
           </Card>
         </Section>
 
@@ -132,16 +133,20 @@ export default function ComoJugarPage() {
             <p className="text-gray-500 text-xs mb-4">
               Los logros se calculan automáticamente y se suman a tu puntaje. No hace falta reclamarlos.
             </p>
-            <Achievement name="Buen arranque"          condition="Acertar 10 partidos de fase de grupos"              pts="1.000" />
-            <Achievement name="Especialista de grupos" condition="Acertar 35 partidos de fase de grupos"              pts="3.000" />
-            <Achievement name="Experto mundialista"    condition="Acertar 45 partidos de fase de grupos"              pts="7.500" />
-            <Achievement name="Máquina de grupos"      condition="Acertar 55 partidos de fase de grupos"              pts="15.000" />
-            <Achievement name="Ojo clínico"            condition="Acertar 18 o más clasificados de grupo"             pts="5.000" />
-            <Achievement name="Tabla perfecta"         condition="Acertar todos los 1° y 2° exactos en los 12 grupos" pts="20.000" />
-            <Achievement name="Bracket fuerte"         condition="Acertar el 70% de las predicciones de eliminatorias" pts="10.000" />
-            <Achievement name="Bracket perfecto"       condition="Acertar toda la llave eliminatoria"                 pts="30.000" />
-            <Achievement name="Final soñada"           condition="Acertar campeón y subcampeón"                      pts="5.000" />
-            <Achievement name="Prode perfecto"         condition="Desbloquear todos los logros anteriores"            pts="150.000" />
+            <Achievement name="Buen arranque"              condition="Acertar 10 partidos de fase de grupos"               pts="2.000" />
+            <Achievement name="Racha de aciertos"          condition="Acertar 25 partidos de fase de grupos"               pts="6.000" />
+            <Achievement name="Especialista de grupos"     condition="Acertar 40 partidos de fase de grupos"               pts="15.000" />
+            <Achievement name="Máquina de grupos"          condition="Acertar 55 partidos de fase de grupos"               pts="35.000" />
+            <Achievement name="Ojo de halcón"              condition="Acertar 12 clasificados de grupo"                    pts="5.000" />
+            <Achievement name="Ojo clínico"                condition="Acertar 18 clasificados de grupo"                    pts="12.000" />
+            <Achievement name="Todos clasificados"         condition="Acertar los 24 clasificados"                         pts="30.000" />
+            <Achievement name="Tabla perfecta"             condition="Acertar todos los 1° y 2° exactos en los 12 grupos"  pts="50.000" />
+            <Achievement name="Bracket fuerte"             condition="Acertar el 70% de las predicciones de eliminatorias" pts="20.000" />
+            <Achievement name="Bracket perfecto"           condition="Acertar toda la llave eliminatoria"                  pts="60.000" />
+            <Achievement name="Fase de grupos excelente"   condition="40+ partidos + 18+ clasificados correctos"           pts="35.000" />
+            <Achievement name="Fase de grupos perfecta"    condition="55 partidos + tabla exacta completa"                 pts="80.000" />
+            <Achievement name="Prode casi perfecto"        condition="Fase excelente + bracket fuerte"                     pts="120.000" />
+            <Achievement name="Prode perfecto"             condition="Desbloquear todos los logros"                        pts="250.000" />
           </Card>
         </Section>
 
@@ -170,12 +175,12 @@ export default function ComoJugarPage() {
           <Card className="p-5">
             <div className="space-y-2">
               {[
-                { label: "Usuario casual",               range: "2.000 – 8.000" },
-                { label: "Usuario activo",               range: "8.000 – 20.000" },
-                { label: "Usuario con buena campaña",   range: "20.000 – 45.000" },
-                { label: "Usuario excelente",            range: "45.000 – 80.000" },
-                { label: "Caso muy poco frecuente",      range: "80.000 – 120.000" },
-                { label: "Prode casi perfecto",          range: "150.000 o más" },
+                { label: "Usuario casual",               range: "5.000 – 20.000" },
+                { label: "Usuario activo",               range: "20.000 – 50.000" },
+                { label: "Usuario con buena campaña",   range: "50.000 – 100.000" },
+                { label: "Usuario excelente",            range: "100.000 – 180.000" },
+                { label: "Caso muy poco frecuente",      range: "180.000 – 300.000" },
+                { label: "Prode casi perfecto",          range: "300.000 o más" },
               ].map(({ label, range }) => (
                 <div key={label} className="flex items-center justify-between py-1.5 border-b border-[#1f1f1f] last:border-0">
                   <span className="text-gray-400 text-sm">{label}</span>
