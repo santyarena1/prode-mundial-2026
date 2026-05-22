@@ -380,7 +380,7 @@ export default function AdminSettingsPage() {
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 text-xs text-gray-600">
             <div>
-              <p className="text-gray-500 font-semibold mb-1">Premios (12):</p>
+              <p className="text-gray-500 font-semibold mb-1">Premios (15):</p>
               <div className="space-y-0.5">
                 <div>• Sorteo semanal → 1.000 pts</div>
                 <div>• Cupón 5% OFF → 5.000 pts</div>
@@ -393,17 +393,21 @@ export default function AdminSettingsPage() {
                 <div>• Mouse gamer → 50.000 pts</div>
                 <div>• Auricular gamer → 65.000 pts</div>
                 <div>• Teclado gamer → 80.000 pts</div>
-                <div>• Premio Jackpot TGS → 120.000 pts</div>
+                <div>• Gift card importante → 90.000 pts</div>
+                <div>• Periférico gamer sponsor → 110.000 pts</div>
+                <div>• Combo gamer sponsor → 130.000 pts</div>
+                <div>• Gran premio mundialero TGS → 150.000 pts</div>
               </div>
             </div>
             <div>
-              <p className="text-gray-500 font-semibold mb-1">Bonus actions (10):</p>
+              <p className="text-gray-500 font-semibold mb-1">Bonus actions (11):</p>
               <div className="space-y-0.5">
                 <div>• Completar prode → 1.000 pts</div>
                 <div>• Seguir Instagram → 500 pts</div>
                 <div>• Seguir TikTok → 500 pts</div>
                 <div>• Suscribirse YouTube → 700 pts</div>
                 <div>• Compartir historia → 1.000 pts</div>
+                <div>• Seguir sponsor → 700 pts</div>
                 <div>• Código compra chica → 1.500 pts</div>
                 <div>• Código compra media → 3.000 pts</div>
                 <div>• Código compra grande → 6.000 pts</div>
