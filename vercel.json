@@ -16,5 +16,9 @@
       "path": "/api/cron/enrichment",
       "schedule": "0 2 * * *"
     }
-  ]
+  ],
+  "github": {
+    "enabled": true,
+    "autoJobCancelation": true
+  }
 }
