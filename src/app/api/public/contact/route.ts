@@ -32,7 +32,7 @@ export async function GET() {
 
     const instagramUrl =
       map.instagram_url?.trim() ||
-      "https://www.instagram.com/thegamershop/";
+      "https://www.instagram.com/thegamershop_oficial/";
 
     return NextResponse.json({
       whatsappNumber,

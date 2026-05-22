@@ -24,6 +24,8 @@ interface PurchaseCodeRow {
   } | null;
 }
 
+const POINTS_PER_PESO = 150; // $150 = 1 punto
+
 const TYPE_TABS: { key: CodeType; label: string; hint: string; placeholder: string; notesPlaceholder: string }[] = [
   {
     key: CODE_TYPES.story,
@@ -42,9 +44,9 @@ const TYPE_TABS: { key: CodeType; label: string; hint: string; placeholder: stri
   {
     key: CODE_TYPES.purchase,
     label: "Compra",
-    hint: "Códigos post-compra para enviar por WhatsApp (TGS-...).",
+    hint: `Ingresá el monto de la compra. El sistema calcula los puntos automáticamente: cada $${POINTS_PER_PESO} = 1 punto.`,
     placeholder: "TGS-... (opcional)",
-    notesPlaceholder: "Nota (ticket, monto...)",
+    notesPlaceholder: "Nro. de ticket, cliente, etc.",
   },
 ];
 
@@ -54,7 +56,7 @@ export function AdminPurchaseCodes() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
-  const [form, setForm] = useState({ code: "", points: "30", notes: "" });
+  const [form, setForm] = useState({ code: "", points: "30", amount: "", notes: "" });
 
   const tabMeta = TYPE_TABS.find((t) => t.key === activeType)!;
 
@@ -72,9 +74,24 @@ export function AdminPurchaseCodes() {
     load(activeType);
   }, [activeType]);
 
+  const isPurchaseTab = activeType === CODE_TYPES.purchase;
+  const purchaseAmount = parseFloat(form.amount);
+  const calculatedPoints = isPurchaseTab
+    ? Math.floor(purchaseAmount / POINTS_PER_PESO)
+    : parseInt(form.points, 10);
+
   const createCode = async () => {
-    const points = parseInt(form.points, 10);
-    if (!points || points < 1) {
+    const points = calculatedPoints;
+    if (isPurchaseTab) {
+      if (!form.amount || isNaN(purchaseAmount) || purchaseAmount <= 0) {
+        toast.error("Ingresá el monto de la compra");
+        return;
+      }
+      if (points < 1) {
+        toast.error(`El monto mínimo es $${POINTS_PER_PESO} para obtener al menos 1 punto`);
+        return;
+      }
+    } else if (!points || points < 1) {
       toast.error("Ingresá los puntos del código");
       return;
     }
@@ -96,7 +113,7 @@ export function AdminPurchaseCodes() {
         return;
       }
       setCodes((prev) => [data.purchaseCode, ...prev]);
-      setForm({ code: "", points: form.points, notes: "" });
+      setForm({ code: "", points: form.points, amount: "", notes: "" });
       toast.success(
         activeType === CODE_TYPES.story
           ? `Código ${data.purchaseCode.code} listo — subilo a historias`
@@ -183,12 +200,29 @@ export function AdminPurchaseCodes() {
             onChange={(e) => setForm((p) => ({ ...p, code: e.target.value.toUpperCase() }))}
             className="font-mono sm:col-span-1"
           />
-          <Input
-            type="number"
-            placeholder="Puntos"
-            value={form.points}
-            onChange={(e) => setForm((p) => ({ ...p, points: e.target.value }))}
-          />
+          {isPurchaseTab ? (
+            <div className="flex flex-col gap-1">
+              <Input
+                type="number"
+                placeholder="Monto de compra ($)"
+                value={form.amount}
+                onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
+              />
+              {form.amount && !isNaN(purchaseAmount) && purchaseAmount > 0 && (
+                <p className="text-yellow-400 text-xs font-bold px-1">
+                  = {calculatedPoints} punto{calculatedPoints !== 1 ? "s" : ""}
+                  {calculatedPoints < 1 && <span className="text-red-400 ml-1">(mínimo $150)</span>}
+                </p>
+              )}
+            </div>
+          ) : (
+            <Input
+              type="number"
+              placeholder="Puntos"
+              value={form.points}
+              onChange={(e) => setForm((p) => ({ ...p, points: e.target.value }))}
+            />
+          )}
           <Input
             placeholder={tabMeta.notesPlaceholder}
             value={form.notes}
