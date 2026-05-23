@@ -14,6 +14,7 @@ import { Logo } from "@/components/layout/Logo";
 import { HeroSponsors } from "@/components/home/HeroSponsors";
 import { HeroVideo } from "@/components/home/HeroVideo";
 import { WelcomeModal } from "@/components/home/WelcomeModal";
+import { SponsorCTA } from "@/components/home/SponsorCTA";
 import { AnimatePresence } from "framer-motion";
 
 interface Sponsor {
@@ -441,6 +442,9 @@ export default function HomePage() {
           )}
         </div>
       </section>
+
+      {/* SPONSOR CTA */}
+      <SponsorCTA totalParticipants={stats?.totalParticipants} />
 
       <Footer />
 

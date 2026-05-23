@@ -8,6 +8,7 @@ import {
   Trophy, Target, Star, Gift, Zap, ChevronRight, User, TrendingUp, CheckCircle2, BookOpen, UserCircle,
 } from "lucide-react";
 import { VirtualAlbumModal } from "@/components/dashboard/VirtualAlbumModal";
+import { SponsorCTA } from "@/components/home/SponsorCTA";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Card } from "@/components/ui/Card";
@@ -297,6 +298,11 @@ export default function DashboardPage() {
               </button>
             </motion.div>
           </div>
+        </div>
+
+        {/* Sponsor CTA */}
+        <div className="mb-6">
+          <SponsorCTA compact />
         </div>
 
         {/* Points breakdown */}
