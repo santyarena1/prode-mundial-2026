@@ -66,8 +66,8 @@ function ImageUploader({
       if (!res.ok) { toast.error(data.error || "Error al subir"); return; }
       onChange(data.url);
       toast.success("Imagen subida");
-    } catch {
-      toast.error("Error de conexión");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error de conexión");
     } finally {
       setUploading(false);
     }

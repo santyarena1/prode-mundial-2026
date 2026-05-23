@@ -19,9 +19,15 @@ export async function POST(request: NextRequest) {
 
   const ext = file.type.split("/")[1].replace("jpeg", "jpg");
   const filename = `prizes/${randomUUID()}.${ext}`;
-  const blob = await put(filename, file.stream(), { access: "public", contentType: file.type });
 
-  return NextResponse.json({ url: blob.url });
+  try {
+    const buffer = await file.arrayBuffer();
+    const blob = await put(filename, buffer, { access: "public", contentType: file.type });
+    return NextResponse.json({ url: blob.url });
+  } catch (err) {
+    console.error("Blob upload error:", err);
+    return NextResponse.json({ error: "Error al subir la imagen al almacenamiento" }, { status: 500 });
+  }
 }
 
 export async function DELETE(request: NextRequest) {
