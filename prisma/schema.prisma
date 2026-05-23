@@ -246,6 +246,7 @@ model BonusAction {
   limitPerUser     Int?
   limitGlobal      Int?
   actionUrl        String?
+  requiredHandles  String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -259,6 +260,7 @@ model UserBonus {
   bonusActionId String
   status        String   @default("pending")
   evidenceUrl   String?
+  socialHandles String?
   pointsEarned  Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

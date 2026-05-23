@@ -7,16 +7,15 @@ export async function GET() {
     const auth = await getAdminFromCookies();
     if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const bonuses = await prisma.userBonus.findMany({
-      where: { status: "pending" },
+    const userBonuses = await prisma.userBonus.findMany({
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
-        bonusAction: true,
+        user: { select: { id: true, firstName: true, lastName: true, email: true, instagram: true } },
+        bonusAction: { select: { name: true, points: true } },
       },
-      orderBy: { createdAt: "asc" },
+      orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ bonuses });
+    return NextResponse.json({ userBonuses });
   } catch (error) {
     console.error("UserBonuses GET error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

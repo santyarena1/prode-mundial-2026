@@ -12,6 +12,7 @@ const updateBonusActionSchema = z.object({
   requiresApproval: z.boolean().optional(),
   active: z.boolean().optional(),
   actionUrl: z.string().nullable().optional(),
+  requiredHandles: z.string().nullable().optional(),
 });
 
 export async function PUT(

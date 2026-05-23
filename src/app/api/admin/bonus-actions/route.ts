@@ -12,6 +12,7 @@ const createBonusActionSchema = z.object({
   requiresApproval: z.boolean().optional(),
   active: z.boolean().optional(),
   actionUrl: z.string().optional(),
+  requiredHandles: z.string().optional(),
 });
 
 export async function GET() {

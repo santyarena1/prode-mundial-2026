@@ -15,6 +15,11 @@ import { LoadingScreen } from "@/components/ui/LoadingSpinner";
 import { PurchaseCodeSection } from "@/components/bonuses/PurchaseCodeSection";
 import { apiFetch } from "@/lib/api";
 
+const HANDLE_LABELS: Record<string, string> = {
+  instagram: "Instagram", tiktok: "TikTok", youtube: "YouTube",
+  twitter: "X / Twitter", facebook: "Facebook", twitch: "Twitch",
+};
+
 interface BonusAction {
   id: string;
   name: string;
@@ -22,6 +27,7 @@ interface BonusAction {
   points: number;
   requiresEvidence: boolean;
   actionUrl?: string | null;
+  requiredHandles?: string | null;
   active: boolean;
   claimedStatus: string | null;
   sponsor?: { name: string };
@@ -43,6 +49,7 @@ export default function BonusesPage() {
   const [redirectDone, setRedirectDone] = useState(false);
   const [referral, setReferral] = useState<ReferralData | null>(null);
   const [copied, setCopied] = useState(false);
+  const [socialHandles, setSocialHandles] = useState<Record<string, Record<string, string>>>({});
 
   useEffect(() => {
     const init = async () => {
@@ -75,6 +82,7 @@ export default function BonusesPage() {
         body: JSON.stringify({
           bonusActionId: bonusId,
           evidenceUrl: evidenceUrls[bonusId] || undefined,
+          socialHandles: socialHandles[bonusId] && Object.keys(socialHandles[bonusId]).length > 0 ? socialHandles[bonusId] : undefined,
         }),
       });
       const data = await res.json();
@@ -238,7 +246,7 @@ export default function BonusesPage() {
                         variant="primary"
                         size="sm"
                         loading={claiming[bonus.id]}
-                        onClick={() => { setRedirectDone(false); setModalBonus(bonus); }}
+                        onClick={() => { setRedirectDone(false); setModalBonus(bonus); setSocialHandles((p) => ({ ...p, [bonus.id]: p[bonus.id] || {} })); }}
                         className="bg-green-600 hover:bg-green-500"
                       >
                         RECLAMAR BONUS
@@ -330,6 +338,30 @@ export default function BonusesPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Social handle inputs */}
+                {(() => {
+                  let handles: string[] = [];
+                  try { handles = modalBonus.requiredHandles ? JSON.parse(modalBonus.requiredHandles) : []; } catch { handles = []; }
+                  if (handles.length === 0) return null;
+                  return (
+                    <div className="mb-5 space-y-3">
+                      <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Tu usuario en:</p>
+                      {handles.map((platform) => (
+                        <Input
+                          key={platform}
+                          placeholder={`Tu @ en ${HANDLE_LABELS[platform] ?? platform}`}
+                          value={socialHandles[modalBonus.id]?.[platform] || ""}
+                          onChange={(e) => setSocialHandles((prev) => ({
+                            ...prev,
+                            [modalBonus!.id]: { ...(prev[modalBonus!.id] || {}), [platform]: e.target.value },
+                          }))}
+                          label={HANDLE_LABELS[platform] ?? platform}
+                        />
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 {/* Evidence input if needed */}
                 {modalBonus.requiresEvidence && (

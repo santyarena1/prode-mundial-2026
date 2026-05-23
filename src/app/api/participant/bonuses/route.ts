@@ -7,6 +7,7 @@ import { calculateUserPoints } from "@/lib/points";
 const claimBonusSchema = z.object({
   bonusActionId: z.string().min(1),
   evidenceUrl: z.string().optional(),
+  socialHandles: z.record(z.string(), z.string()).optional(),
 });
 
 export async function GET() {
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Validation error", details: parsed.error.issues }, { status: 400 });
     }
 
-    const { bonusActionId, evidenceUrl } = parsed.data;
+    const { bonusActionId, evidenceUrl, socialHandles } = parsed.data;
 
     const bonusAction = await prisma.bonusAction.findUnique({ where: { id: bonusActionId } });
     if (!bonusAction || !bonusAction.active) {
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
         userId: auth.userId,
         bonusActionId,
         evidenceUrl: evidenceUrl || null,
+        socialHandles: socialHandles ? JSON.stringify(socialHandles) : null,
         status: "approved",
         pointsEarned,
       },
