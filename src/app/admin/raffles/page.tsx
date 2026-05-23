@@ -16,6 +16,12 @@ interface BonusAction {
   allowMultipleClaims: boolean;
 }
 
+interface Prize {
+  id: string;
+  name: string;
+  requiredPoints: number;
+}
+
 interface WeeklyRaffle {
   id: string;
   title: string;
@@ -26,12 +32,14 @@ interface WeeklyRaffle {
   winnerName?: string | null;
   winnerInstagram?: string | null;
   bonusActionId?: string | null;
+  prizeId?: string | null;
   earlyBirdCutoff?: string | null;
 }
 
 interface Participant {
   user: { id: string; firstName: string; lastName: string; email: string; instagram?: string | null };
   entries: number;
+  sources: string[];
 }
 
 const STATUSES = [
@@ -43,12 +51,13 @@ const STATUSES = [
 
 const emptyForm = {
   title: "", description: "", prize: "", scheduledAt: "", status: "upcoming",
-  winnerName: "", winnerInstagram: "", bonusActionId: "", earlyBirdCutoff: "",
+  winnerName: "", winnerInstagram: "", bonusActionId: "", prizeId: "", earlyBirdCutoff: "",
 };
 
 export default function AdminRafflesPage() {
   const [raffles, setRaffles] = useState<WeeklyRaffle[]>([]);
   const [bonusActions, setBonusActions] = useState<BonusAction[]>([]);
+  const [prizes, setPrizes] = useState<Prize[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -66,9 +75,11 @@ export default function AdminRafflesPage() {
     Promise.all([
       fetch("/api/admin/raffles").then((r) => r.json()),
       fetch("/api/admin/bonus-actions").then((r) => r.json()),
-    ]).then(([rd, bd]) => {
+      fetch("/api/admin/prizes").then((r) => r.json()),
+    ]).then(([rd, bd, pd]) => {
       setRaffles(rd.raffles || []);
       setBonusActions(bd.bonusActions || []);
+      setPrizes(pd.prizes || []);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -131,6 +142,7 @@ export default function AdminRafflesPage() {
         body: JSON.stringify({
           ...form,
           bonusActionId: form.bonusActionId || null,
+          prizeId: form.prizeId || null,
           earlyBirdCutoff: form.earlyBirdCutoff || null,
           winnerName: form.winnerName || null,
           winnerInstagram: form.winnerInstagram || null,
@@ -161,6 +173,7 @@ export default function AdminRafflesPage() {
       winnerName: r.winnerName || "",
       winnerInstagram: r.winnerInstagram || "",
       bonusActionId: r.bonusActionId || "",
+      prizeId: r.prizeId || "",
       earlyBirdCutoff: r.earlyBirdCutoff ? new Date(r.earlyBirdCutoff).toISOString().slice(0, 16) : "",
     });
   };
@@ -175,6 +188,7 @@ export default function AdminRafflesPage() {
         body: JSON.stringify({
           ...editForm,
           bonusActionId: editForm.bonusActionId || null,
+          prizeId: editForm.prizeId || null,
           earlyBirdCutoff: editForm.earlyBirdCutoff || null,
           winnerName: editForm.winnerName || null,
           winnerInstagram: editForm.winnerInstagram || null,
@@ -208,7 +222,7 @@ export default function AdminRafflesPage() {
   const RaffleForm = ({ f, set }: { f: typeof emptyForm; set: (v: typeof emptyForm) => void }) => (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <Input label="Título" placeholder="Ej: Sorteo Semana 1" value={f.title} onChange={(e) => set({ ...f, title: e.target.value })} />
-      <Input label="Premio" placeholder="Ej: Auriculares gaming" value={f.prize} onChange={(e) => set({ ...f, prize: e.target.value })} />
+      <Input label="Premio (descripción libre)" placeholder="Ej: Auriculares gaming" value={f.prize} onChange={(e) => set({ ...f, prize: e.target.value })} />
       <Input label="Fecha y hora del sorteo" type="datetime-local" value={f.scheduledAt} onChange={(e) => set({ ...f, scheduledAt: e.target.value })} />
       <div>
         <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wider">Estado</label>
@@ -218,15 +232,26 @@ export default function AdminRafflesPage() {
         </select>
       </div>
       <div className="sm:col-span-2">
-        <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wider">Cupón del sorteo (Bonus Action)</label>
+        <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wider">Entradas por Bonus Action (cupón)</label>
         <select value={f.bonusActionId} onChange={(e) => set({ ...f, bonusActionId: e.target.value })}
           className="w-full bg-[#111] border border-[#333] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
-          <option value="">— Sin cupón vinculado —</option>
+          <option value="">— Sin cupón —</option>
           {bonusActions.map((a) => (
             <option key={a.id} value={a.id}>{a.name} {a.allowMultipleClaims ? "(múltiples entradas)" : ""}</option>
           ))}
         </select>
-        <p className="text-gray-700 text-xs mt-1">El cupón que los usuarios reclamarán para participar. Activá "múltiples reclamos" en la acción para que puedan obtener más entradas.</p>
+        <p className="text-gray-700 text-xs mt-1">Usuarios que hayan reclamado este bonus action participan. Con "múltiples reclamos" cada claim extra es una entrada más.</p>
+      </div>
+      <div className="sm:col-span-2">
+        <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wider">Entradas por canje de premio</label>
+        <select value={f.prizeId} onChange={(e) => set({ ...f, prizeId: e.target.value })}
+          className="w-full bg-[#111] border border-[#333] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+          <option value="">— Sin premio vinculado —</option>
+          {prizes.map((p) => (
+            <option key={p.id} value={p.id}>{p.name} ({p.requiredPoints.toLocaleString("es-AR")} pts)</option>
+          ))}
+        </select>
+        <p className="text-gray-700 text-xs mt-1">Todos los usuarios que hayan canjeado este premio también participan del sorteo (1 entrada).</p>
       </div>
       <div>
         <Input label="Early bird: cierre de inscripción gratuita" type="datetime-local" value={f.earlyBirdCutoff} onChange={(e) => set({ ...f, earlyBirdCutoff: e.target.value })} />
@@ -275,6 +300,8 @@ export default function AdminRafflesPage() {
       <div className="space-y-3">
         {raffles.map((r) => {
           const linkedAction = bonusActions.find((a) => a.id === r.bonusActionId);
+          const linkedPrize = prizes.find((p) => p.id === r.prizeId);
+          const hasParticipants = !!(r.bonusActionId || r.prizeId);
           return (
             <Card key={r.id} className="p-5">
               {editingId === r.id ? (
@@ -306,6 +333,11 @@ export default function AdminRafflesPage() {
                         {linkedAction.allowMultipleClaims && <span className="text-gray-600">(múltiples entradas)</span>}
                       </div>
                     )}
+                    {linkedPrize && (
+                      <div className="flex items-center gap-1.5 text-green-400 text-xs mt-0.5">
+                        <Users className="w-3 h-3" /> Premio: {linkedPrize.name}
+                      </div>
+                    )}
                     {r.earlyBirdCutoff && (
                       <div className="flex items-center gap-1.5 text-yellow-500/70 text-xs mt-0.5">
                         <Trophy className="w-3 h-3" /> Early bird hasta: {new Date(r.earlyBirdCutoff).toLocaleDateString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
@@ -320,7 +352,7 @@ export default function AdminRafflesPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0 flex-col sm:flex-row">
-                    {r.bonusActionId && r.status !== "completed" && (
+                    {hasParticipants && r.status !== "completed" && (
                       <Button variant="primary" size="sm" onClick={() => openDraw(r)} className="bg-purple-600 hover:bg-purple-500">
                         <Shuffle className="w-4 h-4" /> Sortear
                       </Button>
@@ -395,6 +427,11 @@ export default function AdminRafflesPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-white text-sm font-semibold">{p.user.firstName} {p.user.lastName}</p>
                           <p className="text-gray-600 text-xs truncate">{p.user.email}</p>
+                          {p.sources.length > 0 && (
+                            <p className="text-gray-700 text-[10px] mt-0.5 truncate">
+                              {[...new Set(p.sources)].join(" · ")}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
                           <span className="text-purple-400 font-bold text-sm">{p.entries}</span>

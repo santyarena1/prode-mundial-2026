@@ -13,6 +13,7 @@ const createSchema = z.object({
   winnerInstagram: z.string().nullable().optional(),
   imageUrl: z.string().nullable().optional(),
   bonusActionId: z.string().nullable().optional(),
+  prizeId: z.string().nullable().optional(),
   earlyBirdCutoff: z.string().nullable().optional(),
 });
 

@@ -457,6 +457,7 @@ model WeeklyRaffle {
   winnerInstagram String?
   imageUrl        String?
   bonusActionId   String?
+  prizeId         String?
   earlyBirdCutoff DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
