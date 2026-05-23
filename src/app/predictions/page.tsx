@@ -169,11 +169,16 @@ export default function PredictionsPage() {
       }
 
       const hasSeenOnboarding = typeof window !== "undefined" && sessionStorage.getItem("pred_onboarding_seen");
+      const hasSeenHardcoreSpotlight = typeof window !== "undefined" && sessionStorage.getItem("hardcore_spotlight_seen");
       const missingAny =
         Object.keys(sp).length === 0 ||
         Object.keys(sg).length === 0 ||
         Object.keys(sb).length === 0;
       if (missingAny && !hasSeenOnboarding) setShowOnboarding(true);
+      // Show hardcore spotlight on page load when predictions incomplete, not hardcore, not seen before
+      if (missingAny && !meData.user?.hardcoreMode && !hasSeenHardcoreSpotlight && hasSeenOnboarding) {
+        setShowHardcoreSpotlight(true);
+      }
 
       setLoading(false);
     };
@@ -261,9 +266,6 @@ export default function PredictionsPage() {
     }
     if (ok > 0) {
       toast.success(`${ok} predicción${ok > 1 ? "es" : ""} confirmada${ok > 1 ? "s" : ""} ✓`);
-      if (!hardcoreMode && typeof window !== "undefined" && !sessionStorage.getItem("hardcore_spotlight_seen")) {
-        setShowHardcoreSpotlight(true);
-      }
     }
     setSavingGroup(prev => ({ ...prev, [groupId]: false }));
   }, [pendingPreds, pendingScores, savedPreds, hardcoreMode]);
@@ -1162,7 +1164,13 @@ export default function PredictionsPage() {
                 {/* CTA */}
                 <div className="px-4 pb-6 pt-2 flex-shrink-0">
                   <button
-                    onClick={() => { sessionStorage.setItem("pred_onboarding_seen", "1"); setShowOnboarding(false); }}
+                    onClick={() => {
+                      sessionStorage.setItem("pred_onboarding_seen", "1");
+                      setShowOnboarding(false);
+                      if (!hardcoreMode && !sessionStorage.getItem("hardcore_spotlight_seen")) {
+                        setTimeout(() => setShowHardcoreSpotlight(true), 400);
+                      }
+                    }}
                     className="w-full py-4 px-6 bg-red-600 hover:bg-red-500 active:scale-95 text-white font-black text-base uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-red-500/20"
                   >
                     ¡A predecir! ⚽
