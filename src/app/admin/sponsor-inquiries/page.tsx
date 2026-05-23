@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Handshake, Mail, Phone, Instagram, ChevronDown, Trash2, MessageSquare } from "lucide-react";
+import { Handshake, Mail, Phone, AtSign, ChevronDown, Trash2, MessageSquare } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingScreen } from "@/components/ui/LoadingSpinner";
@@ -158,7 +158,7 @@ export default function SponsorInquiriesPage() {
                     )}
                     {inq.instagram && (
                       <a href={`https://instagram.com/${inq.instagram.replace("@", "")}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-pink-400 text-xs hover:underline">
-                        <Instagram className="w-3.5 h-3.5" />{inq.instagram}
+                        <AtSign className="w-3.5 h-3.5" />{inq.instagram}
                       </a>
                     )}
                   </div>

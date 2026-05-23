@@ -89,6 +89,7 @@ export function SponsorCTA({ compact = false, totalParticipants }: Props) {
   }
 
   return (
+    <>
     <section className="py-20 px-4">
       <div className="max-w-7xl mx-auto">
         <motion.div
@@ -174,5 +175,6 @@ export function SponsorCTA({ compact = false, totalParticipants }: Props) {
     <AnimatePresence>
       {modalOpen && <SponsorInquiryModal onClose={() => setModalOpen(false)} />}
     </AnimatePresence>
+    </>
   );
 }
