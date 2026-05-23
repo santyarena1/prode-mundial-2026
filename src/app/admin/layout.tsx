@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, Calendar, CheckSquare, Trophy, Gift, Zap,
-  Building2, RefreshCw, Settings, LogOut, Menu, X, ChevronRight, BookOpen, Handshake,
+  Building2, RefreshCw, Settings, LogOut, Menu, X, ChevronRight, BookOpen, Handshake, Shuffle,
 } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
 import { StickyBackBar } from "@/components/layout/StickyBackBar";
@@ -19,6 +19,7 @@ const navItems = [
   { href: "/admin/ranking", icon: Trophy, label: "Ranking" },
   { href: "/admin/prizes", icon: Gift, label: "Premios" },
   { href: "/admin/bonus", icon: Zap, label: "Bonus" },
+  { href: "/admin/raffles", icon: Shuffle, label: "Sorteos semanales" },
   { href: "/admin/virtual-album", icon: BookOpen, label: "Álbum virtual" },
   { href: "/admin/sponsors", icon: Building2, label: "Sponsors" },
   { href: "/admin/sponsor-inquiries", icon: Handshake, label: "Consultas sponsors" },

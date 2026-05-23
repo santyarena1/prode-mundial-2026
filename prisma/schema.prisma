@@ -441,3 +441,17 @@ model UserAchievement {
 
   @@unique([userId, achievementRuleId])
 }
+
+model WeeklyRaffle {
+  id              String   @id @default(cuid())
+  title           String
+  description     String?
+  prize           String
+  scheduledAt     DateTime
+  status          String   @default("upcoming")
+  winnerName      String?
+  winnerInstagram String?
+  imageUrl        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
