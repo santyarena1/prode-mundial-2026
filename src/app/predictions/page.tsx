@@ -369,6 +369,19 @@ export default function PredictionsPage() {
     finally { setBuyingChange(false); }
   }, [changeCost]);
 
+  // Unsaved changes detection
+  const hasUnsaved =
+    Object.keys(pendingPreds).length > 0 ||
+    Object.keys(pendingBracket).length > 0 ||
+    Object.values(pendingGroupPreds).some((g) => g.first || g.second);
+
+  // Warn on reload / tab close / external navigation
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    if (hasUnsaved) window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsaved]);
+
   if (loading) return <LoadingScreen text="Cargando predicciones..." />;
 
   const hasAnyLocked =
@@ -566,7 +579,8 @@ export default function PredictionsPage() {
                           {pendingCount > 0 && (
                             <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="pt-1">
                               <Button variant="primary" size="sm" loading={savingGroup[group.id]}
-                                onClick={() => handleSaveGroupMatches(group.id, group.matches)} className="w-full">
+                                onClick={() => handleSaveGroupMatches(group.id, group.matches)} className="w-full"
+                                data-save-predictions>
                                 <Save className="w-4 h-4" />
                                 Confirmar {pendingCount} predicción{pendingCount > 1 ? "es" : ""} del Grupo {group.name}
                               </Button>
@@ -726,7 +740,8 @@ export default function PredictionsPage() {
                     {hasBothPending && (
                       <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>
                         <Button variant="primary" size="sm" loading={savingGroup[`g_${group.id}`]}
-                          onClick={() => handleSaveGroupClassification(group.id)} className="w-full">
+                          onClick={() => handleSaveGroupClassification(group.id)} className="w-full"
+                          data-save-predictions>
                           <Save className="w-4 h-4" />
                           Confirmar clasificados Grupo {group.name}
                         </Button>
@@ -878,7 +893,8 @@ export default function PredictionsPage() {
                     {currentPhasePendingCount > 0 && (
                       <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-5">
                         <Button variant="primary" size="sm" loading={savingBracket}
-                          onClick={handleSaveCurrentPhase} className="w-full">
+                          onClick={handleSaveCurrentPhase} className="w-full"
+                          data-save-predictions>
                           <Save className="w-4 h-4" />
                           Confirmar {currentPhasePendingCount} selección{currentPhasePendingCount > 1 ? "es" : ""} en {currentPhase.label}
                         </Button>
@@ -1179,6 +1195,36 @@ export default function PredictionsPage() {
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Unsaved changes banner ──────────────────────────────────────────── */}
+      <AnimatePresence>
+        {hasUnsaved && (
+          <motion.div
+            initial={{ opacity: 0, y: 80 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 80 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="fixed bottom-0 left-0 right-0 z-40 p-3 sm:p-4"
+          >
+            <div className="max-w-lg mx-auto bg-amber-500 rounded-2xl shadow-2xl shadow-amber-500/30 px-4 py-3 flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-black flex-shrink-0" />
+              <p className="text-black font-bold text-sm flex-1">
+                Tenés predicciones sin guardar — confirmá antes de salir
+              </p>
+              <button
+                onClick={() => {
+                  const saveBtn = document.querySelector<HTMLButtonElement>("[data-save-predictions]");
+                  saveBtn?.click();
+                  saveBtn?.scrollIntoView({ behavior: "smooth", block: "center" });
+                }}
+                className="bg-black text-amber-400 font-black text-xs px-3 py-1.5 rounded-lg hover:bg-gray-900 transition-colors whitespace-nowrap"
+              >
+                Ir a guardar
+              </button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
