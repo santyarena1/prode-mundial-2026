@@ -3,7 +3,9 @@ import { put, del } from "@vercel/blob";
 import { randomUUID } from "crypto";
 import { getAdminFromCookies } from "@/lib/cookies";
 
-const MAX_BYTES = 3 * 1024 * 1024;
+export const maxDuration = 30;
+
+const MAX_BYTES = 8 * 1024 * 1024;
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 export async function POST(request: NextRequest) {
@@ -15,7 +17,7 @@ export async function POST(request: NextRequest) {
 
   if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
   if (!ALLOWED.has(file.type)) return NextResponse.json({ error: "Formato no permitido. Usá JPG, PNG, WebP o GIF." }, { status: 400 });
-  if (file.size > MAX_BYTES) return NextResponse.json({ error: "La imagen no puede superar 3 MB." }, { status: 400 });
+  if (file.size > MAX_BYTES) return NextResponse.json({ error: "La imagen no puede superar 8 MB." }, { status: 400 });
 
   const ext = file.type.split("/")[1].replace("jpeg", "jpg");
   const filename = `prizes/${randomUUID()}.${ext}`;

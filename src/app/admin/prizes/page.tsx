@@ -62,8 +62,16 @@ function ImageUploader({
       const fd = new FormData();
       fd.append("file", file);
       const res = await fetch("/api/admin/prizes/upload-image", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) { toast.error(data.error || "Error al subir"); return; }
+      const text = await res.text();
+      if (!res.ok) {
+        if (res.status === 413 || text.includes("Too Large") || text.includes("Entity")) {
+          toast.error("La imagen es demasiado pesada. Comprimila a menos de 4 MB.");
+        } else {
+          try { toast.error(JSON.parse(text).error || "Error al subir"); } catch { toast.error("Error al subir"); }
+        }
+        return;
+      }
+      const data = JSON.parse(text);
       onChange(data.url);
       toast.success("Imagen subida");
     } catch (err) {
