@@ -111,9 +111,9 @@ export function SponsorCTA({ compact = false, totalParticipants }: Props) {
                 SEA PARTE?
               </h2>
               <p className="text-gray-400 mt-3 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
-                El Prode Mundial 2026 reúne a la comunidad gamer de Argentina en un solo lugar.
+                No hace falta ser una marca gamer. Solo hace falta tener ganas de participar.
                 {totalParticipants && totalParticipants > 10
-                  ? ` Ya somos más de ${totalParticipants.toLocaleString("es-AR")} participantes y crecemos cada día.`
+                  ? ` Más de ${totalParticipants.toLocaleString("es-AR")} personas van a ver tu marca durante el Mundial.`
                   : " Sumate antes de que arranque el mundial y posicioná tu marca desde el comienzo."}
               </p>
             </div>
@@ -146,6 +146,9 @@ export function SponsorCTA({ compact = false, totalParticipants }: Props) {
                 </p>
                 <p className="text-gray-600 text-sm mt-0.5">
                   Cada sponsor define su forma de participar: un premio, una acción, o ambas.
+                </p>
+                <p className="text-gray-700 text-xs mt-2">
+                  * La participación queda sujeta a la decisión de The Gamer Shop.
                 </p>
               </div>
               <a
