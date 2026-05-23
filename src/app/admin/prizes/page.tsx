@@ -492,9 +492,9 @@ export default function AdminPrizesPage() {
                         </button>
                       </div>
                     </div>
-                    <div className="relative w-full h-24 rounded-lg bg-[#1a1a1a] mb-2 overflow-hidden">
+                    <div className="relative w-full aspect-[5/2] rounded-lg bg-[#1a1a1a] mb-2 overflow-hidden">
                       {p.imageUrl
-                        ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-contain" />  // eslint-disable-line @next/next/no-img-element
+                        ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />  // eslint-disable-line @next/next/no-img-element
                         : <div className="w-full h-full flex items-center justify-center"><ImageOff className="w-5 h-5 text-gray-700" /></div>
                       }
                       <SponsorOverlay sponsor={p.sponsor} />

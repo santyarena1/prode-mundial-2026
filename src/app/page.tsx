@@ -328,10 +328,10 @@ export default function HomePage() {
                       </span>
                       <Gift className="w-5 h-5 text-red-500/50" />
                     </div>
-                    <div className="relative w-full h-40 rounded-lg mb-4 overflow-hidden bg-[#1a1a1a]">
+                    <div className="relative w-full aspect-[5/2] rounded-lg mb-4 overflow-hidden bg-[#1a1a1a]">
                       {prize.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={prize.imageUrl} alt={prize.name} className="w-full h-full object-contain" />
+                        <img src={prize.imageUrl} alt={prize.name} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center"><span className="text-4xl">🎁</span></div>
                       )}
