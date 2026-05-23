@@ -1,11 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Gift, Megaphone, Trophy, TrendingUp, ArrowRight, Handshake } from "lucide-react";
-
-// Actualizá este link con el WhatsApp o Instagram de contacto
-const CONTACT_URL =
-  "https://wa.me/?text=Hola%2C%20me%20interesa%20ser%20sponsor%20del%20Prode%20Mundial%202026%20de%20The%20Gamer%20Shop";
+import { SponsorInquiryModal } from "./SponsorInquiryModal";
+import { AnimatePresence } from "framer-motion";
 
 const benefits = [
   {
@@ -44,16 +43,18 @@ interface Props {
 }
 
 export function SponsorCTA({ compact = false, totalParticipants }: Props) {
+  const [modalOpen, setModalOpen] = useState(false);
+
   if (compact) {
     return (
-      <motion.a
-        href={CONTACT_URL}
-        target="_blank"
-        rel="noopener noreferrer"
+      <>
+      <motion.button
+        type="button"
+        onClick={() => setModalOpen(true)}
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6 }}
-        className="block group"
+        className="block w-full group text-left"
       >
         <div className="relative overflow-hidden rounded-2xl border border-[#1e1e1e] bg-gradient-to-r from-[#111] via-[#111] to-[#0d0d0d] p-5 hover:border-red-600/30 transition-all duration-300">
           {/* Accent glow */}
@@ -79,7 +80,11 @@ export function SponsorCTA({ compact = false, totalParticipants }: Props) {
             </div>
           </div>
         </div>
-      </motion.a>
+      </motion.button>
+      <AnimatePresence>
+        {modalOpen && <SponsorInquiryModal onClose={() => setModalOpen(false)} />}
+      </AnimatePresence>
+      </>
     );
   }
 
@@ -151,20 +156,23 @@ export function SponsorCTA({ compact = false, totalParticipants }: Props) {
                   * La participación queda sujeta a la decisión de The Gamer Shop.
                 </p>
               </div>
-              <a
-                href={CONTACT_URL}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => setModalOpen(true)}
                 className="group flex-shrink-0 inline-flex items-center gap-2.5 bg-red-600 hover:bg-red-500 text-white font-black uppercase tracking-wider text-sm px-7 py-3.5 rounded-xl transition-all duration-200 hover:shadow-[0_0_24px_rgba(220,38,38,0.4)] hover:gap-4"
               >
                 Quiero ser sponsor
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
-              </a>
+              </button>
             </div>
 
           </div>
         </motion.div>
       </div>
     </section>
+
+    <AnimatePresence>
+      {modalOpen && <SponsorInquiryModal onClose={() => setModalOpen(false)} />}
+    </AnimatePresence>
   );
 }

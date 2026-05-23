@@ -302,6 +302,22 @@ model Sponsor {
   bonusActions BonusAction[]
 }
 
+model SponsorInquiry {
+  id          String   @id @default(cuid())
+  name        String
+  brand       String
+  email       String
+  phone       String?
+  instagram   String?
+  reason      String
+  offer       String
+  message     String?
+  status      String   @default("pending")
+  adminNotes  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model Setting {
   id        String   @id @default(cuid())
   key       String   @unique
