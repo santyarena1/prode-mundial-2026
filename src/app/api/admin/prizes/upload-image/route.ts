@@ -1,37 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import { put, del } from "@vercel/blob";
-import { randomUUID } from "crypto";
+import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import { del } from "@vercel/blob";
 import { getAdminFromCookies } from "@/lib/cookies";
-import sharp from "sharp";
 
 export const maxDuration = 30;
-
-const MAX_BYTES = 8 * 1024 * 1024;
-const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 export async function POST(request: NextRequest) {
   const auth = await getAdminFromCookies();
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const formData = await request.formData();
-  const file = formData.get("file") as File | null;
-
-  if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
-  if (!ALLOWED.has(file.type)) return NextResponse.json({ error: "Formato no permitido. Usá JPG, PNG, WebP o GIF." }, { status: 400 });
-  if (file.size > MAX_BYTES) return NextResponse.json({ error: "La imagen no puede superar 8 MB." }, { status: 400 });
+  const body = (await request.json()) as HandleUploadBody;
 
   try {
-    const buffer = await file.arrayBuffer();
-    const webpBuffer = await sharp(Buffer.from(buffer))
-      .webp({ quality: 85 })
-      .toBuffer();
-
-    const filename = `prizes/${randomUUID()}.webp`;
-    const blob = await put(filename, webpBuffer, { access: "public", contentType: "image/webp" });
-    return NextResponse.json({ url: blob.url });
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      onBeforeGenerateToken: async (pathname) => ({
+        allowedContentTypes: ["image/webp", "image/jpeg", "image/png", "image/gif"],
+        pathname: `prizes/${pathname}`,
+        maximumSizeInBytes: 20 * 1024 * 1024,
+      }),
+      onUploadCompleted: async () => {},
+    });
+    return NextResponse.json(jsonResponse);
   } catch (err) {
-    console.error("Blob upload error:", err);
-    return NextResponse.json({ error: "Error al subir la imagen al almacenamiento" }, { status: 500 });
+    console.error("Upload error:", err);
+    return NextResponse.json({ error: String(err) }, { status: 400 });
   }
 }
 

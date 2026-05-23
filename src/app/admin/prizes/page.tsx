@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { upload } from "@vercel/blob/client";
 import toast from "react-hot-toast";
 import { Plus, Trash2, CheckCircle2, XCircle, Star, Edit2, X, Upload, ImageOff } from "lucide-react";
 import { Card } from "@/components/ui/Card";
@@ -56,26 +57,41 @@ function ImageUploader({
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
+  const toWebP = (file: File): Promise<File> =>
+    new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d")!.drawImage(img, 0, 0);
+        canvas.toBlob(
+          (blob) => {
+            URL.revokeObjectURL(url);
+            const name = file.name.replace(/\.[^.]+$/, ".webp");
+            resolve(blob ? new File([blob], name, { type: "image/webp" }) : file);
+          },
+          "image/webp",
+          0.85,
+        );
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+
   const handleFile = async (file: File) => {
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/admin/prizes/upload-image", { method: "POST", body: fd });
-      const text = await res.text();
-      if (!res.ok) {
-        if (res.status === 413 || text.includes("Too Large") || text.includes("Entity")) {
-          toast.error("La imagen es demasiado pesada. Comprimila a menos de 4 MB.");
-        } else {
-          try { toast.error(JSON.parse(text).error || "Error al subir"); } catch { toast.error("Error al subir"); }
-        }
-        return;
-      }
-      const data = JSON.parse(text);
-      onChange(data.url);
+      const webpFile = await toWebP(file);
+      const blob = await upload(webpFile.name, webpFile, {
+        access: "public",
+        handleUploadUrl: "/api/admin/prizes/upload-image",
+      });
+      onChange(blob.url);
       toast.success("Imagen subida");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error de conexión");
+      toast.error(err instanceof Error ? err.message : "Error al subir");
     } finally {
       setUploading(false);
     }
