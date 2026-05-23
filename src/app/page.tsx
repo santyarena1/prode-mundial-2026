@@ -336,13 +336,13 @@ export default function HomePage() {
                         <div className="w-full h-full flex items-center justify-center"><span className="text-4xl">🎁</span></div>
                       )}
                       {prize.sponsor?.logoUrl && (
-                        <>
-                          <div className="absolute bottom-0 right-0 w-2/5 h-full bg-gradient-to-l from-black/80 via-black/40 to-transparent pointer-events-none" />
-                          <div className="absolute bottom-2 right-2 w-12 h-12 flex items-center justify-center">
+                        <div className="absolute bottom-0 right-0 pointer-events-none">
+                          <div className="absolute bottom-0 right-0 w-16 h-16 bg-gradient-to-tl from-black/75 via-black/30 to-transparent rounded-tl-xl" />
+                          <div className="absolute bottom-1.5 right-1.5 w-7 h-7 flex items-center justify-center">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={prize.sponsor.logoUrl} alt={prize.sponsor.name} className="max-w-full max-h-full object-contain drop-shadow-lg" />
                           </div>
-                        </>
+                        </div>
                       )}
                     </div>
                     <h3 className="text-white font-bold mb-1 line-clamp-2">{prize.name}</h3>

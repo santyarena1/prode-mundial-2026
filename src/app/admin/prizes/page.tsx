@@ -174,9 +174,9 @@ function ImageUploader({
 function SponsorOverlay({ sponsor }: { sponsor?: Sponsor | null }) {
   if (!sponsor?.logoUrl) return null;
   return (
-    <div className="absolute bottom-0 right-0 w-1/3 h-full pointer-events-none">
-      <div className="absolute inset-0 bg-gradient-to-l from-black/80 via-black/40 to-transparent rounded-r-lg" />
-      <div className="absolute bottom-2 right-2 w-10 h-10 flex items-center justify-center">
+    <div className="absolute bottom-0 right-0 pointer-events-none">
+      <div className="absolute bottom-0 right-0 w-14 h-14 bg-gradient-to-tl from-black/75 via-black/30 to-transparent rounded-tl-xl" />
+      <div className="absolute bottom-1.5 right-1.5 w-6 h-6 flex items-center justify-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={sponsor.logoUrl} alt={sponsor.name} className="max-w-full max-h-full object-contain drop-shadow-lg" />
       </div>
