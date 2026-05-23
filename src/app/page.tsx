@@ -332,10 +332,10 @@ export default function HomePage() {
                       <img
                         src={prize.imageUrl}
                         alt={prize.name}
-                        className="w-full h-28 object-contain rounded-lg mb-4 bg-[#1a1a1a]"
+                        className="w-full h-40 object-cover rounded-lg mb-4"
                       />
                     ) : (
-                      <div className="w-full h-28 bg-[#1a1a1a] rounded-lg mb-4 flex items-center justify-center">
+                      <div className="w-full h-40 bg-[#1a1a1a] rounded-lg mb-4 flex items-center justify-center">
                         <span className="text-4xl">🎁</span>
                       </div>
                     )}

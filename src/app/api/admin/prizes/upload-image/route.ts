@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { put, del } from "@vercel/blob";
 import { randomUUID } from "crypto";
 import { getAdminFromCookies } from "@/lib/cookies";
+import sharp from "sharp";
 
 export const maxDuration = 30;
 
@@ -19,12 +20,14 @@ export async function POST(request: NextRequest) {
   if (!ALLOWED.has(file.type)) return NextResponse.json({ error: "Formato no permitido. Usá JPG, PNG, WebP o GIF." }, { status: 400 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: "La imagen no puede superar 8 MB." }, { status: 400 });
 
-  const ext = file.type.split("/")[1].replace("jpeg", "jpg");
-  const filename = `prizes/${randomUUID()}.${ext}`;
-
   try {
     const buffer = await file.arrayBuffer();
-    const blob = await put(filename, buffer, { access: "public", contentType: file.type });
+    const webpBuffer = await sharp(Buffer.from(buffer))
+      .webp({ quality: 85 })
+      .toBuffer();
+
+    const filename = `prizes/${randomUUID()}.webp`;
+    const blob = await put(filename, webpBuffer, { access: "public", contentType: "image/webp" });
     return NextResponse.json({ url: blob.url });
   } catch (err) {
     console.error("Blob upload error:", err);
