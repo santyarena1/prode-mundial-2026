@@ -43,6 +43,7 @@ interface FeaturedPrize {
   imageUrl?: string | null;
   requiredPoints: number;
   prizeType: string;
+  sponsor?: { id: string; name: string; logoUrl?: string | null } | null;
 }
 
 const PRIZE_TYPE_TAG: Record<string, string> = {
@@ -327,18 +328,23 @@ export default function HomePage() {
                       </span>
                       <Gift className="w-5 h-5 text-red-500/50" />
                     </div>
-                    {prize.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={prize.imageUrl}
-                        alt={prize.name}
-                        className="w-full h-40 object-cover rounded-lg mb-4"
-                      />
-                    ) : (
-                      <div className="w-full h-40 bg-[#1a1a1a] rounded-lg mb-4 flex items-center justify-center">
-                        <span className="text-4xl">🎁</span>
-                      </div>
-                    )}
+                    <div className="relative w-full h-40 rounded-lg mb-4 overflow-hidden bg-[#1a1a1a]">
+                      {prize.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={prize.imageUrl} alt={prize.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center"><span className="text-4xl">🎁</span></div>
+                      )}
+                      {prize.sponsor?.logoUrl && (
+                        <>
+                          <div className="absolute bottom-0 right-0 w-2/5 h-full bg-gradient-to-l from-black/80 via-black/40 to-transparent pointer-events-none" />
+                          <div className="absolute bottom-2 right-2 w-12 h-12 flex items-center justify-center">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={prize.sponsor.logoUrl} alt={prize.sponsor.name} className="max-w-full max-h-full object-contain drop-shadow-lg" />
+                          </div>
+                        </>
+                      )}
+                    </div>
                     <h3 className="text-white font-bold mb-1 line-clamp-2">{prize.name}</h3>
                     <p className="text-gray-500 text-xs mb-3 line-clamp-2">{prize.description}</p>
                     <div className="flex items-center gap-1 text-yellow-400">

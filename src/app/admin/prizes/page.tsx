@@ -19,6 +19,12 @@ const PRIZE_TYPES = [
   { value: "jackpot", label: "Jackpot" },
 ];
 
+interface Sponsor {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+}
+
 interface Prize {
   id: string;
   name: string;
@@ -32,6 +38,8 @@ interface Prize {
   prizeType: string;
   maxPerUser?: number | null;
   maxTotal?: number | null;
+  sponsorId?: string | null;
+  sponsor?: Sponsor | null;
 }
 
 interface Redemption {
@@ -44,7 +52,7 @@ interface Redemption {
 
 const emptyForm = {
   name: "", description: "", imageUrl: "", requiredPoints: "", stock: "",
-  prizeType: "physical", featured: false, sortOrder: "0", maxPerUser: "", maxTotal: "",
+  prizeType: "physical", featured: false, sortOrder: "0", maxPerUser: "", maxTotal: "", sponsorId: "",
 };
 
 function ImageUploader({
@@ -163,9 +171,23 @@ function ImageUploader({
   );
 }
 
+function SponsorOverlay({ sponsor }: { sponsor?: Sponsor | null }) {
+  if (!sponsor?.logoUrl) return null;
+  return (
+    <div className="absolute bottom-0 right-0 w-1/3 h-full pointer-events-none">
+      <div className="absolute inset-0 bg-gradient-to-l from-black/80 via-black/40 to-transparent rounded-r-lg" />
+      <div className="absolute bottom-2 right-2 w-10 h-10 flex items-center justify-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={sponsor.logoUrl} alt={sponsor.name} className="max-w-full max-h-full object-contain drop-shadow-lg" />
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPrizesPage() {
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
+  const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"prizes" | "redemptions">("prizes");
   const [newPrize, setNewPrize] = useState(emptyForm);
@@ -176,12 +198,14 @@ export default function AdminPrizesPage() {
 
   useEffect(() => {
     const init = async () => {
-      const [pRes, rRes] = await Promise.all([
+      const [pRes, rRes, sRes] = await Promise.all([
         fetch("/api/admin/prizes"),
         fetch("/api/admin/redemptions"),
+        fetch("/api/public/sponsors"),
       ]);
       if (pRes.ok) setPrizes((await pRes.json()).prizes || []);
       if (rRes.ok) setRedemptions((await rRes.json()).redemptions || []);
+      if (sRes.ok) setSponsors((await sRes.json()).sponsors || []);
       setLoading(false);
     };
     init();
@@ -215,6 +239,7 @@ export default function AdminPrizesPage() {
           prizeType: newPrize.prizeType,
           maxPerUser: newPrize.maxPerUser ? parseInt(newPrize.maxPerUser) : null,
           maxTotal: newPrize.maxTotal ? parseInt(newPrize.maxTotal) : null,
+          sponsorId: newPrize.sponsorId || null,
         }),
       });
       if (!res.ok) { toast.error("Error al crear premio"); return; }
@@ -277,6 +302,7 @@ export default function AdminPrizesPage() {
       if (editForm.active !== undefined) body.active = editForm.active;
       if (editForm.maxPerUser !== undefined) body.maxPerUser = editForm.maxPerUser ? parseInt(editForm.maxPerUser as string) : null;
       if (editForm.maxTotal !== undefined) body.maxTotal = editForm.maxTotal ? parseInt(editForm.maxTotal as string) : null;
+      if (editForm.sponsorId !== undefined) body.sponsorId = editForm.sponsorId || null;
 
       const res = await fetch(`/api/admin/prizes/${id}`, {
         method: "PUT",
@@ -362,6 +388,17 @@ export default function AdminPrizesPage() {
               <Input type="number" placeholder="Orden (0=primero)" value={newPrize.sortOrder} onChange={e => setNewPrize(p => ({ ...p, sortOrder: e.target.value }))} />
               <Input type="number" placeholder="Máx. canjes por usuario" value={newPrize.maxPerUser} onChange={e => setNewPrize(p => ({ ...p, maxPerUser: e.target.value }))} />
               <Input type="number" placeholder="Máx. canjes total" value={newPrize.maxTotal} onChange={e => setNewPrize(p => ({ ...p, maxTotal: e.target.value }))} />
+              <div className="flex flex-col gap-1">
+                <label className="text-gray-500 text-xs uppercase tracking-wider">Sponsor (logo en imagen)</label>
+                <select
+                  value={newPrize.sponsorId}
+                  onChange={e => setNewPrize(p => ({ ...p, sponsorId: e.target.value }))}
+                  className="bg-[#1a1a1a] border border-[#333] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500"
+                >
+                  <option value="">Sin sponsor</option>
+                  {sponsors.filter(s => s.logoUrl).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
             </div>
             <div className="flex items-center gap-4 mb-3">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -414,6 +451,14 @@ export default function AdminPrizesPage() {
                         {PRIZE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                       </select>
                     </div>
+                    <select
+                      defaultValue={p.sponsorId || ""}
+                      onChange={e => setEditForm(f => ({ ...f, sponsorId: e.target.value }))}
+                      className="w-full bg-[#1a1a1a] border border-[#333] text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-red-500"
+                    >
+                      <option value="">Sin sponsor</option>
+                      {sponsors.filter(s => s.logoUrl).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
                     <div className="flex gap-3 text-xs text-gray-400">
                       <label className="flex items-center gap-1 cursor-pointer">
                         <input type="checkbox" defaultChecked={p.featured} onChange={e => setEditForm(f => ({ ...f, featured: e.target.checked }))} className="accent-yellow-400" />
@@ -447,14 +492,13 @@ export default function AdminPrizesPage() {
                         </button>
                       </div>
                     </div>
-                    {p.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.imageUrl} alt={p.name} className="w-full h-24 object-contain rounded-lg bg-[#1a1a1a] mb-2 p-1" />
-                    ) : (
-                      <div className="w-full h-16 rounded-lg bg-[#1a1a1a] mb-2 flex items-center justify-center">
-                        <ImageOff className="w-5 h-5 text-gray-700" />
-                      </div>
-                    )}
+                    <div className="relative w-full h-24 rounded-lg bg-[#1a1a1a] mb-2 overflow-hidden">
+                      {p.imageUrl
+                        ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />  // eslint-disable-line @next/next/no-img-element
+                        : <div className="w-full h-full flex items-center justify-center"><ImageOff className="w-5 h-5 text-gray-700" /></div>
+                      }
+                      <SponsorOverlay sponsor={p.sponsor} />
+                    </div>
                     <p className="text-gray-500 text-xs mb-3 line-clamp-2">{p.description}</p>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-yellow-400 font-bold text-sm">{p.requiredPoints.toLocaleString()} pts</span>

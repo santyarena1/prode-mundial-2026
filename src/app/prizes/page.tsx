@@ -20,6 +20,7 @@ interface Prize {
   requiredPoints: number;
   stock: number;
   active: boolean;
+  sponsor?: { id: string; name: string; logoUrl?: string | null } | null;
 }
 
 interface UserData {
@@ -128,12 +129,21 @@ export default function PrizesPage() {
               >
                 <Card className="overflow-hidden h-full flex flex-col hover:border-red-600/30 transition-colors">
                   {/* Image */}
-                  <div className="h-40 bg-[#1a1a1a] flex items-center justify-center border-b border-[#222]">
+                  <div className="relative h-40 bg-[#1a1a1a] border-b border-[#222] overflow-hidden">
                     {prize.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={prize.imageUrl} alt={prize.name} className="h-full w-full object-cover" />
                     ) : (
-                      <span className="text-5xl">🎁</span>
+                      <div className="h-full flex items-center justify-center"><span className="text-5xl">🎁</span></div>
+                    )}
+                    {prize.sponsor?.logoUrl && (
+                      <>
+                        <div className="absolute bottom-0 right-0 w-2/5 h-full bg-gradient-to-l from-black/80 via-black/40 to-transparent pointer-events-none" />
+                        <div className="absolute bottom-2 right-2 w-12 h-12 flex items-center justify-center">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={prize.sponsor.logoUrl} alt={prize.sponsor.name} className="max-w-full max-h-full object-contain drop-shadow-lg" />
+                        </div>
+                      </>
                     )}
                   </div>
 
