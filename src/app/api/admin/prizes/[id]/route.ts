@@ -9,7 +9,7 @@ const updatePrizeSchema = z.object({
   imageUrl: z.string().optional(),
   requiredPoints: z.number().int().min(0).optional(),
   stock: z.number().int().min(0).optional(),
-  sponsorId: z.string().optional(),
+  sponsorId: z.string().nullable().optional(),
   active: z.boolean().optional(),
   featured: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
@@ -34,10 +34,14 @@ export async function PUT(
       return NextResponse.json({ error: "Validation error", details: parsed.error.issues }, { status: 400 });
     }
 
-    const { expiresAt, ...rest } = parsed.data;
+    const { expiresAt, sponsorId, ...rest } = parsed.data;
     const prize = await prisma.prize.update({
       where: { id },
-      data: { ...rest, ...(expiresAt ? { expiresAt: new Date(expiresAt) } : {}) },
+      data: {
+        ...rest,
+        ...(expiresAt ? { expiresAt: new Date(expiresAt) } : {}),
+        ...(sponsorId !== undefined ? { sponsorId: sponsorId ?? null } : {}),
+      },
     });
 
     return NextResponse.json({ prize });
