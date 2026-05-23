@@ -396,7 +396,7 @@ export default function AdminPrizesPage() {
                   className="bg-[#1a1a1a] border border-[#333] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500"
                 >
                   <option value="">Sin sponsor</option>
-                  {sponsors.filter(s => s.logoUrl).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {sponsors.map(s => <option key={s.id} value={s.id}>{s.name}{!s.logoUrl ? " (sin logo)" : ""}</option>)}
                 </select>
               </div>
             </div>
@@ -457,7 +457,7 @@ export default function AdminPrizesPage() {
                       className="w-full bg-[#1a1a1a] border border-[#333] text-white rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-red-500"
                     >
                       <option value="">Sin sponsor</option>
-                      {sponsors.filter(s => s.logoUrl).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      {sponsors.map(s => <option key={s.id} value={s.id}>{s.name}{!s.logoUrl ? " (sin logo)" : ""}</option>)}
                     </select>
                     <div className="flex gap-3 text-xs text-gray-400">
                       <label className="flex items-center gap-1 cursor-pointer">
