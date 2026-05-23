@@ -1,6 +1,5 @@
 import { put, del } from "@vercel/blob";
 import { randomUUID } from "crypto";
-import sharp from "sharp";
 
 const MAX_BYTES = 2 * 1024 * 1024;
 
@@ -12,28 +11,6 @@ const ALLOWED_TYPES = new Set([
   "image/svg+xml",
 ]);
 
-async function stripLightBackground(buffer: Buffer): Promise<Buffer> {
-  const image = sharp(buffer).ensureAlpha();
-  const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
-
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    if (r > 235 && g > 235 && b > 235) {
-      data[i + 3] = 0;
-    } else if (r > 210 && g > 210 && b > 210) {
-      data[i + 3] = Math.min(data[i + 3], 80);
-    }
-  }
-
-  return sharp(data, {
-    raw: { width: info.width, height: info.height, channels: 4 },
-  })
-    .png()
-    .toBuffer();
-}
-
 export async function saveSponsorLogo(file: File): Promise<string> {
   if (!ALLOWED_TYPES.has(file.type)) {
     throw new Error("Formato no permitido. Usá JPG, PNG, WebP, GIF o SVG.");
@@ -42,15 +19,12 @@ export async function saveSponsorLogo(file: File): Promise<string> {
     throw new Error("La imagen no puede superar 2 MB.");
   }
 
-  let buffer = Buffer.from(await file.arrayBuffer());
-  if (file.type !== "image/svg+xml") {
-    buffer = Buffer.from(await stripLightBackground(buffer));
-  }
-
-  const filename = `sponsors/${randomUUID()}.png`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const ext = file.type === "image/svg+xml" ? "svg" : file.name.split(".").pop() || "png";
+  const filename = `sponsors/${randomUUID()}.${ext}`;
   const blob = await put(filename, buffer, {
     access: "public",
-    contentType: "image/png",
+    contentType: file.type,
   });
 
   return blob.url;
