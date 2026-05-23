@@ -12,6 +12,8 @@ const updateSchema = z.object({
   winnerName: z.string().nullable().optional(),
   winnerInstagram: z.string().nullable().optional(),
   imageUrl: z.string().nullable().optional(),
+  bonusActionId: z.string().nullable().optional(),
+  earlyBirdCutoff: z.string().nullable().optional(),
 });
 
 export async function PUT(
@@ -29,12 +31,13 @@ export async function PUT(
       return NextResponse.json({ error: "Validation error", details: parsed.error.issues }, { status: 400 });
     }
 
-    const { scheduledAt, ...rest } = parsed.data;
+    const { scheduledAt, earlyBirdCutoff, ...rest } = parsed.data;
     const raffle = await prisma.weeklyRaffle.update({
       where: { id },
       data: {
         ...rest,
         ...(scheduledAt ? { scheduledAt: new Date(scheduledAt) } : {}),
+        ...(earlyBirdCutoff !== undefined ? { earlyBirdCutoff: earlyBirdCutoff ? new Date(earlyBirdCutoff) : null } : {}),
       },
     });
     return NextResponse.json({ raffle });

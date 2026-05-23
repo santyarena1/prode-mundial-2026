@@ -24,6 +24,7 @@ model User {
   referralPoints    Int      @default(0)
   referralCode      String?  @unique
   referredById      String?
+  earlyBirdGranted  Boolean  @default(false)
   hardcoreMode      Boolean  @default(false)
   isBlocked         Boolean  @default(false)
   acceptedTerms     Boolean  @default(false)
@@ -245,8 +246,9 @@ model BonusAction {
   active           Boolean  @default(true)
   limitPerUser     Int?
   limitGlobal      Int?
-  actionUrl        String?
-  requiredHandles  String?
+  actionUrl           String?
+  requiredHandles     String?
+  allowMultipleClaims Boolean  @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -454,6 +456,8 @@ model WeeklyRaffle {
   winnerName      String?
   winnerInstagram String?
   imageUrl        String?
+  bonusActionId   String?
+  earlyBirdCutoff DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }

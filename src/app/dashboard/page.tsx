@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { VirtualAlbumModal } from "@/components/dashboard/VirtualAlbumModal";
 import { SponsorCTA } from "@/components/home/SponsorCTA";
+import { EarlyBirdModal } from "@/components/home/EarlyBirdModal";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Card } from "@/components/ui/Card";
@@ -27,6 +28,7 @@ interface UserData {
   predictionPoints: number;
   bonusPoints: number;
   spentPoints: number;
+  earlyBirdGranted: boolean;
 }
 
 interface RankingUser {
@@ -127,6 +129,7 @@ export default function DashboardPage() {
   const [albumModalOpen, setAlbumModalOpen] = useState(false);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [raffles, setRaffles] = useState<WeeklyRaffle[]>([]);
+  const [showEarlyBird, setShowEarlyBird] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -138,6 +141,15 @@ export default function DashboardPage() {
         }
         const meData = await meRes.json();
         setUser(meData.user);
+
+        // Show early bird modal once
+        if (meData.user.earlyBirdGranted) {
+          const key = `earlyBirdShown_${meData.user.id}`;
+          if (!localStorage.getItem(key)) {
+            setShowEarlyBird(true);
+            localStorage.setItem(key, "1");
+          }
+        }
 
         const [rankRes, predRes, fixRes, redRes, raffleRes] = await Promise.all([
           fetch("/api/public/ranking"),
@@ -433,6 +445,7 @@ export default function DashboardPage() {
       <Footer />
 
       <VirtualAlbumModal open={albumModalOpen} onClose={() => setAlbumModalOpen(false)} />
+      {showEarlyBird && <EarlyBirdModal onClose={() => setShowEarlyBird(false)} />}
     </div>
   );
 }

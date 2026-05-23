@@ -24,6 +24,7 @@ export async function GET() {
         bonusPoints: true,
         spentPoints: true,
         isBlocked: true,
+        earlyBirdGranted: true,
         createdAt: true,
         passwordHash: true,
       },

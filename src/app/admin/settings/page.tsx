@@ -15,6 +15,7 @@ interface EventSettings {
   whatsappPurchaseMessage?: string;
   whatsappVenueMessage?: string;
   instagramUrl?: string;
+  referralPoints?: string;
 }
 
 interface StoreConfig {
@@ -68,6 +69,7 @@ export default function AdminSettingsPage() {
           whatsappPurchaseMessage: get("whatsapp_purchase_message") || "",
           whatsappVenueMessage: get("whatsapp_venue_message") || "",
           instagramUrl: get("instagram_url") || "",
+          referralPoints: get("referral_points") || "200",
         });
         setStores([
           {
@@ -138,6 +140,11 @@ export default function AdminSettingsPage() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ key: "instagram_url", value: eventSettings.instagramUrl || "" }),
+        }),
+        fetch("/api/admin/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: "referral_points", value: String(parseInt(eventSettings.referralPoints || "200") || 200) }),
         }),
       ]);
       toast.success("Configuración guardada");
@@ -309,6 +316,13 @@ export default function AdminSettingsPage() {
               onChange={(e) =>
                 setEventSettings((p) => ({ ...p, instagramUrl: e.target.value }))
               }
+            />
+            <Input
+              type="number"
+              label="Puntos por invitar un amigo (código referido)"
+              placeholder="200"
+              value={eventSettings.referralPoints || "200"}
+              onChange={(e) => setEventSettings((p) => ({ ...p, referralPoints: e.target.value }))}
             />
             <div>
               <label className="text-gray-400 text-xs uppercase tracking-wider mb-1 block">

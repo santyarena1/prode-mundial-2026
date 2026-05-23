@@ -97,6 +97,7 @@ export default function PredictionsPage() {
   const [togglingHardcore, setTogglingHardcore] = useState(false);
   const [pendingScores, setPendingScores] = useState<Record<string, { home?: number; away?: number }>>({});
   const [savedScores, setSavedScores] = useState<Record<string, { home: number; away: number }>>({});
+  const [showHardcoreSpotlight, setShowHardcoreSpotlight] = useState(false);
 
   // Team selection modal for bracket picks
   const [selectionModal, setSelectionModal] = useState<{ phase: string; slot: string } | null>(null);
@@ -258,7 +259,12 @@ export default function PredictionsPage() {
         } catch { toast.error("Error de conexión"); }
       }
     }
-    if (ok > 0) toast.success(`${ok} predicción${ok > 1 ? "es" : ""} confirmada${ok > 1 ? "s" : ""} ✓`);
+    if (ok > 0) {
+      toast.success(`${ok} predicción${ok > 1 ? "es" : ""} confirmada${ok > 1 ? "s" : ""} ✓`);
+      if (!hardcoreMode && typeof window !== "undefined" && !sessionStorage.getItem("hardcore_spotlight_seen")) {
+        setShowHardcoreSpotlight(true);
+      }
+    }
     setSavingGroup(prev => ({ ...prev, [groupId]: false }));
   }, [pendingPreds, pendingScores, savedPreds, hardcoreMode]);
 
@@ -976,6 +982,74 @@ export default function PredictionsPage() {
                     disabled={availablePoints < changeCost} onClick={handleBuyChange} className="flex-1">
                     {availablePoints < changeCost ? "Sin puntos" : `Canjear ${changeCost} pts`}
                   </Button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Hardcore Spotlight Modal ──────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showHardcoreSpotlight && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/85 z-50 backdrop-blur-sm"
+              onClick={() => { sessionStorage.setItem("hardcore_spotlight_seen", "1"); setShowHardcoreSpotlight(false); }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 30 }}
+              transition={{ type: "spring", duration: 0.4 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+            >
+              <div className="bg-[#111] border border-orange-500/40 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center relative pointer-events-auto">
+                <button
+                  onClick={() => { sessionStorage.setItem("hardcore_spotlight_seen", "1"); setShowHardcoreSpotlight(false); }}
+                  className="absolute top-3 right-3 text-gray-600 hover:text-gray-400 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+
+                <div className="w-16 h-16 rounded-full bg-orange-500/20 border border-orange-500/40 flex items-center justify-center mx-auto mb-4">
+                  <Flame className="w-8 h-8 text-orange-400" />
+                </div>
+
+                <h2 className="text-xl font-black uppercase text-white mb-1">
+                  ¿Querés ganar más?
+                </h2>
+                <p className="text-orange-400 font-bold text-xs uppercase tracking-wider mb-4">
+                  Modo Hardcore disponible
+                </p>
+
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 mb-5 text-left space-y-2">
+                  <p className="text-gray-200 text-sm leading-relaxed">
+                    Activando el <strong className="text-orange-400">Modo Hardcore</strong>, en vez de predecir solo el resultado, predecís el <strong className="text-white">marcador exacto</strong>.
+                  </p>
+                  <p className="text-gray-400 text-sm">
+                    Si acertás el marcador, ganás <strong className="text-orange-400">+150 pts extra</strong> por encima del puntaje normal.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={async () => {
+                      sessionStorage.setItem("hardcore_spotlight_seen", "1");
+                      setShowHardcoreSpotlight(false);
+                      await handleToggleHardcore();
+                    }}
+                    className="w-full py-3 bg-orange-500 hover:bg-orange-400 text-black font-black rounded-xl transition-colors uppercase tracking-wider text-sm flex items-center justify-center gap-2"
+                  >
+                    <Flame className="w-4 h-4" /> Activar Modo Hardcore
+                  </button>
+                  <button
+                    onClick={() => { sessionStorage.setItem("hardcore_spotlight_seen", "1"); setShowHardcoreSpotlight(false); }}
+                    className="w-full py-2.5 text-gray-500 hover:text-gray-300 font-semibold text-sm transition-colors"
+                  >
+                    No gracias, seguir sin Hardcore
+                  </button>
                 </div>
               </div>
             </motion.div>

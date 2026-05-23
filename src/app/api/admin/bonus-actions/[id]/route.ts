@@ -13,6 +13,7 @@ const updateBonusActionSchema = z.object({
   active: z.boolean().optional(),
   actionUrl: z.string().nullable().optional(),
   requiredHandles: z.string().nullable().optional(),
+  allowMultipleClaims: z.boolean().optional(),
 });
 
 export async function PUT(

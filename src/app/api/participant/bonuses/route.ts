@@ -58,12 +58,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Bonus action not found or inactive" }, { status: 404 });
     }
 
-    // Check for duplicate
-    const existing = await prisma.userBonus.findFirst({
-      where: { userId: auth.userId, bonusActionId, status: { not: "rejected" } },
-    });
-    if (existing) {
-      return NextResponse.json({ error: "Bonus already claimed" }, { status: 409 });
+    // Check for duplicate (skip if multiple claims allowed)
+    if (!bonusAction.allowMultipleClaims) {
+      const existing = await prisma.userBonus.findFirst({
+        where: { userId: auth.userId, bonusActionId, status: { not: "rejected" } },
+      });
+      if (existing) {
+        return NextResponse.json({ error: "Bonus already claimed" }, { status: 409 });
+      }
     }
 
     const pointsEarned = Math.floor(bonusAction.points * bonusAction.multiplier);

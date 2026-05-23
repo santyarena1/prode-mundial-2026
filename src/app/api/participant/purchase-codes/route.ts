@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import { getUserFromCookies } from "@/lib/cookies";
+import { calculateUserPoints } from "@/lib/points";
 import {
   isValidCodeType,
   normalizePurchaseCode,
-  redeemMessageForType,
   type CodeType,
 } from "@/lib/purchase-code";
 
@@ -76,10 +76,13 @@ export async function POST(request: NextRequest) {
 
     if (purchaseCode.status === "pending") {
       if (purchaseCode.userId === auth.userId) {
-        return NextResponse.json({
-          redemption: purchaseCode,
-          message: "Tu código ya está en revisión",
+        // Auto-approve their own pending code
+        const updated = await prisma.purchaseCode.update({
+          where: { id: purchaseCode.id },
+          data: { status: "redeemed", redeemedAt: new Date() },
         });
+        await calculateUserPoints(auth.userId);
+        return NextResponse.json({ redemption: updated, message: "¡Puntos acreditados!" });
       }
       return NextResponse.json({ error: "Este código ya fue cargado por otro usuario" }, { status: 409 });
     }
@@ -94,15 +97,18 @@ export async function POST(request: NextRequest) {
     const updated = await prisma.purchaseCode.update({
       where: { id: purchaseCode.id },
       data: {
-        status: "pending",
+        status: "redeemed",
         userId: auth.userId,
+        redeemedAt: new Date(),
       },
     });
+
+    await calculateUserPoints(auth.userId);
 
     return NextResponse.json(
       {
         redemption: updated,
-        message: redeemMessageForType(purchaseCode.type),
+        message: "¡Código válido! Tus puntos fueron acreditados automáticamente.",
       },
       { status: 201 }
     );

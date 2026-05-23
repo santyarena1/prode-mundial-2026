@@ -111,12 +111,39 @@ export async function POST(request: NextRequest) {
 
     // Award referral points to the person who invited
     if (referrer) {
-      const REFERRAL_POINTS = 200;
+      const referralSetting = await prisma.setting.findUnique({ where: { key: "referral_points" } });
+      const REFERRAL_POINTS = referralSetting ? (parseInt(referralSetting.value) || 200) : 200;
       await prisma.user.update({
         where: { id: referrer.id },
         data: { referralPoints: { increment: REFERRAL_POINTS } },
       });
       calculateUserPoints(referrer.id).catch(() => {});
+    }
+
+    // Early bird: auto-grant raffle entry if registering before cutoff
+    const earlyBirdRaffle = await prisma.weeklyRaffle.findFirst({
+      where: {
+        earlyBirdCutoff: { gt: new Date() },
+        bonusActionId: { not: null },
+        status: { in: ["upcoming", "live"] },
+      },
+      orderBy: { earlyBirdCutoff: "asc" },
+    });
+    if (earlyBirdRaffle?.bonusActionId) {
+      await prisma.$transaction([
+        prisma.userBonus.create({
+          data: {
+            userId: user.id,
+            bonusActionId: earlyBirdRaffle.bonusActionId,
+            status: "approved",
+            pointsEarned: 0,
+          },
+        }),
+        prisma.user.update({
+          where: { id: user.id },
+          data: { earlyBirdGranted: true },
+        }),
+      ]);
     }
 
     sendWelcomeEmail({ firstName: user.firstName, lastName: user.lastName, email: user.email })

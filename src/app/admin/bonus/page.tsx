@@ -56,6 +56,7 @@ export default function AdminBonusPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(emptyEdit);
   const [claimsFilter, setClaimsFilter] = useState<"all" | "approved" | "rejected">("all");
+  const [nameSearch, setNameSearch] = useState("");
 
   useEffect(() => {
     const init = async () => {
@@ -149,6 +150,21 @@ export default function AdminBonusPage() {
     }
   };
 
+  const deleteBonus = async (id: string) => {
+    if (!confirm("¿Eliminar este reclamo? Se quitarán los puntos si estaba aprobado.")) return;
+    setUpdating((prev) => ({ ...prev, [id]: true }));
+    try {
+      const res = await fetch(`/api/admin/user-bonuses/${id}`, { method: "DELETE" });
+      if (!res.ok) { toast.error("Error al eliminar"); return; }
+      setUserBonuses((prev) => prev.filter((b) => b.id !== id));
+      toast.success("Reclamo eliminado");
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setUpdating((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
   const updateBonus = async (id: string, status: "approved" | "rejected") => {
     setUpdating((prev) => ({ ...prev, [id]: true }));
     try {
@@ -169,9 +185,13 @@ export default function AdminBonusPage() {
 
   if (loading) return <LoadingScreen />;
 
-  const filteredBonuses = claimsFilter === "all"
-    ? userBonuses
-    : userBonuses.filter((b) => b.status === claimsFilter);
+  const filteredBonuses = userBonuses
+    .filter((b) => claimsFilter === "all" || b.status === claimsFilter)
+    .filter((b) => {
+      if (!nameSearch.trim()) return true;
+      const full = `${b.user.firstName} ${b.user.lastName}`.toLowerCase();
+      return full.includes(nameSearch.toLowerCase().trim());
+    });
 
   const HandlesCheckboxes = ({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) => (
     <div>
@@ -327,21 +347,29 @@ export default function AdminBonusPage() {
 
       {activeTab === "claims" && (
         <div>
-          {/* Filter */}
-          <div className="flex gap-2 mb-4 flex-wrap">
-            {[
-              { key: "all" as const, label: `Todos (${userBonuses.length})` },
-              { key: "approved" as const, label: `Aprobados (${userBonuses.filter(b => b.status === "approved").length})` },
-              { key: "rejected" as const, label: `Rechazados (${userBonuses.filter(b => b.status === "rejected").length})` },
-            ].map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setClaimsFilter(f.key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${claimsFilter === f.key ? "bg-red-600 text-white" : "bg-[#111] border border-[#222] text-gray-500 hover:text-gray-300"}`}
-              >
-                {f.label}
-              </button>
-            ))}
+          {/* Search + Filter */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <Input
+              placeholder="Buscar por nombre..."
+              value={nameSearch}
+              onChange={(e) => setNameSearch(e.target.value)}
+              className="sm:max-w-xs"
+            />
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { key: "all" as const, label: `Todos (${userBonuses.length})` },
+                { key: "approved" as const, label: `Aprobados (${userBonuses.filter(b => b.status === "approved").length})` },
+                { key: "rejected" as const, label: `Rechazados (${userBonuses.filter(b => b.status === "rejected").length})` },
+              ].map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setClaimsFilter(f.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${claimsFilter === f.key ? "bg-red-600 text-white" : "bg-[#111] border border-[#222] text-gray-500 hover:text-gray-300"}`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -390,16 +418,26 @@ export default function AdminBonusPage() {
                       )}
                       <p className="text-gray-700 text-xs mt-1">{new Date(b.createdAt).toLocaleString("es-AR")}</p>
                     </div>
-                    {b.status === "approved" && (
-                      <Button variant="danger" size="sm" loading={updating[b.id]} onClick={() => updateBonus(b.id, "rejected")} className="flex-shrink-0">
-                        <XCircle className="w-3 h-3" /> Rechazar
-                      </Button>
-                    )}
-                    {b.status === "rejected" && (
-                      <Button variant="primary" size="sm" loading={updating[b.id]} onClick={() => updateBonus(b.id, "approved")} className="flex-shrink-0 bg-green-600 hover:bg-green-500">
-                        <CheckCircle2 className="w-3 h-3" /> Aprobar
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                      {b.status !== "approved" && (
+                        <Button variant="primary" size="sm" loading={updating[b.id]} onClick={() => updateBonus(b.id, "approved")} className="bg-green-600 hover:bg-green-500">
+                          <CheckCircle2 className="w-3 h-3" /> Aprobar
+                        </Button>
+                      )}
+                      {b.status !== "rejected" && (
+                        <Button variant="danger" size="sm" loading={updating[b.id]} onClick={() => updateBonus(b.id, "rejected")}>
+                          <XCircle className="w-3 h-3" /> Rechazar
+                        </Button>
+                      )}
+                      <button
+                        onClick={() => deleteBonus(b.id)}
+                        disabled={updating[b.id]}
+                        className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-400/10 transition-colors disabled:opacity-40"
+                        title="Eliminar reclamo"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </Card>
               );
