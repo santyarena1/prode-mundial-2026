@@ -13,6 +13,7 @@ const updateSponsorSchema = z.object({
   tiktokUrl: z.string().optional(),
   youtubeUrl: z.string().optional(),
   active: z.boolean().optional(),
+  showInHome: z.boolean().optional(),
 });
 
 export async function PUT(

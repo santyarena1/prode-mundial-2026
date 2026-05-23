@@ -6,6 +6,7 @@ export async function GET() {
     const sponsors = await prisma.sponsor.findMany({
       where: {
         active: true,
+        showInHome: true,
         logoUrl: { not: null },
       },
       orderBy: { name: "asc" },

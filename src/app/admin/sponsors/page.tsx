@@ -16,6 +16,7 @@ interface Sponsor {
   logoUrl?: string | null;
   websiteUrl?: string | null;
   active: boolean;
+  showInHome: boolean;
 }
 
 export default function AdminSponsorsPage() {
@@ -116,6 +117,17 @@ export default function AdminSponsorsPage() {
     } finally {
       setUploadingId(null);
     }
+  };
+
+  const toggleShowInHome = async (id: string, current: boolean) => {
+    const res = await apiFetch(`/api/admin/sponsors/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ showInHome: !current }),
+    });
+    if (!res.ok) { toast.error("Error al actualizar"); return; }
+    const data = await res.json();
+    setSponsors((prev) => prev.map((s) => (s.id === id ? data.sponsor : s)));
   };
 
   const deleteSponsor = async (id: string) => {
@@ -220,10 +232,21 @@ export default function AdminSponsorsPage() {
                 {s.websiteUrl}
               </a>
             )}
-            <div className="mt-2 mb-3">
+            <div className="mt-2 mb-3 flex items-center gap-2 flex-wrap">
               <Badge variant={s.active ? "success" : "default"}>
                 {s.active ? "Activo" : "Inactivo"}
               </Badge>
+              <button
+                type="button"
+                onClick={() => toggleShowInHome(s.id, s.showInHome)}
+                className={`text-xs font-bold px-2 py-0.5 rounded-full border transition-colors ${
+                  s.showInHome
+                    ? "bg-blue-500/10 border-blue-500/30 text-blue-400 hover:border-blue-500/60"
+                    : "bg-[#1a1a1a] border-[#333] text-gray-600 hover:border-[#444]"
+                }`}
+              >
+                {s.showInHome ? "Visible en home" : "Oculto en home"}
+              </button>
             </div>
             <label className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white cursor-pointer border border-[#333] rounded-lg px-3 py-1.5 hover:border-red-600/40 transition-colors">
               <input

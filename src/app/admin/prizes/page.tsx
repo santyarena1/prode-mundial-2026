@@ -201,7 +201,7 @@ export default function AdminPrizesPage() {
       const [pRes, rRes, sRes] = await Promise.all([
         fetch("/api/admin/prizes"),
         fetch("/api/admin/redemptions"),
-        fetch("/api/public/sponsors"),
+        fetch("/api/admin/sponsors"),
       ]);
       if (pRes.ok) setPrizes((await pRes.json()).prizes || []);
       if (rRes.ok) setRedemptions((await rRes.json()).redemptions || []);

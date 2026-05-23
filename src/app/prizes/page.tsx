@@ -129,9 +129,10 @@ export default function PrizesPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.08 }}
+                className="h-full"
               >
                 <button
-                  className="w-full text-left"
+                  className="w-full h-full text-left"
                   onClick={() => setSelectedPrize(prize)}
                 >
                   <Card className="overflow-hidden h-full flex flex-col hover:border-red-600/40 transition-colors cursor-pointer">
@@ -156,7 +157,7 @@ export default function PrizesPage() {
 
                     <div className="p-5 flex-1 flex flex-col">
                       <h3 className="text-white font-bold text-lg mb-1">{prize.name}</h3>
-                      <p className="text-gray-500 text-sm flex-1 mb-4 leading-relaxed line-clamp-2">
+                      <p className="text-gray-500 text-sm mb-4 leading-relaxed line-clamp-1 h-[1.375rem]">
                         {prize.description}
                       </p>
                       <div className="flex items-center justify-between">

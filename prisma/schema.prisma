@@ -293,6 +293,7 @@ model Sponsor {
   tiktokUrl    String?
   youtubeUrl   String?
   active       Boolean @default(true)
+  showInHome   Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
