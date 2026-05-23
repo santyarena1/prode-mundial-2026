@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, UserX, UserCheck, RefreshCcw, KeyRound, X, Eye, EyeOff, ExternalLink } from "lucide-react";
+import { Search, UserX, UserCheck, RefreshCcw, KeyRound, X, Eye, EyeOff, ExternalLink, ChevronUp, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -27,6 +27,8 @@ interface Participant {
 }
 
 type PredictionResetType = "matches" | "groups" | "bracket";
+type SortField = "name" | "points" | "predictions" | "createdAt" | "status";
+type SortDir = "asc" | "desc";
 
 interface PredictionSummary {
   total: number;
@@ -70,6 +72,8 @@ export default function AdminParticipantsPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [sortField, setSortField] = useState<SortField>("createdAt");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   useEffect(() => {
     apiFetch("/api/admin/participants")
@@ -86,15 +90,42 @@ export default function AdminParticipantsPage() {
   }, []);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return participants;
-    const q = search.toLowerCase();
-    return participants.filter(
-      (p) =>
-        `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) ||
-        p.email.toLowerCase().includes(q) ||
-        p.phone.includes(q)
-    );
-  }, [participants, search]);
+    const q = search.trim().toLowerCase();
+    const list = q
+      ? participants.filter(
+          (p) =>
+            `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) ||
+            p.email.toLowerCase().includes(q) ||
+            p.phone.includes(q)
+        )
+      : [...participants];
+
+    list.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case "name":      cmp = `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`); break;
+        case "points":    cmp = a.totalPoints - b.totalPoints; break;
+        case "predictions": cmp = (a._count?.predictions ?? 0) - (b._count?.predictions ?? 0); break;
+        case "createdAt": cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); break;
+        case "status":    cmp = Number(a.isBlocked) - Number(b.isBlocked); break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+    return list;
+  }, [participants, search, sortField, sortDir]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortField(field); setSortDir("desc"); }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ChevronUp className="w-3 h-3 opacity-20 inline ml-0.5" />;
+    return sortDir === "asc"
+      ? <ChevronUp className="w-3 h-3 text-red-400 inline ml-0.5" />
+      : <ChevronDown className="w-3 h-3 text-red-400 inline ml-0.5" />;
+  };
 
   const toggleBlock = async (id: string, isBlocked: boolean) => {
     setToggling((prev) => ({ ...prev, [id]: true }));
@@ -258,16 +289,26 @@ export default function AdminParticipantsPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#222]">
-                {["Nombre", "Email", "Teléfono", "Instagram", "Puntos", "Predicciones", "Estado", "Creado", "Acciones"].map(
-                  (col) => (
-                    <th
-                      key={col}
-                      className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500"
-                    >
-                      {col}
-                    </th>
-                  )
-                )}
+                {([
+                  { label: "Nombre", field: "name" as SortField },
+                  { label: "Email", field: null },
+                  { label: "Teléfono", field: null },
+                  { label: "Instagram", field: null },
+                  { label: "Puntos", field: "points" as SortField },
+                  { label: "Predicciones", field: "predictions" as SortField },
+                  { label: "Estado", field: "status" as SortField },
+                  { label: "Creado", field: "createdAt" as SortField },
+                  { label: "Acciones", field: null },
+                ]).map(({ label, field }) => (
+                  <th
+                    key={label}
+                    onClick={field ? () => handleSort(field) : undefined}
+                    className={`px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 select-none ${field ? "cursor-pointer hover:text-gray-300 transition-colors" : ""}`}
+                  >
+                    {label}
+                    {field && <SortIcon field={field} />}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
