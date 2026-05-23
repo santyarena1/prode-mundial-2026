@@ -132,7 +132,7 @@ export default function PrizesPage() {
                   <div className="relative h-40 bg-[#1a1a1a] border-b border-[#222] overflow-hidden">
                     {prize.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={prize.imageUrl} alt={prize.name} className="h-full w-full object-cover" />
+                      <img src={prize.imageUrl} alt={prize.name} className="h-full w-full object-contain" />
                     ) : (
                       <div className="h-full flex items-center justify-center"><span className="text-5xl">🎁</span></div>
                     )}
