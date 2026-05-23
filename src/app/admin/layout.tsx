@@ -58,12 +58,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex">
+    <div className="h-screen bg-[#0a0a0a] flex overflow-hidden">
       {/* Sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#0d0d0d] border-r border-[#1a1a1a] flex flex-col transition-transform duration-300 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } lg:translate-x-0 lg:static lg:inset-auto`}
+        } lg:translate-x-0 lg:static lg:inset-auto lg:h-full lg:flex-shrink-0`}
       >
         {/* Logo */}
         <div className="px-5 py-6 border-b border-[#1a1a1a]">
@@ -117,7 +117,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       )}
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex flex-col shrink-0 bg-[#0d0d0d]">
           <div className="h-14 border-b border-[#1a1a1a] flex items-center px-4 gap-3">
