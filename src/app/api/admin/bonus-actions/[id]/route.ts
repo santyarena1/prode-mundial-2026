@@ -11,6 +11,7 @@ const updateBonusActionSchema = z.object({
   sponsorId: z.string().optional(),
   requiresApproval: z.boolean().optional(),
   active: z.boolean().optional(),
+  actionUrl: z.string().nullable().optional(),
 });
 
 export async function PUT(

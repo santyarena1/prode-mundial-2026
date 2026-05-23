@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, CheckCircle2, Clock, XCircle, Link as LinkIcon, X, Shuffle, AlertTriangle, Shield } from "lucide-react";
+import { Zap, CheckCircle2, Clock, XCircle, Link as LinkIcon, X, Shuffle, AlertTriangle, Shield, Copy, Users, ExternalLink } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Card } from "@/components/ui/Card";
@@ -21,9 +21,16 @@ interface BonusAction {
   description: string;
   points: number;
   requiresEvidence: boolean;
+  actionUrl?: string | null;
   active: boolean;
   claimedStatus: string | null;
   sponsor?: { name: string };
+}
+
+interface ReferralData {
+  referralCode: string | null;
+  referralPoints: number;
+  referralCount: number;
 }
 
 export default function BonusesPage() {
@@ -33,6 +40,9 @@ export default function BonusesPage() {
   const [claiming, setClaiming] = useState<Record<string, boolean>>({});
   const [evidenceUrls, setEvidenceUrls] = useState<Record<string, string>>({});
   const [modalBonus, setModalBonus] = useState<BonusAction | null>(null);
+  const [redirectDone, setRedirectDone] = useState(false);
+  const [referral, setReferral] = useState<ReferralData | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -41,11 +51,16 @@ export default function BonusesPage() {
         router.replace("/login");
         return;
       }
-      const bonRes = await apiFetch("/api/participant/bonuses");
+      const [bonRes, refRes] = await Promise.all([
+        apiFetch("/api/participant/bonuses"),
+        apiFetch("/api/participant/referral"),
+      ]);
       if (bonRes.ok) {
         const data = await bonRes.json();
-        setBonuses(data.bonusActions || []);
+        const sorted = (data.bonusActions || []).sort((a: BonusAction, b: BonusAction) => b.points - a.points);
+        setBonuses(sorted);
       }
+      if (refRes.ok) setReferral(await refRes.json());
       setLoading(false);
     };
     init();
@@ -67,15 +82,25 @@ export default function BonusesPage() {
         toast.error(data.error || "Error al reclamar bonus");
         return;
       }
-      toast.success("Bonus reclamado. Se revisará pronto.");
-      // Refresh
+      toast.success(`+${data.pointsEarned} puntos acreditados!`);
       const bonRes = await apiFetch("/api/participant/bonuses");
-      if (bonRes.ok) setBonuses((await bonRes.json()).bonusActions || []);
+      if (bonRes.ok) {
+        const d = await bonRes.json();
+        const sorted = (d.bonusActions || []).sort((a: BonusAction, b: BonusAction) => b.points - a.points);
+        setBonuses(sorted);
+      }
     } catch {
       toast.error("Error de conexión");
     } finally {
       setClaiming((prev) => ({ ...prev, [bonusId]: false }));
     }
+  };
+
+  const copyReferralCode = () => {
+    if (!referral?.referralCode) return;
+    navigator.clipboard.writeText(referral.referralCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const statusBadge = (status: string | null) => {
@@ -99,13 +124,58 @@ export default function BonusesPage() {
             BONUS <span className="text-green-400">EXTRA</span>
           </h1>
           <p className="text-gray-500 mt-1">
-            Códigos en historias, local, compra y acciones bonus
+            Códigos de compra, acciones bonus e invitaciones
           </p>
         </div>
 
+        {/* Purchase codes */}
         <div className="mb-8">
           <PurchaseCodeSection />
         </div>
+
+        {/* Referral section */}
+        {referral && (
+          <div className="mb-8">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-gray-600 mb-3">
+              Invitá amigos
+            </h2>
+            <Card className="p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Users className="w-4 h-4 text-green-400" />
+                    <h3 className="text-white font-bold">Código de invitación</h3>
+                  </div>
+                  <p className="text-gray-500 text-sm mb-3">
+                    Compartí tu código. Cada amigo que se registre con él te da <span className="text-green-400 font-bold">+200 pts</span>.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <div className="bg-[#1a1a1a] border border-[#333] rounded-lg px-4 py-2 font-mono text-white font-bold tracking-widest text-lg">
+                      {referral.referralCode ?? "—"}
+                    </div>
+                    <button
+                      onClick={copyReferralCode}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-600/20 border border-green-600/30 text-green-400 hover:bg-green-600/30 transition-colors text-sm font-semibold"
+                    >
+                      {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      {copied ? "¡Copiado!" : "Copiar"}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex gap-6 sm:flex-col sm:gap-2 text-center sm:text-right flex-shrink-0">
+                  <div>
+                    <div className="text-2xl font-black text-green-400">{referral.referralCount}</div>
+                    <div className="text-gray-600 text-xs uppercase tracking-wider">Amigos invitados</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-black text-yellow-400">+{referral.referralPoints}</div>
+                    <div className="text-gray-600 text-xs uppercase tracking-wider">Puntos ganados</div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
 
         <h2 className="text-xs font-bold uppercase tracking-widest text-gray-600 mb-3">
           Acciones bonus
@@ -167,7 +237,7 @@ export default function BonusesPage() {
                         variant="primary"
                         size="sm"
                         loading={claiming[bonus.id]}
-                        onClick={() => setModalBonus(bonus)}
+                        onClick={() => { setRedirectDone(false); setModalBonus(bonus); }}
                         className="bg-green-600 hover:bg-green-500"
                       >
                         RECLAMAR BONUS
@@ -187,7 +257,7 @@ export default function BonusesPage() {
 
       <Footer />
 
-      {/* ── Sorteo info modal ─────────────────────────────────────────────── */}
+      {/* Claim modal */}
       <AnimatePresence>
         {modalBonus && (
           <>
@@ -221,7 +291,7 @@ export default function BonusesPage() {
                 {/* Description */}
                 <p className="text-gray-400 text-sm leading-relaxed mb-5">{modalBonus.description}</p>
 
-                {/* Sorteo rules */}
+                {/* Info cards */}
                 <div className="space-y-3 mb-6">
                   <div className="flex gap-3 p-3.5 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
                     <Shuffle className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
@@ -252,7 +322,6 @@ export default function BonusesPage() {
                       <p className="text-amber-500/80 text-xs leading-relaxed">
                         Si al momento del sorteo no podemos comprobar que completaste la acción,
                         tu participación queda <strong className="text-amber-400">automáticamente anulada</strong> y el premio pasa al siguiente ganador.
-                        Esto se repetirá hasta encontrar un ganador válido.
                       </p>
                     </div>
                   </div>
@@ -271,6 +340,31 @@ export default function BonusesPage() {
                   </div>
                 )}
 
+                {/* Redirect flow */}
+                {modalBonus.actionUrl && !redirectDone && (
+                  <div className="mb-5 p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
+                    <p className="text-green-300 text-xs font-bold mb-2">Paso 1: Realizá la acción</p>
+                    <p className="text-gray-400 text-xs mb-3">Hacé click para ir a completar la acción. Cuando termines, volvé acá y confirmá.</p>
+                    <a
+                      href={modalBonus.actionUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setTimeout(() => setRedirectDone(true), 1500)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-bold rounded-lg transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Ir a hacer la acción
+                    </a>
+                  </div>
+                )}
+
+                {modalBonus.actionUrl && redirectDone && (
+                  <div className="mb-5 p-3 bg-green-500/10 border border-green-500/20 rounded-xl flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
+                    <p className="text-green-300 text-xs font-semibold">Listo, ahora confirmá tu participación abajo.</p>
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex gap-3">
                   <button
@@ -283,14 +377,15 @@ export default function BonusesPage() {
                     variant="primary"
                     size="sm"
                     loading={claiming[modalBonus.id]}
+                    disabled={!!(modalBonus.actionUrl && !redirectDone)}
                     onClick={async () => {
                       await handleClaim(modalBonus.id);
                       setModalBonus(null);
                     }}
-                    className="flex-1 bg-green-600 hover:bg-green-500"
+                    className="flex-1 bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    Entendido, participar
+                    {modalBonus.actionUrl ? "Ya lo hice, confirmar" : "Entendido, participar"}
                   </Button>
                 </div>
               </div>

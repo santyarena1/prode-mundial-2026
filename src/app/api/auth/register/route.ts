@@ -5,6 +5,7 @@ import prisma from "@/lib/db";
 import { signUserToken } from "@/lib/auth";
 import { USER_COOKIE, COOKIE_OPTIONS } from "@/lib/cookies";
 import { sendWelcomeEmail } from "@/lib/email";
+import { calculateUserPoints } from "@/lib/points";
 
 const registerSchema = z.object({
   firstName: z.string().min(1),
@@ -13,10 +14,15 @@ const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres" }),
   instagram: z.string().optional(),
+  inviteCode: z.string().optional(),
   acceptedTerms: z.boolean().refine((v) => v === true, {
     message: "Must accept terms",
   }),
 });
+
+function generateReferralCode(): string {
+  return Math.random().toString(36).substring(2, 10).toUpperCase();
+}
 
 function getClientIp(request: NextRequest): string {
   return (
@@ -57,7 +63,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { firstName, lastName, instagram, acceptedTerms, password } = parsed.data;
+    const { firstName, lastName, instagram, acceptedTerms, password, inviteCode } = parsed.data;
     const email = parsed.data.email.trim().toLowerCase();
     const phone = parsed.data.phone.trim();
 
@@ -73,6 +79,21 @@ export async function POST(request: NextRequest) {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // Find referrer if invite code was provided
+    let referrer: { id: string } | null = null;
+    if (inviteCode) {
+      referrer = await prisma.user.findUnique({
+        where: { referralCode: inviteCode.trim().toUpperCase() },
+        select: { id: true },
+      });
+    }
+
+    // Generate unique referral code for new user
+    let referralCode = generateReferralCode();
+    while (await prisma.user.findUnique({ where: { referralCode } })) {
+      referralCode = generateReferralCode();
+    }
+
     const user = await prisma.user.create({
       data: {
         firstName,
@@ -83,8 +104,20 @@ export async function POST(request: NextRequest) {
         instagram: instagram || null,
         acceptedTerms,
         registrationIp: ip !== "unknown" ? ip : null,
+        referralCode,
+        referredById: referrer?.id ?? null,
       },
     });
+
+    // Award referral points to the person who invited
+    if (referrer) {
+      const REFERRAL_POINTS = 200;
+      await prisma.user.update({
+        where: { id: referrer.id },
+        data: { referralPoints: { increment: REFERRAL_POINTS } },
+      });
+      calculateUserPoints(referrer.id).catch(() => {});
+    }
 
     sendWelcomeEmail({ firstName: user.firstName, lastName: user.lastName, email: user.email })
       .catch((err) => console.error("[email] Failed to send welcome email:", err));

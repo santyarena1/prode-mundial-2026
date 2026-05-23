@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  Trophy, Target, Star, Gift, Zap, ChevronRight, User, TrendingUp, CheckCircle2, BookOpen, UserCircle,
+  Trophy, Target, Star, Gift, Zap, ChevronRight, User, TrendingUp, CheckCircle2, BookOpen,
 } from "lucide-react";
 import { VirtualAlbumModal } from "@/components/dashboard/VirtualAlbumModal";
 import { SponsorCTA } from "@/components/home/SponsorCTA";
@@ -42,14 +42,6 @@ interface FixtureMatch {
 }
 
 const actionCards = [
-  {
-    href: "/perfil",
-    icon: <UserCircle className="w-6 h-6" />,
-    title: "Mi perfil",
-    description: "Tus datos, contraseña y cómo recuperar la cuenta",
-    color: "text-cyan-400",
-    bg: "bg-cyan-600/10 border-cyan-600/20",
-  },
   {
     href: "/predictions",
     icon: <Target className="w-6 h-6" />,

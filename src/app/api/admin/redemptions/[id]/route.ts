@@ -54,3 +54,28 @@ export async function PUT(
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await getAdminFromCookies();
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { id } = await params;
+    const r = await prisma.prizeRedemption.findUnique({ where: { id } });
+    if (!r) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    await prisma.prizeRedemption.delete({ where: { id } });
+    await prisma.user.update({
+      where: { id: r.userId },
+      data: { spentPoints: { decrement: r.pointsSpent }, totalPoints: { increment: r.pointsSpent } },
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Redemption DELETE error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}

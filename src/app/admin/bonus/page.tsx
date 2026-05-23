@@ -16,6 +16,7 @@ interface BonusAction {
   description: string;
   points: number;
   requiresEvidence: boolean;
+  actionUrl?: string | null;
   active: boolean;
 }
 
@@ -37,6 +38,7 @@ export default function AdminBonusPage() {
     name: "",
     description: "",
     points: "",
+    actionUrl: "",
     requiresEvidence: false,
   });
   const [creating, setCreating] = useState(false);
@@ -70,13 +72,14 @@ export default function AdminBonusPage() {
           description: newAction.description,
           points: parseInt(newAction.points),
           requiresEvidence: newAction.requiresEvidence,
+          actionUrl: newAction.actionUrl.trim() || undefined,
           active: true,
         }),
       });
       if (!res.ok) { toast.error("Error al crear acción bonus"); return; }
       const data = await res.json();
       setActions((prev) => [...prev, data.bonusAction]);
-      setNewAction({ name: "", description: "", points: "", requiresEvidence: false });
+      setNewAction({ name: "", description: "", points: "", actionUrl: "", requiresEvidence: false });
       toast.success("Acción bonus creada");
     } catch {
       toast.error("Error de conexión");
@@ -152,6 +155,7 @@ export default function AdminBonusPage() {
               <Input placeholder="Nombre" value={newAction.name} onChange={(e) => setNewAction((p) => ({ ...p, name: e.target.value }))} />
               <Input type="number" placeholder="Puntos" value={newAction.points} onChange={(e) => setNewAction((p) => ({ ...p, points: e.target.value }))} />
               <Input placeholder="Descripción" value={newAction.description} onChange={(e) => setNewAction((p) => ({ ...p, description: e.target.value }))} className="sm:col-span-2" />
+              <Input placeholder="URL de la acción (opcional)" value={newAction.actionUrl} onChange={(e) => setNewAction((p) => ({ ...p, actionUrl: e.target.value }))} className="sm:col-span-2" />
             </div>
             <label className="flex items-center gap-2 text-sm text-gray-400 mb-3 cursor-pointer">
               <input
@@ -179,6 +183,11 @@ export default function AdminBonusPage() {
                       <Badge variant={a.active ? "success" : "default"}>{a.active ? "Activo" : "Inactivo"}</Badge>
                     </div>
                     <p className="text-gray-500 text-xs mt-1">{a.description}</p>
+                    {a.actionUrl && (
+                      <a href={a.actionUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-xs hover:underline mt-0.5 inline-block">
+                        {a.actionUrl}
+                      </a>
+                    )}
                   </div>
                   <button onClick={() => deleteAction(a.id)} className="text-gray-600 hover:text-red-400">
                     <Trash2 className="w-4 h-4" />

@@ -97,15 +97,17 @@ export default function HomePage() {
   const [featuredPrizes, setFeaturedPrizes] = useState<FeaturedPrize[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, rankingRes, sponsorsRes, prizesRes] = await Promise.all([
+        const [statsRes, rankingRes, sponsorsRes, prizesRes, meRes] = await Promise.all([
           fetch("/api/public/stats"),
           fetch("/api/public/ranking"),
           fetch("/api/public/sponsors"),
           fetch("/api/public/prizes/featured"),
+          fetch("/api/auth/me"),
         ]);
         if (statsRes.ok) setStats(await statsRes.json());
         if (rankingRes.ok) {
@@ -120,6 +122,7 @@ export default function HomePage() {
           const data = await prizesRes.json();
           setFeaturedPrizes(data.prizes || []);
         }
+        if (meRes.ok) setIsLoggedIn(true);
       } catch {
         // ignore
       } finally {
@@ -192,11 +195,19 @@ export default function HomePage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.3 }}
               >
-                <button onClick={() => setShowWelcome(true)} className="w-full sm:w-auto">
-                  <Button variant="primary" size="lg" className="animate-glow w-full sm:min-w-[180px]">
-                    SUMATE AHORA
-                  </Button>
-                </button>
+                {isLoggedIn ? (
+                  <Link href="/dashboard" className="w-full sm:w-auto">
+                    <Button variant="primary" size="lg" className="animate-glow w-full sm:min-w-[180px]">
+                      IR AL DASHBOARD
+                    </Button>
+                  </Link>
+                ) : (
+                  <button onClick={() => setShowWelcome(true)} className="w-full sm:w-auto">
+                    <Button variant="primary" size="lg" className="animate-glow w-full sm:min-w-[180px]">
+                      SUMATE AHORA
+                    </Button>
+                  </button>
+                )}
                 <Link href="/fixture-live" className="w-full sm:w-auto">
                   <Button
                     variant="outline"

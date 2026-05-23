@@ -68,6 +68,7 @@ export default function RegisterPage() {
     confirmPassword: "",
     acceptedTerms: false,
   });
+  const [inviteCode, setInviteCode] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
 
   useEffect(() => {
@@ -103,6 +104,7 @@ export default function RegisterPage() {
           email: form.email.trim().toLowerCase(),
           password: form.password,
           instagram: form.instagram.trim() || undefined,
+          inviteCode: inviteCode.trim().toUpperCase() || undefined,
           acceptedTerms: form.acceptedTerms,
         }),
       });
@@ -141,6 +143,13 @@ export default function RegisterPage() {
             <h1 className="text-2xl font-black uppercase text-white">Creá tu cuenta</h1>
             <p className="text-gray-500 text-sm mt-1">Unite al Prode Mundial Gamer 2026</p>
           </div>
+
+          <p className="text-center text-gray-500 text-sm mb-2">
+            ¿Ya tenés cuenta?{" "}
+            <Link href="/login" className="text-red-400 hover:text-red-300 font-medium">
+              Iniciá sesión
+            </Link>
+          </p>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3">
@@ -189,6 +198,16 @@ export default function RegisterPage() {
               onChange={(e) => handleChange("instagram", e.target.value)}
               icon={<AtSign className="w-4 h-4" />}
             />
+
+            <div>
+              <Input
+                label="Código de invitación (opcional)"
+                placeholder="Ej: ABC12345"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+              />
+              <p className="text-gray-700 text-xs mt-1">Si alguien te invitó al prode, ingresá su código para darle puntos extra.</p>
+            </div>
 
             <div className="relative">
               <Input
@@ -274,12 +293,6 @@ export default function RegisterPage() {
             </Button>
           </form>
 
-          <p className="text-center text-gray-600 text-sm mt-6">
-            ¿Ya tenés cuenta?{" "}
-            <Link href="/login" className="text-red-400 hover:text-red-300 font-medium">
-              Ingresá con tu email
-            </Link>
-          </p>
         </Card>
       </div>
     </div>

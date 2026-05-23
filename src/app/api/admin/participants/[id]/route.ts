@@ -23,12 +23,14 @@ export async function GET(
       include: {
         predictions: {
           include: { match: { include: { homeTeam: true, awayTeam: true } } },
+          orderBy: { createdAt: "desc" },
         },
         groupPredictions: { include: { group: true, firstTeam: true, secondTeam: true } },
-        bracketPredictions: true,
+        bracketPredictions: { orderBy: { createdAt: "desc" } },
         specialPredictions: true,
-        bonuses: { include: { bonusAction: true } },
-        redemptions: { include: { prize: true } },
+        bonuses: { include: { bonusAction: true }, orderBy: { createdAt: "desc" } },
+        redemptions: { include: { prize: true }, orderBy: { createdAt: "desc" } },
+        userAchievements: { include: { achievementRule: true }, orderBy: { awardedAt: "desc" } },
       },
     });
 

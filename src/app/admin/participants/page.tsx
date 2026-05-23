@@ -3,7 +3,8 @@
 import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, UserX, UserCheck, RefreshCcw, KeyRound, X, Eye, EyeOff } from "lucide-react";
+import { Search, UserX, UserCheck, RefreshCcw, KeyRound, X, Eye, EyeOff, ExternalLink } from "lucide-react";
+import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -307,6 +308,11 @@ export default function AdminParticipantsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-2">
+                      <Link href={`/admin/participants/${p.id}`}>
+                        <Button variant="secondary" size="sm" title="Ver perfil completo">
+                          <ExternalLink className="w-3 h-3" />
+                        </Button>
+                      </Link>
                       <Button
                         variant="secondary"
                         size="sm"

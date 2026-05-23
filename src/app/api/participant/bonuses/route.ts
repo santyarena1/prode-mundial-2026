@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import { getUserFromCookies } from "@/lib/cookies";
+import { calculateUserPoints } from "@/lib/points";
 
 const claimBonusSchema = z.object({
   bonusActionId: z.string().min(1),
@@ -64,19 +65,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Bonus already claimed" }, { status: 409 });
     }
 
+    const pointsEarned = Math.floor(bonusAction.points * bonusAction.multiplier);
     const userBonus = await prisma.userBonus.create({
       data: {
         userId: auth.userId,
         bonusActionId,
         evidenceUrl: evidenceUrl || null,
-        status: bonusAction.requiresApproval ? "pending" : "approved",
-        pointsEarned: bonusAction.requiresApproval
-          ? 0
-          : Math.floor(bonusAction.points * bonusAction.multiplier),
+        status: "approved",
+        pointsEarned,
       },
     });
 
-    return NextResponse.json({ userBonus }, { status: 201 });
+    // Award points immediately
+    await calculateUserPoints(auth.userId);
+
+    return NextResponse.json({ userBonus, pointsEarned }, { status: 201 });
   } catch (error) {
     console.error("Bonuses POST error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

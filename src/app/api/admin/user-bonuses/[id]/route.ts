@@ -53,3 +53,25 @@ export async function PUT(
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await getAdminFromCookies();
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { id } = await params;
+    const existing = await prisma.userBonus.findUnique({ where: { id } });
+    if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    await prisma.userBonus.delete({ where: { id } });
+    await calculateUserPoints(existing.userId);
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("UserBonus DELETE error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}

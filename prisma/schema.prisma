@@ -21,12 +21,18 @@ model User {
   bonusPoints       Int      @default(0)
   achievementPoints Int      @default(0)
   spentPoints       Int      @default(0)
+  referralPoints    Int      @default(0)
+  referralCode      String?  @unique
+  referredById      String?
   hardcoreMode      Boolean  @default(false)
   isBlocked         Boolean  @default(false)
   acceptedTerms     Boolean  @default(false)
   registrationIp    String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+
+  referredBy            User?    @relation("UserReferrals", fields: [referredById], references: [id])
+  referrals             User[]   @relation("UserReferrals")
 
   predictions           Prediction[]
   groupPredictions      GroupPrediction[]
@@ -239,6 +245,7 @@ model BonusAction {
   active           Boolean  @default(true)
   limitPerUser     Int?
   limitGlobal      Int?
+  actionUrl        String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

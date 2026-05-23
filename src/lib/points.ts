@@ -315,12 +315,13 @@ export async function calculateUserPoints(userId: string): Promise<number> {
     }
   }
 
-  // ── 4. Bonus points (bonus actions + purchase codes) ─────────────────────
-  const [bonusAgg, codeAgg] = await Promise.all([
+  // ── 4. Bonus points (bonus actions + purchase codes + referrals) ─────────
+  const [bonusAgg, codeAgg, userRec] = await Promise.all([
     prisma.userBonus.aggregate({ where: { userId, status: "approved" }, _sum: { pointsEarned: true } }),
     prisma.purchaseCode.aggregate({ where: { userId, status: "redeemed" }, _sum: { points: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { referralPoints: true } }),
   ]);
-  const bonusPoints = (bonusAgg._sum.pointsEarned ?? 0) + (codeAgg._sum.points ?? 0);
+  const bonusPoints = (bonusAgg._sum.pointsEarned ?? 0) + (codeAgg._sum.points ?? 0) + (userRec?.referralPoints ?? 0);
 
   // ── 5. Achievements ──────────────────────────────────────────────────────
   const achievementPoints = await applyAchievements(userId, achievementStats);

@@ -11,6 +11,7 @@ const createBonusActionSchema = z.object({
   sponsorId: z.string().optional(),
   requiresApproval: z.boolean().optional(),
   active: z.boolean().optional(),
+  actionUrl: z.string().optional(),
 });
 
 export async function GET() {
