@@ -39,10 +39,14 @@ export async function GET() {
       });
     }
 
+    const setting = await prisma.setting.findUnique({ where: { key: "referral_points" } });
+    const pointsPerReferral = setting ? (parseInt(setting.value) || 200) : 200;
+
     return NextResponse.json({
       referralCode: user.referralCode,
       referralPoints: user.referralPoints,
       referralCount: user._count.referrals,
+      pointsPerReferral,
     });
   } catch (error) {
     console.error("Referral GET error:", error);
