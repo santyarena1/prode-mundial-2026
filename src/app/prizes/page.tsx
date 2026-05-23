@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Gift, Star, Lock } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { LoadingScreen } from "@/components/ui/LoadingSpinner";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { PrizeDetailModal } from "@/components/prizes/PrizeDetailModal";
 
 interface Prize {
   id: string;
@@ -20,6 +21,7 @@ interface Prize {
   requiredPoints: number;
   stock: number;
   active: boolean;
+  prizeType: string;
   sponsor?: { id: string; name: string; logoUrl?: string | null } | null;
 }
 
@@ -33,6 +35,7 @@ export default function PrizesPage() {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [redeeming, setRedeeming] = useState<Record<string, boolean>>({});
+  const [selectedPrize, setSelectedPrize] = useState<Prize | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -118,7 +121,7 @@ export default function PrizesPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {prizes.filter((p) => p.active).map((prize, i) => {
             const canAfford = user && user.totalPoints >= prize.requiredPoints;
-            const missing = user ? prize.requiredPoints - user.totalPoints : null;
+            const missing = user ? prize.requiredPoints - user.totalPoints : 0;
 
             return (
               <motion.div
@@ -127,74 +130,50 @@ export default function PrizesPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.08 }}
               >
-                <Card className="overflow-hidden h-full flex flex-col hover:border-red-600/30 transition-colors">
-                  {/* Image */}
-                  <div className="relative w-full aspect-[5/2] bg-[#1a1a1a] border-b border-[#222] overflow-hidden">
-                    {prize.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={prize.imageUrl} alt={prize.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="h-full flex items-center justify-center"><span className="text-5xl">🎁</span></div>
-                    )}
-                    {prize.sponsor?.logoUrl && (
-                      <div className="absolute bottom-0 right-0 pointer-events-none">
-                        <div className="absolute bottom-0 right-0 w-16 h-16 bg-gradient-to-tl from-black/75 via-black/30 to-transparent rounded-tl-xl" />
-                        <div className="absolute bottom-1.5 right-1.5 w-7 h-7 flex items-center justify-center">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={prize.sponsor.logoUrl} alt={prize.sponsor.name} className="max-w-full max-h-full object-contain drop-shadow-lg" />
+                <button
+                  className="w-full text-left"
+                  onClick={() => setSelectedPrize(prize)}
+                >
+                  <Card className="overflow-hidden h-full flex flex-col hover:border-red-600/40 transition-colors cursor-pointer">
+                    {/* Image */}
+                    <div className="relative w-full aspect-[5/2] bg-[#1a1a1a] border-b border-[#222] overflow-hidden">
+                      {prize.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={prize.imageUrl} alt={prize.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="h-full flex items-center justify-center"><span className="text-5xl">🎁</span></div>
+                      )}
+                      {prize.sponsor?.logoUrl && (
+                        <div className="absolute bottom-0 right-0 pointer-events-none">
+                          <div className="absolute bottom-0 right-0 w-16 h-16 bg-gradient-to-tl from-black/75 via-black/30 to-transparent rounded-tl-xl" />
+                          <div className="absolute bottom-1.5 right-1.5 w-7 h-7 flex items-center justify-center">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={prize.sponsor.logoUrl} alt={prize.sponsor.name} className="max-w-full max-h-full object-contain drop-shadow-lg" />
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-5 flex-1 flex flex-col">
-                    <h3 className="text-white font-bold text-lg mb-1">{prize.name}</h3>
-                    <p className="text-gray-500 text-sm flex-1 mb-4 leading-relaxed">
-                      {prize.description}
-                    </p>
-
-                    <div className="flex items-center gap-2 mb-4">
-                      <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                      <span className="text-yellow-400 font-black text-lg">
-                        {prize.requiredPoints}
-                      </span>
-                      <span className="text-gray-600 text-sm">puntos necesarios</span>
+                      )}
                     </div>
 
-                    {prize.stock === 0 ? (
-                      <Button variant="secondary" size="md" className="w-full" disabled>
-                        Sin stock
-                      </Button>
-                    ) : user ? (
-                      canAfford ? (
-                        <Button
-                          variant="primary"
-                          size="md"
-                          className="w-full"
-                          loading={redeeming[prize.id]}
-                          onClick={() => handleRedeem(prize.id, prize.name)}
-                        >
-                          🎁 CANJEAR AHORA
-                        </Button>
-                      ) : (
-                        <div>
-                          <Button variant="secondary" size="md" className="w-full" disabled>
-                            Te faltan {missing} puntos
-                          </Button>
-                          <p className="text-gray-700 text-xs text-center mt-1.5">
-                            Seguí prediciendo para acumular más
-                          </p>
+                    <div className="p-5 flex-1 flex flex-col">
+                      <h3 className="text-white font-bold text-lg mb-1">{prize.name}</h3>
+                      <p className="text-gray-500 text-sm flex-1 mb-4 leading-relaxed line-clamp-2">
+                        {prize.description}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                          <span className="text-yellow-400 font-black">{prize.requiredPoints.toLocaleString("es-AR")}</span>
+                          <span className="text-gray-600 text-xs">pts</span>
                         </div>
-                      )
-                    ) : (
-                      <Link href="/register">
-                        <Button variant="outline" size="md" className="w-full">
-                          Participar para canjear
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
-                </Card>
+                        {canAfford ? (
+                          <span className="text-xs text-green-400 font-bold">✓ Podés canjear</span>
+                        ) : missing && missing > 0 ? (
+                          <span className="text-xs text-gray-600">Faltan {missing.toLocaleString("es-AR")} pts</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </Card>
+                </button>
               </motion.div>
             );
           })}
@@ -202,6 +181,21 @@ export default function PrizesPage() {
       </div>
 
       <Footer />
+
+      <AnimatePresence>
+        {selectedPrize && (
+          <PrizeDetailModal
+            prize={selectedPrize}
+            user={user}
+            redeeming={!!redeeming[selectedPrize.id]}
+            onClose={() => setSelectedPrize(null)}
+            onRedeem={(id, name) => {
+              handleRedeem(id, name);
+              setSelectedPrize(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
