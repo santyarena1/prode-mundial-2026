@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "react-hot-toast";
+import { BackgroundOrbs } from "@/components/ui/BackgroundOrbs";
 import "./globals.css";
 
 const inter = Inter({
@@ -50,6 +51,7 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-[#0a0a0a] text-white">
+        <BackgroundOrbs />
         {children}
         <Toaster
           position="top-right"
