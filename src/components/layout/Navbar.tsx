@@ -40,6 +40,9 @@ export function Navbar() {
       }
     };
     fetchUser();
+
+    window.addEventListener("pointsUpdated", fetchUser);
+    return () => window.removeEventListener("pointsUpdated", fetchUser);
   }, [pathname]);
 
   useEffect(() => {

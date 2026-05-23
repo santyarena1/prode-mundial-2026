@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Plus, Trash2, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, Trash2, CheckCircle2, XCircle, Pencil, Save, X as XIcon } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -43,6 +43,8 @@ export default function AdminBonusPage() {
   });
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{ name: string; description: string; points: string; actionUrl: string; active: boolean }>({ name: "", description: "", points: "", actionUrl: "", active: true });
 
   useEffect(() => {
     const init = async () => {
@@ -94,6 +96,38 @@ export default function AdminBonusPage() {
     if (!res.ok) { toast.error("Error al eliminar"); return; }
     setActions((prev) => prev.filter((a) => a.id !== id));
     toast.success("Acción eliminada");
+  };
+
+  const startEdit = (a: BonusAction) => {
+    setEditingId(a.id);
+    setEditForm({ name: a.name, description: a.description, points: String(a.points), actionUrl: a.actionUrl || "", active: a.active });
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    setUpdating((p) => ({ ...p, [editingId]: true }));
+    try {
+      const res = await fetch(`/api/admin/bonus-actions/${editingId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editForm.name,
+          description: editForm.description,
+          points: parseInt(editForm.points),
+          actionUrl: editForm.actionUrl.trim() || null,
+          active: editForm.active,
+        }),
+      });
+      if (!res.ok) { toast.error("Error al guardar"); return; }
+      const data = await res.json();
+      setActions((prev) => prev.map((a) => a.id === editingId ? { ...a, ...data.bonusAction } : a));
+      setEditingId(null);
+      toast.success("Acción actualizada");
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setUpdating((p) => ({ ...p, [editingId!]: false }));
+    }
   };
 
   const updateBonus = async (id: string, status: "approved" | "rejected") => {
@@ -174,25 +208,61 @@ export default function AdminBonusPage() {
           <div className="space-y-3">
             {actions.map((a) => (
               <Card key={a.id} className="p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-white font-bold text-sm">{a.name}</h3>
-                      <Badge variant="success" className="text-xs">+{a.points} pts</Badge>
-                      {a.requiresEvidence && <Badge variant="info">Requiere evidencia</Badge>}
-                      <Badge variant={a.active ? "success" : "default"}>{a.active ? "Activo" : "Inactivo"}</Badge>
+                {editingId === a.id ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Input placeholder="Nombre" value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} />
+                      <Input type="number" placeholder="Puntos" value={editForm.points} onChange={(e) => setEditForm((p) => ({ ...p, points: e.target.value }))} />
+                      <textarea
+                        placeholder="Descripción (qué hay que hacer exactamente)"
+                        value={editForm.description}
+                        onChange={(e) => setEditForm((p) => ({ ...p, description: e.target.value }))}
+                        rows={3}
+                        className="sm:col-span-2 bg-[#111] border border-[#333] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-red-500 resize-none"
+                      />
+                      <Input placeholder="URL de la acción (para redirigir al usuario)" value={editForm.actionUrl} onChange={(e) => setEditForm((p) => ({ ...p, actionUrl: e.target.value }))} className="sm:col-span-2" />
                     </div>
-                    <p className="text-gray-500 text-xs mt-1">{a.description}</p>
-                    {a.actionUrl && (
-                      <a href={a.actionUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-xs hover:underline mt-0.5 inline-block">
-                        {a.actionUrl}
-                      </a>
-                    )}
+                    <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                      <input type="checkbox" checked={editForm.active} onChange={(e) => setEditForm((p) => ({ ...p, active: e.target.checked }))} />
+                      Activo (visible para usuarios)
+                    </label>
+                    <div className="flex gap-2">
+                      <Button variant="primary" size="sm" loading={updating[a.id]} onClick={saveEdit}>
+                        <Save className="w-4 h-4" /> Guardar
+                      </Button>
+                      <button onClick={() => setEditingId(null)} className="text-gray-500 hover:text-white">
+                        <XIcon className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                  <button onClick={() => deleteAction(a.id)} className="text-gray-600 hover:text-red-400">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-white font-bold text-sm">{a.name}</h3>
+                        <Badge variant="success" className="text-xs">+{a.points} pts</Badge>
+                        {a.requiresEvidence && <Badge variant="info">Requiere evidencia</Badge>}
+                        <Badge variant={a.active ? "success" : "default"}>{a.active ? "Activo" : "Inactivo"}</Badge>
+                      </div>
+                      <p className="text-gray-500 text-xs mt-1">{a.description}</p>
+                      {a.actionUrl ? (
+                        <a href={a.actionUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-xs hover:underline mt-0.5 inline-block truncate max-w-full">
+                          {a.actionUrl}
+                        </a>
+                      ) : (
+                        <span className="text-gray-700 text-xs mt-0.5 inline-block">Sin URL de redirección</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button onClick={() => startEdit(a)} className="text-gray-600 hover:text-blue-400" title="Editar">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => deleteAction(a.id)} className="text-gray-600 hover:text-red-400" title="Eliminar">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </Card>
             ))}
           </div>

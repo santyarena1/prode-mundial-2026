@@ -83,6 +83,7 @@ export default function BonusesPage() {
         return;
       }
       toast.success(`+${data.pointsEarned} puntos acreditados!`);
+      window.dispatchEvent(new CustomEvent("pointsUpdated"));
       const bonRes = await apiFetch("/api/participant/bonuses");
       if (bonRes.ok) {
         const d = await bonRes.json();
@@ -147,7 +148,7 @@ export default function BonusesPage() {
                     <h3 className="text-white font-bold">Código de invitación</h3>
                   </div>
                   <p className="text-gray-500 text-sm mb-3">
-                    Compartí tu código. Cada amigo que se registre con él te da <span className="text-green-400 font-bold">+200 pts</span>.
+                    Compartí tu código. Cada amigo que use tu código al registrarse te suma <span className="text-green-400 font-bold">+200 pts automáticamente</span>.
                   </p>
                   <div className="flex items-center gap-2">
                     <div className="bg-[#1a1a1a] border border-[#333] rounded-lg px-4 py-2 font-mono text-white font-bold tracking-widest text-lg">
@@ -288,8 +289,11 @@ export default function BonusesPage() {
                   </button>
                 </div>
 
-                {/* Description */}
-                <p className="text-gray-400 text-sm leading-relaxed mb-5">{modalBonus.description}</p>
+                {/* What to do */}
+                <div className="p-3.5 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl mb-5">
+                  <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-1">Qué tenés que hacer</p>
+                  <p className="text-gray-200 text-sm leading-relaxed">{modalBonus.description}</p>
+                </div>
 
                 {/* Info cards */}
                 <div className="space-y-3 mb-6">
