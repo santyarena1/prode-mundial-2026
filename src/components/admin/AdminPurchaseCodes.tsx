@@ -193,18 +193,20 @@ export function AdminPurchaseCodes() {
           Nuevo código — {tabMeta.label}
         </h3>
         <p className="text-gray-600 text-xs mb-4">{tabMeta.hint}</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <Input
+            label={`Código (dejar vacío para generar automático)`}
             placeholder={tabMeta.placeholder}
             value={form.code}
             onChange={(e) => setForm((p) => ({ ...p, code: e.target.value.toUpperCase() }))}
-            className="font-mono sm:col-span-1"
+            className="font-mono"
           />
           {isPurchaseTab ? (
             <div className="flex flex-col gap-1">
               <Input
                 type="number"
-                placeholder="Monto de compra ($)"
+                label={`Monto de la compra ($) — cada $${POINTS_PER_PESO} = 1 punto`}
+                placeholder="Ej: 1500"
                 value={form.amount}
                 onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
               />
@@ -218,16 +220,18 @@ export function AdminPurchaseCodes() {
           ) : (
             <Input
               type="number"
-              placeholder="Puntos"
+              label="Puntos que otorga este código"
+              placeholder="Ej: 300"
               value={form.points}
               onChange={(e) => setForm((p) => ({ ...p, points: e.target.value }))}
             />
           )}
           <Input
+            label="Nota interna (opcional)"
             placeholder={tabMeta.notesPlaceholder}
             value={form.notes}
             onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-            className="sm:col-span-3"
+            className="sm:col-span-2"
           />
         </div>
         <Button variant="primary" size="sm" loading={creating} onClick={createCode}>

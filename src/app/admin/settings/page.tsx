@@ -321,7 +321,7 @@ export default function AdminSettingsPage() {
               type="number"
               label="Puntos por invitar un amigo (código referido)"
               placeholder="200"
-              value={eventSettings.referralPoints || "200"}
+              value={eventSettings.referralPoints ?? "200"}
               onChange={(e) => setEventSettings((p) => ({ ...p, referralPoints: e.target.value }))}
             />
             <div>
