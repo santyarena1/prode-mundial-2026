@@ -386,20 +386,34 @@ export default function DashboardPage() {
               Canjear más →
             </Link>
           </div>
-          {redemptions.length === 0 ? (
-            <Card className="p-6 flex items-center gap-4">
-              <Package className="w-8 h-8 text-gray-700 flex-shrink-0" />
-              <div>
-                <p className="text-gray-400 text-sm font-semibold">Todavía no canjeaste ningún premio</p>
-                <p className="text-gray-600 text-xs mt-0.5">Acumulá puntos y canjeá productos gaming exclusivos.</p>
-              </div>
-              <Link href="/prizes" className="ml-auto flex-shrink-0">
-                <Button variant="primary" size="sm">Ver premios</Button>
-              </Link>
-            </Card>
-          ) : (
-            <div className="space-y-2">
-              {redemptions.map((red) => {
+          <div className="space-y-2">
+            {/* Early bird ticket */}
+            {user.earlyBirdGranted && (
+              <Card className="p-4 flex items-center gap-4 border-amber-500/20 bg-amber-500/5">
+                <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0 text-xl">
+                  🎟️
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-amber-200 text-sm font-bold">Ticket Early Bird</p>
+                  <p className="text-amber-600 text-xs mt-0.5">Participás en todos los sorteos con <span className="font-bold text-amber-400">doble chance</span> 🎉</p>
+                </div>
+                <Badge variant="warning" className="flex-shrink-0 text-[10px]">x2</Badge>
+              </Card>
+            )}
+
+            {redemptions.length === 0 && !user.earlyBirdGranted ? (
+              <Card className="p-6 flex items-center gap-4">
+                <Package className="w-8 h-8 text-gray-700 flex-shrink-0" />
+                <div>
+                  <p className="text-gray-400 text-sm font-semibold">Todavía no canjeaste ningún premio</p>
+                  <p className="text-gray-600 text-xs mt-0.5">Acumulá puntos y canjeá productos gaming exclusivos.</p>
+                </div>
+                <Link href="/prizes" className="ml-auto flex-shrink-0">
+                  <Button variant="primary" size="sm">Ver premios</Button>
+                </Link>
+              </Card>
+            ) : (
+              redemptions.map((red) => {
                 const st = REDEMPTION_STATUS[red.status] ?? { label: red.status, icon: null };
                 return (
                   <Card key={red.id} className="p-4 flex items-center gap-4">
@@ -425,9 +439,9 @@ export default function DashboardPage() {
                     </div>
                   </Card>
                 );
-              })}
-            </div>
-          )}
+              })
+            )}
+          </div>
         </motion.div>
 
         {/* Sponsor CTA */}

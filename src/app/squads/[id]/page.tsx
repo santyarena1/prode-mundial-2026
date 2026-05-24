@@ -204,6 +204,10 @@ export default function SquadDetailPage() {
     CHAMPION:         { label: "Campeón del mundo", desc: "Si predijiste al campeón antes de que arrancara el torneo" },
     RUNNER_UP:        { label: "Finalista (subcampeón)", desc: "Si predijiste correctamente al equipo que llegó a la final pero no ganó" },
     FINAL_EXACT:      { label: "Final perfecta", desc: "Bonus especial por acertar al campeón Y al finalista exactamente (se suma a los puntos de campeón y finalista)" },
+    SPECIAL_CHAMPION:    { label: "Predicción especial: Campeón", desc: "Puntos si predijiste al campeón del mundo en la predicción especial antes del torneo" },
+    SPECIAL_TOP_SCORER:  { label: "Predicción especial: Goleador", desc: "Si predijiste correctamente quién sería el máximo goleador del Mundial" },
+    SPECIAL_REVELATION:  { label: "Predicción especial: Revelación", desc: "Si predijiste al equipo que fue considerado la sorpresa o revelación del torneo" },
+    SPECIAL_BEST_PLAYER: { label: "Predicción especial: Mejor jugador", desc: "Si predijiste correctamente quién ganaría el Balón de Oro o sería elegido el mejor del torneo" },
   };
 
   return (
@@ -255,18 +259,18 @@ export default function SquadDetailPage() {
                   tab === t ? "bg-red-600 text-white" : "text-gray-500 hover:text-gray-300"
                 }`}
               >
-                {t === "ranking" ? "Ranking" : t === "prizes" ? "Premios" : "Config"}
+                {t === "ranking" ? "Miembros" : t === "prizes" ? "Premios" : "Config"}
               </button>
             ))}
           </div>
 
-          {/* Ranking tab */}
+          {/* Members/Ranking tab */}
           {tab === "ranking" && (
             <div className="space-y-2">
               {squad.members.map((m, i) => (
                 <Card key={m.id} className={`p-4 ${m.id === myMemberId ? "border-red-600/40" : ""}`}>
                   <div className="flex items-center gap-3">
-                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-black ${
+                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0 ${
                       i === 0 ? "bg-yellow-500/20 text-yellow-400" :
                       i === 1 ? "bg-gray-400/20 text-gray-300" :
                       i === 2 ? "bg-orange-700/20 text-orange-500" :
@@ -275,15 +279,18 @@ export default function SquadDetailPage() {
                       {i + 1}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-white font-bold truncate">
                           {m.user.firstName} {m.user.lastName}
                         </span>
-                        {m.role === "admin" && <Crown className="w-3.5 h-3.5 text-yellow-500" />}
-                        {m.id === myMemberId && <span className="text-xs text-gray-600">(vos)</span>}
+                        {m.role === "admin" && <Crown className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />}
+                        {m.id === myMemberId && <span className="text-xs text-gray-600 flex-shrink-0">(vos)</span>}
                       </div>
+                      {m.user.instagram && (
+                        <p className="text-gray-600 text-xs mt-0.5">@{m.user.instagram}</p>
+                      )}
                     </div>
-                    <span className="text-yellow-500 font-black text-sm">{m.totalPoints} pts</span>
+                    <span className="text-yellow-500 font-black text-sm flex-shrink-0">{m.totalPoints} pts</span>
                   </div>
                 </Card>
               ))}
