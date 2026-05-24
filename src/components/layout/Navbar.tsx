@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, X, Trophy, LogOut } from "lucide-react";
+import { Menu, X, Trophy, LogOut, AlertTriangle, Save, Bell } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { UserMenu } from "@/components/layout/UserMenu";
@@ -24,6 +25,9 @@ export function Navbar() {
   const [user, setUser] = useState<UserData | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [hasPendingPreds, setHasPendingPreds] = useState(false);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -39,14 +43,38 @@ export function Navbar() {
         // not logged in
       }
     };
+    const fetchNotifications = async () => {
+      try {
+        const res = await apiFetch("/api/participant/notifications");
+        if (res.ok) {
+          const data = await res.json();
+          setUnreadCount(data.unreadCount ?? 0);
+        }
+      } catch {
+        // ignore
+      }
+    };
     fetchUser();
+    fetchNotifications();
 
     window.addEventListener("pointsUpdated", fetchUser);
-    return () => window.removeEventListener("pointsUpdated", fetchUser);
+    window.addEventListener("notificationsRead", fetchNotifications);
+    return () => {
+      window.removeEventListener("pointsUpdated", fetchUser);
+      window.removeEventListener("notificationsRead", fetchNotifications);
+    };
   }, [pathname]);
 
   useEffect(() => {
     setMobileOpen(false);
+    if (pathname !== "/predictions") {
+      const pending = sessionStorage.getItem("pred_unsaved") === "1";
+      setHasPendingPreds(pending);
+      if (pending) setShowUnsavedModal(true);
+    } else {
+      setHasPendingPreds(false);
+      setShowUnsavedModal(false);
+    }
   }, [pathname]);
 
   useEffect(() => {
@@ -68,14 +96,63 @@ export function Navbar() {
     { href: "/ranking", label: "Ranking" },
     { href: "/como-jugar", label: "Cómo jugar" },
     ...(user ? [{ href: "/my-predictions", label: "Mis Predicciones" }] : []),
+    ...(user ? [{ href: "/squads", label: "Grupos" }] : []),
   ];
 
   const isActive = (href: string) => pathname === href;
   const isHome = pathname === "/";
   const showBack = shouldShowBackButton(pathname) && !isHome;
 
+  const unsavedModal = (
+    <AnimatePresence>
+      {showUnsavedModal && hasPendingPreds && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/75 z-50 backdrop-blur-sm"
+            onClick={() => setShowUnsavedModal(false)}
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92, y: 24 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.92, y: 24 }}
+            transition={{ type: "spring", duration: 0.35 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+          >
+            <div className="bg-[#111] border border-amber-500/40 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center pointer-events-auto">
+              <div className="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-7 h-7 text-amber-400" />
+              </div>
+              <h2 className="text-white font-black text-lg mb-2">¡Che, no guardaste!</h2>
+              <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                Tenés predicciones seleccionadas sin confirmar.{" "}
+                <span className="text-amber-400 font-semibold">No van a contar hasta que las guardes.</span>
+              </p>
+              <div className="flex flex-col gap-2">
+                <Link
+                  href="/predictions"
+                  onClick={() => setShowUnsavedModal(false)}
+                  className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl transition-colors text-sm uppercase tracking-wider flex items-center justify-center gap-2"
+                >
+                  <Save className="w-4 h-4" /> Ir a guardar mis predicciones
+                </Link>
+                <button
+                  onClick={() => setShowUnsavedModal(false)}
+                  className="w-full py-2.5 text-gray-500 hover:text-gray-300 font-semibold text-sm transition-colors"
+                >
+                  Ahora no
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+
   if (isHome) {
     return (
+      <>
       <nav className="fixed top-0 left-0 right-0 z-50 pb-5 sm:pb-6 overflow-visible">
         <div
           aria-hidden
@@ -109,6 +186,14 @@ export function Navbar() {
                     <Trophy className="w-3 h-3 mr-1" />
                     {user.totalPoints} pts
                   </Badge>
+                  <Link href="/notifications" className="relative text-gray-500 hover:text-white transition-colors" title="Notificaciones">
+                    <Bell className="w-4 h-4" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-600 text-white text-[8px] font-black flex items-center justify-center">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="text-gray-500 hover:text-red-400 transition-colors"
@@ -176,10 +261,13 @@ export function Navbar() {
           </div>
         )}
       </nav>
+      {unsavedModal}
+      </>
     );
   }
 
   return (
+    <>
     <header className="sticky top-0 z-50 w-full flex flex-col">
       {/* Fila principal del menú */}
       <nav className="relative w-full bg-[#0a0a0a]/90 backdrop-blur-lg border-b border-[#1a1a1a]/80 overflow-visible">
@@ -215,6 +303,14 @@ export function Navbar() {
                     <Trophy className="w-3 h-3 mr-1" />
                     {user.totalPoints} pts
                   </Badge>
+                  <Link href="/notifications" className="relative text-gray-500 hover:text-white transition-colors" title="Notificaciones">
+                    <Bell className="w-4 h-4" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-600 text-white text-[8px] font-black flex items-center justify-center">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="text-gray-500 hover:text-red-400 transition-colors"
@@ -288,5 +384,7 @@ export function Navbar() {
         </div>
       )}
     </header>
+    {unsavedModal}
+    </>
   );
 }

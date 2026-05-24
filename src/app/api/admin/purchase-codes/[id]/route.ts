@@ -73,11 +73,13 @@ export async function DELETE(
     const existing = await prisma.purchaseCode.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    if (existing.status === "redeemed") {
-      return NextResponse.json({ error: "No se puede eliminar un código ya canjeado" }, { status: 400 });
+    await prisma.purchaseCode.delete({ where: { id } });
+
+    // Recalculate points if the code had already been redeemed
+    if (existing.status === "redeemed" && existing.userId) {
+      await calculateUserPoints(existing.userId);
     }
 
-    await prisma.purchaseCode.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Admin purchase code DELETE error:", error);

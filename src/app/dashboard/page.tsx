@@ -6,7 +6,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Trophy, Target, Star, Gift, Zap, ChevronRight, User, TrendingUp, CheckCircle2, BookOpen,
-  Clock, Shuffle, Package, XCircle,
+  Clock, Shuffle, Package, XCircle, Users,
 } from "lucide-react";
 import { VirtualAlbumModal } from "@/components/dashboard/VirtualAlbumModal";
 import { SponsorCTA } from "@/components/home/SponsorCTA";
@@ -29,6 +29,7 @@ interface UserData {
   bonusPoints: number;
   spentPoints: number;
   earlyBirdGranted: boolean;
+  earlyBirdEligible?: boolean;
 }
 
 interface RankingUser {
@@ -117,6 +118,14 @@ const actionCards = [
     color: "text-green-400",
     bg: "bg-green-600/10 border-green-600/20",
   },
+  {
+    href: "/squads",
+    icon: <Users className="w-6 h-6" />,
+    title: "Grupos",
+    description: "Competí con tus amigos en privado",
+    color: "text-orange-400",
+    bg: "bg-orange-600/10 border-orange-600/20",
+  },
 ];
 
 export default function DashboardPage() {
@@ -130,6 +139,7 @@ export default function DashboardPage() {
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [raffles, setRaffles] = useState<WeeklyRaffle[]>([]);
   const [showEarlyBird, setShowEarlyBird] = useState(false);
+  const [earlyBirdMode, setEarlyBirdMode] = useState<"claim" | "confirmed">("confirmed");
 
   useEffect(() => {
     const init = async () => {
@@ -142,12 +152,17 @@ export default function DashboardPage() {
         const meData = await meRes.json();
         setUser(meData.user);
 
-        // Show early bird modal once
-        if (meData.user.earlyBirdGranted) {
-          const key = `earlyBirdShown_${meData.user.id}`;
-          if (!localStorage.getItem(key)) {
+        if (meData.user.earlyBirdEligible && !meData.user.earlyBirdGranted) {
+          // Eligible but not yet claimed — show every visit until claimed
+          setEarlyBirdMode("claim");
+          setShowEarlyBird(true);
+        } else if (meData.user.earlyBirdGranted) {
+          // Already granted — show confirmation once
+          const shownKey = `earlyBirdShown_${meData.user.id}`;
+          if (!localStorage.getItem(shownKey)) {
+            setEarlyBirdMode("confirmed");
             setShowEarlyBird(true);
-            localStorage.setItem(key, "1");
+            localStorage.setItem(shownKey, "1");
           }
         }
 
@@ -445,7 +460,15 @@ export default function DashboardPage() {
       <Footer />
 
       <VirtualAlbumModal open={albumModalOpen} onClose={() => setAlbumModalOpen(false)} />
-      {showEarlyBird && <EarlyBirdModal onClose={() => setShowEarlyBird(false)} />}
+      {showEarlyBird && (
+        <EarlyBirdModal
+          mode={earlyBirdMode}
+          onClose={() => setShowEarlyBird(false)}
+          onClaimed={() => {
+            setUser(u => u ? { ...u, earlyBirdGranted: true, earlyBirdEligible: false } : u);
+          }}
+        />
+      )}
     </div>
   );
 }

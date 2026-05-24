@@ -14,9 +14,12 @@ export function getBackFallback(pathname: string): string {
     "/bonuses",
     "/prizes",
     "/perfil",
+    "/squads",
+    "/notifications",
   ];
   if (pathname === "/dashboard") return "/";
   if (dashboardRoutes.includes(pathname)) return "/dashboard";
+  if (pathname.startsWith("/squads/")) return "/squads";
 
   return "/";
 }
@@ -32,10 +35,11 @@ export function getBackLabel(pathname: string): string {
     return "Volver al panel";
   }
   if (
-    ["/predictions", "/my-predictions", "/bonuses", "/prizes", "/perfil"].includes(pathname)
+    ["/predictions", "/my-predictions", "/bonuses", "/prizes", "/perfil", "/squads", "/notifications"].includes(pathname)
   ) {
     return "Volver al panel";
   }
+  if (pathname.startsWith("/squads/")) return "Volver a grupos";
   if (pathname === "/dashboard") return "Volver al inicio";
   return "Volver";
 }

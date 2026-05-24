@@ -98,6 +98,8 @@ export default function PredictionsPage() {
   const [pendingScores, setPendingScores] = useState<Record<string, { home?: number; away?: number }>>({});
   const [savedScores, setSavedScores] = useState<Record<string, { home: number; away: number }>>({});
   const [showHardcoreSpotlight, setShowHardcoreSpotlight] = useState(false);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [pendingNavUrl, setPendingNavUrl] = useState<string | null>(null);
 
   // Team selection modal for bracket picks
   const [selectionModal, setSelectionModal] = useState<{ phase: string; slot: string } | null>(null);
@@ -373,13 +375,40 @@ export default function PredictionsPage() {
   const hasUnsaved =
     Object.keys(pendingPreds).length > 0 ||
     Object.keys(pendingBracket).length > 0 ||
-    Object.values(pendingGroupPreds).some((g) => g.first || g.second);
+    Object.values(pendingGroupPreds).some((g) => g.first || g.second) ||
+    Object.values(pendingScores).some((s) => s.home !== undefined || s.away !== undefined);
+
+  // Persist unsaved state to sessionStorage so other pages can warn the user
+  useEffect(() => {
+    if (hasUnsaved) {
+      sessionStorage.setItem("pred_unsaved", "1");
+    } else {
+      sessionStorage.removeItem("pred_unsaved");
+    }
+  }, [hasUnsaved]);
 
   // Warn on reload / tab close / external navigation
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
     if (hasUnsaved) window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsaved]);
+
+  // Intercept internal link clicks when there are unsaved changes
+  useEffect(() => {
+    if (!hasUnsaved) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement).closest("a");
+      if (!target) return;
+      const href = target.getAttribute("href");
+      if (!href || href.startsWith("#") || href === "/predictions") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setPendingNavUrl(href);
+      setShowUnsavedModal(true);
+    };
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
   }, [hasUnsaved]);
 
   if (loading) return <LoadingScreen text="Cargando predicciones..." />;
@@ -524,7 +553,7 @@ export default function PredictionsPage() {
                 if (savedPreds[m.id]) return false;
                 if (hardcoreMode) {
                   const s = pendingScores[m.id];
-                  return s?.home !== undefined && s?.away !== undefined;
+                  return s?.home !== undefined || s?.away !== undefined;
                 }
                 return !!pendingPreds[m.id];
               }).length;
@@ -578,12 +607,22 @@ export default function PredictionsPage() {
                           ))}
                           {pendingCount > 0 && (
                             <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="pt-1">
-                              <Button variant="primary" size="sm" loading={savingGroup[group.id]}
-                                onClick={() => handleSaveGroupMatches(group.id, group.matches)} className="w-full"
-                                data-save-predictions>
-                                <Save className="w-4 h-4" />
-                                Confirmar {pendingCount} predicción{pendingCount > 1 ? "es" : ""} del Grupo {group.name}
-                              </Button>
+                              {(() => {
+                                const readyCount = hardcoreMode
+                                  ? group.matches.filter(m => !savedPreds[m.id] && pendingScores[m.id]?.home !== undefined && pendingScores[m.id]?.away !== undefined).length
+                                  : pendingCount;
+                                return (
+                                  <Button variant="primary" size="sm" loading={savingGroup[group.id]}
+                                    onClick={() => handleSaveGroupMatches(group.id, group.matches)} className="w-full"
+                                    data-save-predictions
+                                    disabled={hardcoreMode && readyCount === 0}>
+                                    <Save className="w-4 h-4" />
+                                    {hardcoreMode && readyCount === 0
+                                      ? "Completá los dos marcadores para guardar"
+                                      : `Confirmar ${readyCount} predicción${readyCount !== 1 ? "es" : ""} del Grupo ${group.name}`}
+                                  </Button>
+                                );
+                              })()}
                             </motion.div>
                           )}
                         </div>
@@ -1225,6 +1264,52 @@ export default function PredictionsPage() {
               </button>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Unsaved changes navigation modal ───────────────────────────────── */}
+      <AnimatePresence>
+        {showUnsavedModal && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/80 z-50 backdrop-blur-sm"
+              onClick={() => setShowUnsavedModal(false)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 24 }}
+              transition={{ type: "spring", duration: 0.35 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+            >
+              <div className="bg-[#111] border border-amber-500/40 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center pointer-events-auto">
+                <div className="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center mx-auto mb-4">
+                  <AlertTriangle className="w-7 h-7 text-amber-400" />
+                </div>
+                <h2 className="text-white font-black text-lg mb-2">¡Che, no guardaste!</h2>
+                <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                  Tenés predicciones sin confirmar. Si salís ahora las perdés y no van a contar para el prode.{" "}
+                  <span className="text-amber-400 font-semibold">Volvé y tocá Guardar</span> para que cuenten.
+                </p>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => setShowUnsavedModal(false)}
+                    className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl transition-colors text-sm uppercase tracking-wider"
+                  >
+                    Volver a guardar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowUnsavedModal(false);
+                      if (pendingNavUrl) router.push(pendingNavUrl);
+                    }}
+                    className="w-full py-2.5 text-gray-500 hover:text-gray-300 font-semibold text-sm transition-colors"
+                  >
+                    Salir igual (sin guardar)
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>

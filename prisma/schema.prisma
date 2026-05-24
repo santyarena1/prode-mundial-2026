@@ -44,6 +44,11 @@ model User {
   purchaseCodes         PurchaseCode[]
   virtualAlbumInterests VirtualAlbumInterest[]
   userAchievements      UserAchievement[]
+  notifications         Notification[]
+  createdSquads         Squad[]       @relation("SquadCreator")
+  squadMemberships      SquadMember[]
+  squadInvitesSent      SquadInvite[] @relation("SquadInviteSent")
+  squadInvitesReceived  SquadInvite[] @relation("SquadInviteReceived")
 }
 
 model AdminUser {
@@ -63,9 +68,10 @@ model WorldCupGroup {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  teams            Team[]
-  matches          Match[]
-  groupPredictions GroupPrediction[]
+  teams                Team[]
+  matches              Match[]
+  groupPredictions     GroupPrediction[]
+  squadGroupPredictions SquadGroupPrediction[]
 }
 
 model Team {
@@ -86,6 +92,9 @@ model Team {
   groupFirsts        GroupPrediction[]   @relation("FirstTeam")
   groupSeconds       GroupPrediction[]   @relation("SecondTeam")
   bracketPredictions BracketPrediction[]
+  squadGroupFirsts   SquadGroupPrediction[] @relation("SquadFirstTeam")
+  squadGroupSeconds  SquadGroupPrediction[] @relation("SquadSecondTeam")
+  squadBracketPreds  SquadBracketPrediction[]
 }
 
 model Match {
@@ -110,12 +119,13 @@ model Match {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  group       WorldCupGroup? @relation(fields: [groupId], references: [id])
-  homeTeam    Team?          @relation("HomeTeam", fields: [homeTeamId], references: [id])
-  awayTeam    Team?          @relation("AwayTeam", fields: [awayTeamId], references: [id])
-  winnerTeam  Team?          @relation("WinnerTeam", fields: [winnerTeamId], references: [id])
-  predictions Prediction[]
-  events      MatchEvent[]
+  group            WorldCupGroup? @relation(fields: [groupId], references: [id])
+  homeTeam         Team?          @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam         Team?          @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  winnerTeam       Team?          @relation("WinnerTeam", fields: [winnerTeamId], references: [id])
+  predictions      Prediction[]
+  events           MatchEvent[]
+  squadPredictions SquadPrediction[]
 }
 
 model Prediction {
@@ -461,4 +471,167 @@ model WeeklyRaffle {
   earlyBirdCutoff DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// ── Squads (private friend competitions) ─────────────────────────────────────
+
+model Squad {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  inviteCode  String   @unique
+  createdBy   String
+  isHardcore  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creator    User             @relation("SquadCreator", fields: [createdBy], references: [id])
+  members    SquadMember[]
+  invites    SquadInvite[]
+  prizes     SquadPrize[]
+  pointRules SquadPointRule[]
+}
+
+model SquadMember {
+  id          String   @id @default(cuid())
+  squadId     String
+  userId      String
+  role        String   @default("member")
+  totalPoints Int      @default(0)
+  spentPoints Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  squad        Squad                    @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  user         User                     @relation(fields: [userId], references: [id])
+  predictions  SquadPrediction[]
+  groupPreds   SquadGroupPrediction[]
+  bracketPreds SquadBracketPrediction[]
+  redemptions  SquadRedemption[]
+
+  @@unique([squadId, userId])
+}
+
+model SquadInvite {
+  id            String   @id @default(cuid())
+  squadId       String
+  invitedBy     String
+  invitedUserId String
+  status        String   @default("pending")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  squad       Squad @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  inviter     User  @relation("SquadInviteSent", fields: [invitedBy], references: [id])
+  invitedUser User  @relation("SquadInviteReceived", fields: [invitedUserId], references: [id])
+
+  @@unique([squadId, invitedUserId])
+}
+
+model SquadPointRule {
+  id      String @id @default(cuid())
+  squadId String
+  key     String
+  points  Int
+
+  squad Squad @relation(fields: [squadId], references: [id], onDelete: Cascade)
+
+  @@unique([squadId, key])
+}
+
+model SquadPrediction {
+  id                 String   @id @default(cuid())
+  memberId           String
+  matchId            String
+  predictedOutcome   String?
+  predictedHomeScore Int?
+  predictedAwayScore Int?
+  pointsEarned       Int      @default(0)
+  isLocked           Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  member SquadMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  match  Match       @relation(fields: [matchId], references: [id])
+
+  @@unique([memberId, matchId])
+}
+
+model SquadGroupPrediction {
+  id           String   @id @default(cuid())
+  memberId     String
+  wcGroupId    String
+  firstTeamId  String?
+  secondTeamId String?
+  pointsEarned Int      @default(0)
+  isLocked     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  member     SquadMember   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  wcGroup    WorldCupGroup @relation(fields: [wcGroupId], references: [id])
+  firstTeam  Team?         @relation("SquadFirstTeam", fields: [firstTeamId], references: [id])
+  secondTeam Team?         @relation("SquadSecondTeam", fields: [secondTeamId], references: [id])
+
+  @@unique([memberId, wcGroupId])
+}
+
+model SquadBracketPrediction {
+  id              String   @id @default(cuid())
+  memberId        String
+  phase           String
+  matchSlot       String
+  predictedTeamId String?
+  pointsEarned    Int      @default(0)
+  isLocked        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  member        SquadMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  predictedTeam Team?       @relation(fields: [predictedTeamId], references: [id])
+
+  @@unique([memberId, phase, matchSlot])
+}
+
+model SquadPrize {
+  id          String   @id @default(cuid())
+  squadId     String
+  name        String
+  description String?
+  pointsCost  Int
+  stock       Int      @default(-1)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  squad       Squad             @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  redemptions SquadRedemption[]
+}
+
+model SquadRedemption {
+  id          String   @id @default(cuid())
+  memberId    String
+  prizeId     String
+  pointsSpent Int
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  member SquadMember @relation(fields: [memberId], references: [id])
+  prize  SquadPrize  @relation(fields: [prizeId], references: [id])
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  data      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

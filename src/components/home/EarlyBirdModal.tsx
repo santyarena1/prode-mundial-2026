@@ -1,13 +1,39 @@
 "use client";
 
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Zap, Star } from "lucide-react";
+import { X, Trophy, Zap, Star, Ticket } from "lucide-react";
+import toast from "react-hot-toast";
+import { apiFetch } from "@/lib/api";
 
 interface Props {
+  mode: "claim" | "confirmed";
   onClose: () => void;
+  onClaimed?: () => void;
 }
 
-export function EarlyBirdModal({ onClose }: Props) {
+export function EarlyBirdModal({ mode, onClose, onClaimed }: Props) {
+  const [claiming, setClaiming] = useState(false);
+
+  const handleClaim = async () => {
+    setClaiming(true);
+    try {
+      const res = await apiFetch("/api/participant/early-bird-claim", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Error al reclamar");
+        return;
+      }
+      toast.success("¡Ticket reclamado! Ya estás participando del sorteo 🎟️");
+      onClaimed?.();
+      onClose();
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setClaiming(false);
+    }
+  };
+
   return (
     <AnimatePresence>
       <motion.div
@@ -34,7 +60,11 @@ export function EarlyBirdModal({ onClose }: Props) {
 
           {/* Icon */}
           <div className="w-16 h-16 rounded-full bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center mx-auto mb-5">
-            <Trophy className="w-8 h-8 text-yellow-400" />
+            {mode === "claim" ? (
+              <Ticket className="w-8 h-8 text-yellow-400" />
+            ) : (
+              <Trophy className="w-8 h-8 text-yellow-400" />
+            )}
           </div>
 
           {/* Stars decoration */}
@@ -44,31 +74,66 @@ export function EarlyBirdModal({ onClose }: Props) {
             ))}
           </div>
 
-          <h2 className="text-2xl font-black uppercase text-white mb-2">
-            ¡Llegaste a tiempo!
-          </h2>
-          <p className="text-yellow-400 font-bold text-sm uppercase tracking-wider mb-4">
-            Participante early bird
-          </p>
+          {mode === "claim" ? (
+            <>
+              <h2 className="text-2xl font-black uppercase text-white mb-2">
+                ¡Tenés un ticket gratis!
+              </h2>
+              <p className="text-yellow-400 font-bold text-sm uppercase tracking-wider mb-4">
+                Participante early bird
+              </p>
 
-          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-5">
-            <p className="text-gray-200 text-sm leading-relaxed">
-              Te registraste <strong className="text-white">antes del inicio del Mundial</strong>, así que te regalamos{" "}
-              <strong className="text-yellow-400">una entrada automática al primer sorteo semanal</strong>.
-            </p>
-          </div>
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-5 text-left space-y-2">
+                <p className="text-gray-200 text-sm leading-relaxed">
+                  Te registraste <strong className="text-white">antes del inicio del Mundial</strong>, así que podés reclamar{" "}
+                  <strong className="text-yellow-400">una entrada gratis al sorteo semanal</strong>.
+                </p>
+                <p className="text-gray-500 text-xs">Solo 1 ticket por participante.</p>
+              </div>
 
-          <div className="flex items-center justify-center gap-2 text-gray-400 text-xs mb-6">
-            <Zap className="w-3.5 h-3.5 text-green-400" />
-            Tu entrada ya está registrada — no necesitás hacer nada más.
-          </div>
+              <button
+                onClick={handleClaim}
+                disabled={claiming}
+                className="w-full py-3 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-60 text-black font-black rounded-xl transition-colors uppercase tracking-wider text-sm mb-2"
+              >
+                {claiming ? "Reclamando..." : "🎟️ Reclamar mi ticket gratis"}
+              </button>
+              <button
+                onClick={onClose}
+                className="w-full py-2 text-gray-600 hover:text-gray-400 font-semibold text-sm transition-colors"
+              >
+                Ahora no
+              </button>
+            </>
+          ) : (
+            <>
+              <h2 className="text-2xl font-black uppercase text-white mb-2">
+                ¡Llegaste a tiempo!
+              </h2>
+              <p className="text-yellow-400 font-bold text-sm uppercase tracking-wider mb-4">
+                Participante early bird
+              </p>
 
-          <button
-            onClick={onClose}
-            className="w-full py-3 bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-xl transition-colors uppercase tracking-wider text-sm"
-          >
-            ¡Perfecto, a jugar!
-          </button>
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-5">
+                <p className="text-gray-200 text-sm leading-relaxed">
+                  Te registraste <strong className="text-white">antes del inicio del Mundial</strong>, así que te regalamos{" "}
+                  <strong className="text-yellow-400">una entrada automática al primer sorteo semanal</strong>.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-center gap-2 text-gray-400 text-xs mb-6">
+                <Zap className="w-3.5 h-3.5 text-green-400" />
+                Tu entrada ya está registrada — no necesitás hacer nada más.
+              </div>
+
+              <button
+                onClick={onClose}
+                className="w-full py-3 bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-xl transition-colors uppercase tracking-wider text-sm"
+              >
+                ¡Perfecto, a jugar!
+              </button>
+            </>
+          )}
         </motion.div>
       </motion.div>
     </AnimatePresence>

@@ -35,7 +35,22 @@ export async function GET() {
     }
 
     const { passwordHash, ...profile } = user;
-    return NextResponse.json({ user: { ...profile, hasPassword: !!passwordHash } });
+
+    // Check if user is eligible for early bird (registered before any raffle's cutoff) but hasn't claimed yet
+    let earlyBirdEligible = false;
+    if (!user.earlyBirdGranted) {
+      const earlyBirdRaffle = await prisma.weeklyRaffle.findFirst({
+        where: {
+          bonusActionId: { not: null },
+          status: { in: ["upcoming", "live"] },
+          earlyBirdCutoff: { gte: user.createdAt },
+        },
+        orderBy: { earlyBirdCutoff: "asc" },
+      });
+      earlyBirdEligible = !!earlyBirdRaffle;
+    }
+
+    return NextResponse.json({ user: { ...profile, hasPassword: !!passwordHash, earlyBirdEligible } });
   } catch (error) {
     console.error("Me error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

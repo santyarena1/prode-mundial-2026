@@ -3,9 +3,11 @@
 import React, { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { ArrowLeft, Trophy, Star, Zap, Gift, Medal, Target, Trash2, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { ArrowLeft, Trophy, Star, Zap, Gift, Medal, Target, Trash2, CheckCircle2, XCircle, Clock, Plus } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { LoadingScreen } from "@/components/ui/LoadingSpinner";
 
 type Tab = "bonuses" | "redemptions" | "predictions" | "achievements";
@@ -56,6 +58,9 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("bonuses");
   const [deleting, setDeleting] = useState<Record<string, boolean>>({});
+  const [manualPoints, setManualPoints] = useState("");
+  const [manualNote, setManualNote] = useState("");
+  const [addingPoints, setAddingPoints] = useState(false);
 
   useEffect(() => {
     fetch(`/api/admin/participants/${id}`)
@@ -112,6 +117,26 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
     setDeleting(p => ({ ...p, [itemId]: false }));
   };
 
+  const addManualPoints = async () => {
+    const pts = parseInt(manualPoints, 10);
+    if (!pts || pts < 1) { toast.error("Ingresá una cantidad válida de puntos"); return; }
+    setAddingPoints(true);
+    try {
+      const res = await fetch(`/api/admin/participants/${id}/manual-points`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ points: pts, note: manualNote.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || "Error"); return; }
+      setUser(u => u ? { ...u, totalPoints: data.totalPoints, bonusPoints: data.bonusPoints } : u);
+      setManualPoints("");
+      setManualNote("");
+      toast.success(`+${pts} puntos acreditados`);
+    } catch { toast.error("Error de conexión"); }
+    finally { setAddingPoints(false); }
+  };
+
   if (loading) return <LoadingScreen />;
   if (!user) return <div className="text-gray-500 p-8">Usuario no encontrado</div>;
 
@@ -157,6 +182,31 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
                 <div className="text-gray-600 text-xs uppercase tracking-wider">{s.label}</div>
               </div>
             ))}
+          </div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-[#1f1f1f]">
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-600 mb-3">Sumar puntos extra</p>
+          <div className="flex flex-wrap gap-2 items-end">
+            <div className="w-28">
+              <Input
+                type="number"
+                label="Puntos"
+                placeholder="Ej: 500"
+                value={manualPoints}
+                onChange={e => setManualPoints(e.target.value)}
+              />
+            </div>
+            <div className="flex-1 min-w-[10rem]">
+              <Input
+                label="Nota interna (opcional)"
+                placeholder="Motivo o descripción"
+                value={manualNote}
+                onChange={e => setManualNote(e.target.value)}
+              />
+            </div>
+            <Button variant="primary" size="sm" loading={addingPoints} onClick={addManualPoints}>
+              <Plus className="w-4 h-4" /> Sumar
+            </Button>
           </div>
         </div>
       </Card>

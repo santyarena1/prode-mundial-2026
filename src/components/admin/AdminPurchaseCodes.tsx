@@ -56,6 +56,7 @@ export function AdminPurchaseCodes() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
+  const [removing, setRemoving] = useState<Record<string, boolean>>({});
   const [form, setForm] = useState({ code: "", points: "30", amount: "", notes: "" });
 
   const tabMeta = TYPE_TABS.find((t) => t.key === activeType)!;
@@ -147,15 +148,23 @@ export function AdminPurchaseCodes() {
     }
   };
 
-  const remove = async (id: string) => {
-    if (!confirm("¿Eliminar este código?")) return;
-    const res = await fetch(`/api/admin/purchase-codes/${id}`, { method: "DELETE" });
-    if (!res.ok) {
-      toast.error("No se pudo eliminar");
-      return;
+  const remove = async (id: string, wasRedeemed: boolean) => {
+    const msg = wasRedeemed
+      ? "¿Eliminar este código? Los puntos acreditados al usuario serán descontados."
+      : "¿Eliminar este código?";
+    if (!confirm(msg)) return;
+    setRemoving((p) => ({ ...p, [id]: true }));
+    try {
+      const res = await fetch(`/api/admin/purchase-codes/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        toast.error("No se pudo eliminar");
+        return;
+      }
+      setCodes((prev) => prev.filter((c) => c.id !== id));
+      toast.success(wasRedeemed ? "Código eliminado y puntos descontados" : "Código eliminado");
+    } finally {
+      setRemoving((p) => ({ ...p, [id]: false }));
     }
-    setCodes((prev) => prev.filter((c) => c.id !== id));
-    toast.success("Código eliminado");
   };
 
   const copyCode = (code: string) => {
@@ -338,15 +347,15 @@ export function AdminPurchaseCodes() {
                     {c.user.email}
                   </span>
                 )}
-                {c.status === "available" && (
-                  <button
-                    type="button"
-                    onClick={() => remove(c.id)}
-                    className="text-gray-600 hover:text-red-400"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => remove(c.id, c.status === "redeemed")}
+                  disabled={removing[c.id]}
+                  className="text-gray-600 hover:text-red-400 disabled:opacity-40 transition-colors"
+                  title="Eliminar código"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             </div>
             {c.notes && <p className="text-gray-600 text-xs mt-2">{c.notes}</p>}
