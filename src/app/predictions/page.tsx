@@ -120,7 +120,7 @@ export default function PredictionsPage() {
       ]);
 
       let sp: Record<string, Outcome> = {};
-      let sg: Record<string, { first?: string; second?: string }> = {};
+      let sg: Record<string, { first?: string; second?: string; third?: string }> = {};
       let sb: Record<string, string> = {};
 
       if (groupsRes.ok) {
