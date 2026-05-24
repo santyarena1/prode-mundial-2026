@@ -190,19 +190,19 @@ export default function SquadDetailPage() {
   const myMember = squad.members.find((m) => m.id === myMemberId);
   const availablePoints = (myMember?.totalPoints ?? 0) - (myMember?.spentPoints ?? 0);
 
-  const RULE_LABELS: Record<string, string> = {
-    GROUP_SIGN: "Acertar resultado",
-    GROUP_DRAW_BONUS: "Bonus empate exacto",
-    EXACT_SCORE: "Marcador exacto (HC)",
-    GROUP_CLASSIFIED: "Acertar clasificado",
-    GROUP_POSITION: "Posición exacta en grupo",
-    ROUND_OF_32: "Ronda de 32",
-    ROUND_OF_16: "Octavos",
-    QUARTER_FINALS: "Cuartos de final",
-    SEMI_FINALS: "Semifinal",
-    CHAMPION: "Campeón",
-    RUNNER_UP: "Finalista",
-    FINAL_EXACT: "Campeón + finalista exactos",
+  const RULE_META: Record<string, { label: string; desc: string }> = {
+    GROUP_SIGN:       { label: "Acertar el resultado", desc: "Ganaste puntos si predijiste quién ganó o si fue empate (sin importar el marcador exacto)" },
+    GROUP_DRAW_BONUS: { label: "Bonus por empate", desc: "Puntos extra cuando predijiste empate Y el partido terminó empatado" },
+    EXACT_SCORE:      { label: "Marcador exacto", desc: "Bonus adicional por acertar el resultado Y los goles exactos de cada equipo (modo Hardcore)" },
+    GROUP_CLASSIFIED: { label: "Equipo clasificado del grupo", desc: "Puntos por cada equipo que predijiste que pasaba de fase, sin importar la posición" },
+    GROUP_POSITION:   { label: "Posición exacta en el grupo", desc: "Puntos extra si acertaste que ese equipo salió primero o segundo en su grupo específicamente" },
+    ROUND_OF_32:      { label: "Equipo que pasa en 16vos", desc: "Por cada equipo que predijiste correctamente que avanzaba desde la ronda de 32" },
+    ROUND_OF_16:      { label: "Equipo que pasa en Octavos", desc: "Por cada equipo que predijiste correctamente que avanzaba desde los octavos de final" },
+    QUARTER_FINALS:   { label: "Equipo que pasa en Cuartos", desc: "Por cada equipo que predijiste correctamente que avanzaba desde los cuartos de final" },
+    SEMI_FINALS:      { label: "Equipo que pasa en Semis", desc: "Por cada equipo que predijiste correctamente que pasaba a la final desde las semifinales" },
+    CHAMPION:         { label: "Campeón del mundo", desc: "Si predijiste al campeón antes de que arrancara el torneo" },
+    RUNNER_UP:        { label: "Finalista (subcampeón)", desc: "Si predijiste correctamente al equipo que llegó a la final pero no ganó" },
+    FINAL_EXACT:      { label: "Final perfecta", desc: "Bonus especial por acertar al campeón Y al finalista exactamente (se suma a los puntos de campeón y finalista)" },
   };
 
   return (
@@ -369,7 +369,7 @@ export default function SquadDetailPage() {
                 <PointRulesEditor
                   squadId={id}
                   rules={rules}
-                  labels={RULE_LABELS}
+                  meta={RULE_META}
                   isAdmin={isAdmin}
                   onSaved={(r) => setRules(r)}
                 />
@@ -512,13 +512,13 @@ export default function SquadDetailPage() {
 function PointRulesEditor({
   squadId,
   rules,
-  labels,
+  meta,
   isAdmin,
   onSaved,
 }: {
   squadId: string;
   rules: Record<string, number>;
-  labels: Record<string, string>;
+  meta: Record<string, { label: string; desc: string }>;
   isAdmin: boolean;
   onSaved: (rules: Record<string, number>) => void;
 }) {
@@ -547,19 +547,22 @@ function PointRulesEditor({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {Object.entries(rules).map(([key]) => (
-        <div key={key} className="flex items-center justify-between gap-3">
-          <span className="text-gray-400 text-sm truncate flex-1">{labels[key] ?? key}</span>
+        <div key={key} className="flex items-start justify-between gap-4 py-2 border-b border-[#1a1a1a] last:border-0">
+          <div className="flex-1 min-w-0">
+            <p className="text-white text-sm font-semibold">{meta[key]?.label ?? key}</p>
+            <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">{meta[key]?.desc}</p>
+          </div>
           {isAdmin ? (
             <input
               type="number"
-              className="w-24 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-2 py-1 text-white text-sm text-right"
+              className="w-24 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-2 py-1.5 text-white text-sm text-right flex-shrink-0"
               value={draft[key] ?? ""}
               onChange={(e) => setDraft((p) => ({ ...p, [key]: e.target.value }))}
             />
           ) : (
-            <span className="text-yellow-500 font-bold text-sm">{rules[key]}</span>
+            <span className="text-yellow-500 font-bold text-sm flex-shrink-0">{rules[key]} pts</span>
           )}
         </div>
       ))}
