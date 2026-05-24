@@ -51,14 +51,14 @@ export async function GET(
       for (const r of redemptions) add(r.user, "canje de premio");
     }
 
-    // Early bird users get a bonus extra entry (double chance)
+    // Early bird users get one extra entry
     const participantIds = Array.from(byUser.keys());
     if (participantIds.length > 0) {
       const earlyBirdUsers = await prisma.user.findMany({
         where: { id: { in: participantIds }, earlyBirdGranted: true },
         select: userSelect,
       });
-      for (const u of earlyBirdUsers) add(u, "ticket early bird (x2)");
+      for (const u of earlyBirdUsers) add(u, "ticket early bird");
     }
 
     const participants = Array.from(byUser.values()).sort((a, b) => b.entries - a.entries);

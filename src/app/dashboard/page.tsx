@@ -395,9 +395,9 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-amber-200 text-sm font-bold">Ticket Early Bird</p>
-                  <p className="text-amber-600 text-xs mt-0.5">Participás en todos los sorteos con <span className="font-bold text-amber-400">doble chance</span> 🎉</p>
+                  <p className="text-amber-600 text-xs mt-0.5">Tenés una entrada extra en todos los sorteos 🎉</p>
                 </div>
-                <Badge variant="warning" className="flex-shrink-0 text-[10px]">x2</Badge>
+                <Badge variant="warning" className="flex-shrink-0 text-[10px]">+1 entrada</Badge>
               </Card>
             )}
 

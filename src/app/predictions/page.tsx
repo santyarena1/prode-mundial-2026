@@ -556,7 +556,7 @@ export default function PredictionsPage() {
                 if (savedPreds[m.id]) return false;
                 if (hardcoreMode) {
                   const s = pendingScores[m.id];
-                  return s?.home !== undefined || s?.away !== undefined;
+                  return s?.home !== undefined && s?.away !== undefined;
                 }
                 return !!pendingPreds[m.id];
               }).length;
@@ -610,22 +610,12 @@ export default function PredictionsPage() {
                           ))}
                           {pendingCount > 0 && (
                             <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="pt-1">
-                              {(() => {
-                                const readyCount = hardcoreMode
-                                  ? group.matches.filter(m => !savedPreds[m.id] && pendingScores[m.id]?.home !== undefined && pendingScores[m.id]?.away !== undefined).length
-                                  : pendingCount;
-                                return (
-                                  <Button variant="primary" size="sm" loading={savingGroup[group.id]}
-                                    onClick={() => handleSaveGroupMatches(group.id, group.matches)} className="w-full"
-                                    data-save-predictions
-                                    disabled={hardcoreMode && readyCount === 0}>
-                                    <Save className="w-4 h-4" />
-                                    {hardcoreMode && readyCount === 0
-                                      ? "Completá los dos marcadores para guardar"
-                                      : `Confirmar ${readyCount} predicción${readyCount !== 1 ? "es" : ""} del Grupo ${group.name}`}
-                                  </Button>
-                                );
-                              })()}
+                              <Button variant="primary" size="sm" loading={savingGroup[group.id]}
+                                onClick={() => handleSaveGroupMatches(group.id, group.matches)} className="w-full"
+                                data-save-predictions>
+                                <Save className="w-4 h-4" />
+                                {`Confirmar ${pendingCount} predicción${pendingCount !== 1 ? "es" : ""} del Grupo ${group.name}`}
+                              </Button>
                             </motion.div>
                           )}
                         </div>
