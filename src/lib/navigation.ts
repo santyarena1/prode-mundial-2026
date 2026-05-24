@@ -5,6 +5,8 @@ export function getBackFallback(pathname: string): string {
   if (pathname.startsWith("/admin")) {
     if (pathname === "/admin/login") return "/";
     if (pathname === "/admin/dashboard") return "/";
+    if (pathname.startsWith("/admin/squads/")) return "/admin/squads";
+    if (pathname.startsWith("/admin/participants/")) return "/admin/participants";
     return "/admin/dashboard";
   }
 

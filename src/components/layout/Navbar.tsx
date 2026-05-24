@@ -210,13 +210,25 @@ export function Navbar() {
                 </Link>
               )}
             </div>
-            <button
-              className="md:hidden text-white/90 hover:text-white p-1"
-              onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
-            >
-              {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
+            <div className="md:hidden flex items-center gap-2">
+              {user && (
+                <Link href="/notifications" className="relative text-white/80 hover:text-white p-1" title="Notificaciones">
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-red-600 text-white text-[8px] font-black flex items-center justify-center">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </Link>
+              )}
+              <button
+                className="text-white/90 hover:text-white p-1"
+                onClick={() => setMobileOpen(!mobileOpen)}
+                aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
+              >
+                {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </button>
+            </div>
           </div>
         </div>
         {mobileOpen && (
@@ -328,13 +340,25 @@ export function Navbar() {
               )}
             </div>
 
-            <button
-              className="md:hidden text-white/90 hover:text-white p-1"
-              onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
-            >
-              {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
+            <div className="md:hidden flex items-center gap-2">
+              {user && (
+                <Link href="/notifications" className="relative text-white/80 hover:text-white p-1" title="Notificaciones">
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-red-600 text-white text-[8px] font-black flex items-center justify-center">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </Link>
+              )}
+              <button
+                className="text-white/90 hover:text-white p-1"
+                onClick={() => setMobileOpen(!mobileOpen)}
+                aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
+              >
+                {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </button>
+            </div>
           </div>
         </div>
       </nav>

@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, Calendar, CheckSquare, Trophy, Gift, Zap,
-  Building2, RefreshCw, Settings, LogOut, Menu, X, ChevronRight, BookOpen, Handshake, Shuffle,
+  Building2, RefreshCw, Settings, LogOut, Menu, X, ChevronRight, BookOpen, Handshake, Shuffle, Swords,
 } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
 import { StickyBackBar } from "@/components/layout/StickyBackBar";
@@ -23,6 +23,7 @@ const navItems = [
   { href: "/admin/virtual-album", icon: BookOpen, label: "Álbum virtual" },
   { href: "/admin/sponsors", icon: Building2, label: "Sponsors" },
   { href: "/admin/sponsor-inquiries", icon: Handshake, label: "Consultas sponsors" },
+  { href: "/admin/squads", icon: Swords, label: "Grupos" },
   { href: "/admin/sync", icon: RefreshCw, label: "Sincronización" },
   { href: "/admin/settings", icon: Settings, label: "Configuración" },
 ];
@@ -130,7 +131,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </button>
             <div className="flex-1 min-w-0">
               <h1 className="text-white font-bold text-sm uppercase tracking-wider">
-                {navItems.find((n) => n.href === pathname)?.label || "Admin Panel"}
+                {navItems.find((n) => pathname === n.href || pathname.startsWith(n.href + "/"))?.label || "Admin Panel"}
               </h1>
             </div>
             <div className="text-xs text-gray-600 hidden sm:block">

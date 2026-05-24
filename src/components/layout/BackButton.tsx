@@ -20,10 +20,6 @@ export function BackButton({ className = "", label, href }: BackButtonProps) {
   if (!shouldShowBackButton(pathname) && !href) return null;
 
   const handleClick = () => {
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      router.back();
-      return;
-    }
     router.push(fallback);
   };
 
