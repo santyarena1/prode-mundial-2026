@@ -22,7 +22,7 @@ function groupQualifiers(
     status: string;
     phase: string;
   }>
-): { first: string | null; second: string | null } {
+): { first: string | null; second: string | null; third: string | null } {
   const stats: Record<string, { pts: number; gd: number; gf: number }> = {};
   for (const t of teams) stats[t.id] = { pts: 0, gd: 0, gf: 0 };
   for (const m of matches) {
@@ -40,7 +40,7 @@ function groupQualifiers(
     stats[m.awayTeamId].gf += a;
   }
   const sorted = Object.entries(stats).sort(([, a], [, b]) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-  return { first: sorted[0]?.[0] ?? null, second: sorted[1]?.[0] ?? null };
+  return { first: sorted[0]?.[0] ?? null, second: sorted[1]?.[0] ?? null, third: sorted[2]?.[0] ?? null };
 }
 
 export async function calculateSquadMemberPoints(memberId: string): Promise<number> {
@@ -118,6 +118,9 @@ export async function calculateSquadMemberPoints(memberId: string): Promise<numb
     }
     if (predFirst && predFirst === actualFirst) pts += rules.GROUP_POSITION ?? 600;
     if (predSecond && predSecond === actualSecond) pts += rules.GROUP_POSITION ?? 600;
+    if (gp.thirdTeamId && actual.third && gp.thirdTeamId === actual.third) {
+      pts += rules.GROUP_THIRD_QUALIFIED ?? 250;
+    }
 
     if (gp.pointsEarned !== pts) {
       await prisma.squadGroupPrediction.update({ where: { id: gp.id }, data: { pointsEarned: pts } });

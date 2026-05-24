@@ -7,6 +7,7 @@ const groupPredictionSchema = z.object({
   groupId: z.string().min(1),
   firstTeamId: z.string().optional(),
   secondTeamId: z.string().optional(),
+  thirdTeamId: z.string().optional(),
 });
 
 export async function GET() {
@@ -16,7 +17,7 @@ export async function GET() {
 
     const groupPredictions = await prisma.groupPrediction.findMany({
       where: { userId: auth.userId },
-      include: { group: true, firstTeam: true, secondTeam: true },
+      include: { group: true, firstTeam: true, secondTeam: true, thirdTeam: true },
     });
 
     return NextResponse.json({ groupPredictions });

@@ -91,9 +91,11 @@ model Team {
   wonMatches         Match[]             @relation("WinnerTeam")
   groupFirsts        GroupPrediction[]   @relation("FirstTeam")
   groupSeconds       GroupPrediction[]   @relation("SecondTeam")
+  groupThirds        GroupPrediction[]   @relation("ThirdTeam")
   bracketPredictions BracketPrediction[]
   squadGroupFirsts   SquadGroupPrediction[] @relation("SquadFirstTeam")
   squadGroupSeconds  SquadGroupPrediction[] @relation("SquadSecondTeam")
+  squadGroupThirds   SquadGroupPrediction[] @relation("SquadThirdTeam")
   squadBracketPreds  SquadBracketPrediction[]
 }
 
@@ -154,6 +156,7 @@ model GroupPrediction {
   groupId      String
   firstTeamId  String?
   secondTeamId String?
+  thirdTeamId  String?
   pointsEarned Int       @default(0)
   isLocked     Boolean   @default(false)
   lockedAt     DateTime?
@@ -164,6 +167,7 @@ model GroupPrediction {
   group      WorldCupGroup @relation(fields: [groupId], references: [id])
   firstTeam  Team?         @relation("FirstTeam", fields: [firstTeamId], references: [id])
   secondTeam Team?         @relation("SecondTeam", fields: [secondTeamId], references: [id])
+  thirdTeam  Team?         @relation("ThirdTeam", fields: [thirdTeamId], references: [id])
 
   @@unique([userId, groupId])
 }
@@ -563,6 +567,7 @@ model SquadGroupPrediction {
   wcGroupId    String
   firstTeamId  String?
   secondTeamId String?
+  thirdTeamId  String?
   pointsEarned Int      @default(0)
   isLocked     Boolean  @default(false)
   createdAt    DateTime @default(now())
@@ -572,6 +577,7 @@ model SquadGroupPrediction {
   wcGroup    WorldCupGroup @relation(fields: [wcGroupId], references: [id])
   firstTeam  Team?         @relation("SquadFirstTeam", fields: [firstTeamId], references: [id])
   secondTeam Team?         @relation("SquadSecondTeam", fields: [secondTeamId], references: [id])
+  thirdTeam  Team?         @relation("SquadThirdTeam", fields: [thirdTeamId], references: [id])
 
   @@unique([memberId, wcGroupId])
 }

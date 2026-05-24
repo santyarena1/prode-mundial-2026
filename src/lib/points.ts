@@ -4,8 +4,9 @@ export const DEFAULT_POINT_RULES = {
   GROUP_SIGN:       { label: "Acertar resultado (ganador/perdedor)",       points: 150 },
   GROUP_DRAW_BONUS: { label: "Bonus por acertar empate exacto",            points: 100 },
   EXACT_SCORE:      { label: "Bonus por marcador exacto (Modo Hardcore)",  points: 150 },
-  GROUP_CLASSIFIED: { label: "Acertar equipo clasificado del grupo",        points: 400 },
-  GROUP_POSITION:   { label: "Acertar posición exacta en grupo (1° o 2°)", points: 600 },
+  GROUP_CLASSIFIED:       { label: "Acertar equipo clasificado 1° o 2°",       points: 400 },
+  GROUP_POSITION:         { label: "Acertar posición exacta en grupo (1° o 2°)", points: 600 },
+  GROUP_THIRD_QUALIFIED:  { label: "Acertar 3° que avanza como mejor tercero",   points: 250 },
   ROUND_OF_32:      { label: "Acertar equipo que pasa en Ronda de 32",     points: 700 },
   ROUND_OF_16:      { label: "Acertar equipo que pasa en Octavos",         points: 1200 },
   QUARTER_FINALS:   { label: "Acertar equipo que pasa en Cuartos",         points: 2000 },
@@ -48,7 +49,7 @@ function calculateGroupQualifiers(
     status: string;
     phase: string;
   }>
-): { first: string | null; second: string | null } {
+): { first: string | null; second: string | null; third: string | null } {
   const stats: Record<string, { pts: number; gd: number; gf: number }> = {};
   for (const t of teams) stats[t.id] = { pts: 0, gd: 0, gf: 0 };
 
@@ -70,7 +71,7 @@ function calculateGroupQualifiers(
   const sorted = Object.entries(stats)
     .sort(([, a], [, b]) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
 
-  return { first: sorted[0]?.[0] ?? null, second: sorted[1]?.[0] ?? null };
+  return { first: sorted[0]?.[0] ?? null, second: sorted[1]?.[0] ?? null, third: sorted[2]?.[0] ?? null };
 }
 
 // ── Achievement calculation (idempotent) ─────────────────────────────────────
@@ -223,7 +224,7 @@ export async function calculateUserPoints(userId: string): Promise<number> {
     }
 
     achievementStats.groupsChecked++;
-    const { first, second } = calculateGroupQualifiers(gp.group.teams, gp.group.matches);
+    const { first, second, third } = calculateGroupQualifiers(gp.group.teams, gp.group.matches);
     let earned = 0;
     let positionPerfect = true;
 
@@ -243,6 +244,10 @@ export async function calculateUserPoints(userId: string): Promise<number> {
         if (gp.secondTeamId === second) earned += pts("GROUP_POSITION");
         else positionPerfect = false;
       } else positionPerfect = false;
+    }
+
+    if (gp.thirdTeamId && third && gp.thirdTeamId === third) {
+      earned += pts("GROUP_THIRD_QUALIFIED");
     }
 
     if (positionPerfect && gp.firstTeamId && gp.secondTeamId) {
