@@ -314,7 +314,8 @@ export default function BonusesPage() {
               transition={{ duration: 0.2 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
             >
-              <div className="bg-[#111] border border-[#2a2a2a] rounded-2xl shadow-2xl max-w-md w-full p-6 pointer-events-auto">
+              <div className="bg-[#111] border border-[#2a2a2a] rounded-2xl shadow-2xl max-w-md w-full pointer-events-auto max-h-[85vh] flex flex-col">
+                <div className="overflow-y-auto flex-1 p-6">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-5">
                   <div className="flex items-center gap-3">
@@ -473,6 +474,7 @@ export default function BonusesPage() {
                     <CheckCircle2 className="w-4 h-4" />
                     {modalBonus.actionUrl ? "Ya lo hice, confirmar" : "Entendido, participar"}
                   </Button>
+                </div>
                 </div>
               </div>
             </motion.div>
