@@ -81,11 +81,11 @@ export default function PredictionsPage() {
   const [allTeams, setAllTeams] = useState<Team[]>([]);
 
   const [savedPreds, setSavedPreds] = useState<Record<string, Outcome>>({});
-  const [savedGroupPreds, setSavedGroupPreds] = useState<Record<string, { first?: string; second?: string; third?: string }>>({});
+  const [savedGroupPreds, setSavedGroupPreds] = useState<Record<string, { first?: string; second?: string }>>({});
   const [savedBracket, setSavedBracket] = useState<Record<string, string>>({});
 
   const [pendingPreds, setPendingPreds] = useState<Record<string, Outcome>>({});
-  const [pendingGroupPreds, setPendingGroupPreds] = useState<Record<string, { first?: string; second?: string; third?: string }>>({});
+  const [pendingGroupPreds, setPendingGroupPreds] = useState<Record<string, { first?: string; second?: string }>>({});
   const [pendingBracket, setPendingBracket] = useState<Record<string, string>>({});
 
   const [savingGroup, setSavingGroup] = useState<Record<string, boolean>>({});
@@ -129,7 +129,7 @@ export default function PredictionsPage() {
       ]);
 
       let sp: Record<string, Outcome> = {};
-      let sg: Record<string, { first?: string; second?: string; third?: string }> = {};
+      let sg: Record<string, { first?: string; second?: string }> = {};
       let sb: Record<string, string> = {};
 
       if (groupsRes.ok) {
@@ -162,7 +162,7 @@ export default function PredictionsPage() {
       if (groupPredRes.ok) {
         const data = await groupPredRes.json();
         for (const p of data.groupPredictions || [])
-          if (p.isLocked) sg[p.groupId] = { first: p.firstTeamId || undefined, second: p.secondTeamId || undefined, third: p.thirdTeamId || undefined };
+          if (p.isLocked) sg[p.groupId] = { first: p.firstTeamId || undefined, second: p.secondTeamId || undefined };
         setSavedGroupPreds(sg);
       }
 
@@ -210,22 +210,14 @@ export default function PredictionsPage() {
 
   const getEligibleTeams = useCallback((phaseKey: string): Team[] => {
     const idx = ELIMINATORIAS_PHASES.findIndex(p => p.key === phaseKey);
-    if (idx === 0) {
-      // 32 teams qualify: 24 (top 2 per group) + up to 8 best thirds
-      const classifiedIds = new Set<string>();
-      for (const pred of Object.values(savedGroupPreds)) {
-        if (pred.first)  classifiedIds.add(pred.first);
-        if (pred.second) classifiedIds.add(pred.second);
-        if (pred.third)  classifiedIds.add(pred.third);
-      }
-      return allTeams.filter(t => classifiedIds.has(t.id));
-    }
+    // Round of 32: any of the 48 teams can appear (includes 8 best thirds)
+    if (idx === 0) return allTeams;
     const prev = ELIMINATORIAS_PHASES[idx - 1];
     const prevIds = Object.entries(savedBracket)
       .filter(([k]) => k.startsWith(`${prev.key}:`))
       .map(([, v]) => v);
     return allTeams.filter(t => prevIds.includes(t.id));
-  }, [savedBracket, savedGroupPreds, allTeams]);
+  }, [savedBracket, allTeams]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -288,11 +280,8 @@ export default function PredictionsPage() {
       const cur = prev[groupId] || {};
       if (cur.first === teamId) return { ...prev, [groupId]: { ...cur, first: undefined } };
       if (cur.second === teamId) return { ...prev, [groupId]: { ...cur, second: undefined } };
-      if (cur.third === teamId) return { ...prev, [groupId]: { ...cur, third: undefined } };
       if (!cur.first) return { ...prev, [groupId]: { ...cur, first: teamId } };
-      if (!cur.second) return { ...prev, [groupId]: { ...cur, second: teamId } };
-      if (!cur.third) return { ...prev, [groupId]: { ...cur, third: teamId } };
-      return { ...prev, [groupId]: { ...cur, third: teamId } };
+      return { ...prev, [groupId]: { ...cur, second: teamId } };
     });
   }, [savedGroupPreds]);
 
@@ -304,7 +293,7 @@ export default function PredictionsPage() {
     try {
       const res = await apiFetch("/api/participant/group-predictions", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groupId, firstTeamId: pending.first, secondTeamId: pending.second, thirdTeamId: pending.third }),
+        body: JSON.stringify({ groupId, firstTeamId: pending.first, secondTeamId: pending.second }),
       });
       if (res.ok) {
         setSavedGroupPreds(prev => ({ ...prev, [groupId]: pending }));
@@ -661,25 +650,13 @@ export default function PredictionsPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 bg-[#111] border border-[#1e1e1e] rounded-lg px-3 py-2">
-                <span className="text-lg leading-none">🥉</span>
-                <div>
-                  <p className="text-white font-bold text-xs">3° Mejor tercero</p>
-                  <p className="text-yellow-400 font-black text-sm">250 pts</p>
-                </div>
-              </div>
-              <div className="mt-2 bg-yellow-500/5 border border-yellow-500/15 rounded-lg px-3 py-2 text-xs text-yellow-300/70 leading-relaxed">
-                En 2026 hay 12 grupos de 4 equipos. Clasifican los 2 primeros de cada grupo (24 en total) +
-                los <strong className="text-yellow-300">8 mejores terceros</strong> del torneo.
-                También podés predecir el 3° de cada grupo (opcional, +250 pts si ese equipo avanza).
-              </div>
             </div>
             <div className="bg-[#161616] border border-[#222] rounded-xl p-4">
               <p className="text-white text-sm font-bold mb-1">¿Cómo funciona?</p>
               <p className="text-gray-500 text-xs leading-relaxed">
-                Predecí el <span className="text-yellow-400 font-semibold">1°</span> y <span className="text-gray-200 font-semibold">2°</span> de cada grupo (obligatorio para desbloquear las eliminatorias).
-                También podés predecir el <span className="text-orange-400 font-semibold">3°</span> de cada grupo: si ese equipo avanza como mejor tercero, sumás 250 pts extra.
-                Tocá un equipo para asignarlo al próximo lugar disponible.
+                Predecí el <span className="text-yellow-400 font-semibold">1°</span> y <span className="text-gray-200 font-semibold">2°</span> de cada grupo.
+                Necesitás completar todos los grupos para desbloquear la fase eliminatoria.
+                En 2026 hay 12 grupos: clasifican los 2 primeros de cada grupo (24) + los 8 mejores terceros.
               </p>
             </div>
 
@@ -689,10 +666,8 @@ export default function PredictionsPage() {
               const isLocked = !!saved;
               const firstId  = isLocked ? saved?.first  : pending.first;
               const secondId = isLocked ? saved?.second : pending.second;
-              const thirdId  = isLocked ? saved?.third  : pending.third;
               const firstTeam  = group.teams.find(t => t.id === firstId);
               const secondTeam = group.teams.find(t => t.id === secondId);
-              const thirdTeam  = group.teams.find(t => t.id === thirdId);
               const hasBothPending = !isLocked && pending.first && pending.second;
 
               return (
@@ -717,25 +692,21 @@ export default function PredictionsPage() {
 
                   <div className={`p-4 space-y-4 ${isLocked ? "bg-[#0d110d]" : "bg-[#0f0f0f]"}`}>
                     {/* Podium slots */}
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {[
                         { label: "1° Lugar", emoji: "🥇", team: firstTeam, color: "yellow" },
                         { label: "2° Lugar", emoji: "🥈", team: secondTeam, color: "gray" },
-                        { label: "3° (opcional)", emoji: "🥉", team: thirdTeam, color: "bronze" },
                       ].map(slot => (
                         <div key={slot.label} className={`flex flex-col items-center p-3 rounded-xl border gap-1.5 text-center min-h-[110px] justify-center transition-all ${
                           slot.team
                             ? slot.color === "yellow" ? "bg-yellow-500/10 border-yellow-500/30"
-                            : slot.color === "gray" ? "bg-[#1e1e1e] border-gray-500/30"
-                            : "bg-orange-900/10 border-orange-800/30"
+                            : "bg-[#1e1e1e] border-gray-500/30"
                             : "bg-[#161616] border-dashed border-[#262626]"
                         }`}>
                           <span className="text-xl leading-none">{slot.emoji}</span>
                           <p className={`text-[9px] font-black uppercase tracking-wider ${
                             slot.team
-                              ? slot.color === "yellow" ? "text-yellow-400"
-                              : slot.color === "gray" ? "text-gray-400"
-                              : "text-orange-500"
+                              ? slot.color === "yellow" ? "text-yellow-400" : "text-gray-400"
                               : "text-gray-700"
                           }`}>
                             {slot.label}
@@ -747,7 +718,7 @@ export default function PredictionsPage() {
                                 <img src={slot.team.flagUrl} alt="" className="w-9 h-6 object-cover rounded shadow-lg" />
                               )}
                               <p className={`font-bold text-[10px] leading-tight ${
-                                slot.color === "yellow" ? "text-yellow-200" : slot.color === "gray" ? "text-gray-200" : "text-orange-200"
+                                slot.color === "yellow" ? "text-yellow-200" : "text-gray-200"
                               }`}>
                                 {slot.team.name}
                               </p>
@@ -768,20 +739,17 @@ export default function PredictionsPage() {
                         <p className="text-gray-700 text-[10px] font-bold uppercase tracking-widest">
                           {!firstId ? "Tocá un equipo para el 1° lugar" :
                            !secondId ? "Elegí el 2° lugar" :
-                           !thirdId ? "Elegí el 3° (opcional, +250 pts si acierta)" :
                            "Tocá para cambiar"}
                         </p>
                         {group.teams.map(team => {
                           const isFirst  = pending.first  === team.id;
                           const isSecond = pending.second === team.id;
-                          const isThird  = pending.third  === team.id;
                           return (
                             <motion.button key={team.id} whileTap={{ scale: 0.97 }}
                               onClick={() => handleToggleGroupTeam(group.id, team.id)}
                               className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all ${
                                 isFirst  ? "bg-yellow-500/15 border-yellow-500/40 text-yellow-200" :
                                 isSecond ? "bg-[#1e1e1e] border-gray-500/30 text-gray-200" :
-                                isThird  ? "bg-orange-900/15 border-orange-800/30 text-orange-200" :
                                 "bg-[#141414] border-[#222] text-gray-400 hover:border-[#333] hover:text-gray-200 active:scale-[0.98]"
                               }`}
                             >
@@ -792,10 +760,9 @@ export default function PredictionsPage() {
                               <span className="font-semibold text-sm flex-1 text-left">{team.name}</span>
                               {isFirst  && <span className="text-sm font-black text-yellow-400 flex-shrink-0">🥇 1°</span>}
                               {isSecond && <span className="text-sm font-black text-gray-300 flex-shrink-0">🥈 2°</span>}
-                              {isThird  && <span className="text-sm font-black text-orange-400 flex-shrink-0">🥉 3°</span>}
-                              {!isFirst && !isSecond && !isThird && (
+                              {!isFirst && !isSecond && (
                                 <span className="text-[10px] text-gray-700 font-semibold flex-shrink-0">
-                                  {!firstId ? "→ 1°" : !secondId ? "→ 2°" : !thirdId ? "→ 3°" : "Cambiar"}
+                                  {!firstId ? "→ 1°" : "→ 2°"}
                                 </span>
                               )}
                             </motion.button>
