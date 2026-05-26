@@ -1,4 +1,6 @@
 import nodemailer from "nodemailer";
+import { Resend } from "resend";
+import { createHmac } from "crypto";
 
 function createTransporter() {
   return nodemailer.createTransport({
@@ -350,4 +352,115 @@ export async function sendWelcomeEmail(user: {
   }
 
   console.warn("[email] SMTP not configured — skipping welcome email");
+}
+
+// ─── Announcements via Resend ──────────────────────────────────────────────────
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+const RESEND_FROM = process.env.RESEND_FROM || "Prode Mundial Gamer <no-reply@thegamershop.com.ar>";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://prode-mundial-2026-ten-blue.vercel.app";
+
+export function generateUnsubscribeToken(userId: string): string {
+  return createHmac("sha256", process.env.UNSUBSCRIBE_SECRET || "prode-unsub-secret")
+    .update(userId)
+    .digest("hex");
+}
+
+export function verifyUnsubscribeToken(userId: string, token: string): boolean {
+  const expected = generateUnsubscribeToken(userId);
+  return expected === token;
+}
+
+function buildAnnouncementHtml(params: {
+  subject: string;
+  message: string;
+  ctaUrl?: string;
+  ctaLabel?: string;
+  userId: string;
+  firstName: string;
+}): string {
+  const { subject, message, ctaUrl, ctaLabel, userId, firstName } = params;
+  const messageHtml = message.replace(/\n/g, "<br>");
+  const unsubUrl = `${APP_URL}/api/unsubscribe?userId=${userId}&token=${generateUnsubscribeToken(userId)}`;
+
+  const ctaBlock =
+    ctaUrl && ctaLabel
+      ? `<div style="text-align:center;margin:32px 0;">
+          <a href="${ctaUrl}" style="background:#dc2626;color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">${ctaLabel}</a>
+         </div>`
+      : "";
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${subject}</title></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+      <tr>
+        <td style="background:#0a0a0a;padding:24px 32px;text-align:center;">
+          <div style="font-size:22px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">⚽ Prode Mundial Gamer 2026</div>
+          <div style="font-size:11px;color:#666;margin-top:4px;letter-spacing:2px;text-transform:uppercase;">The Gamer Shop</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:32px;">
+          <p style="margin:0 0 8px;font-size:14px;color:#6b7280;">Hola, <strong style="color:#111">${firstName}</strong></p>
+          <h1 style="margin:0 0 24px;font-size:22px;font-weight:800;color:#0a0a0a;line-height:1.3;">${subject}</h1>
+          <div style="font-size:15px;color:#374151;line-height:1.7;">${messageHtml}</div>
+          ${ctaBlock}
+        </td>
+      </tr>
+      <tr><td style="padding:0 32px;"><div style="height:1px;background:#f0f0f0;"></div></td></tr>
+      <tr>
+        <td style="padding:24px 32px;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">
+            Recibís este email porque te registraste en el Prode Mundial Gamer 2026.<br>
+            <a href="${unsubUrl}" style="color:#9ca3af;text-decoration:underline;">Desuscribirse de comunicaciones</a>
+          </p>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+}
+
+export async function sendAnnouncement(params: {
+  users: Array<{ id: string; email: string; firstName: string }>;
+  subject: string;
+  message: string;
+  ctaUrl?: string;
+  ctaLabel?: string;
+}): Promise<{ sent: number; failed: number }> {
+  const { users, subject, message, ctaUrl, ctaLabel } = params;
+  let sent = 0;
+  let failed = 0;
+
+  // Resend batch: max 100 per call
+  const CHUNK = 100;
+  for (let i = 0; i < users.length; i += CHUNK) {
+    const chunk = users.slice(i, i + CHUNK);
+    const emails = chunk.map((u) => ({
+      from: RESEND_FROM,
+      to: u.email,
+      subject,
+      html: buildAnnouncementHtml({ subject, message, ctaUrl, ctaLabel, userId: u.id, firstName: u.firstName }),
+    }));
+
+    try {
+      const result = await resend.batch.send(emails);
+      const data = result.data;
+      if (data) {
+        sent += data.length;
+      } else {
+        failed += chunk.length;
+      }
+    } catch {
+      failed += chunk.length;
+    }
+  }
+
+  return { sent, failed };
 }

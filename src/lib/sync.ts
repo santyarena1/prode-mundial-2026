@@ -177,11 +177,11 @@ export async function syncFixtures(): Promise<{ success: boolean; message: strin
 
 // ─── Results ──────────────────────────────────────────────────────────────────
 
-export async function syncResults(): Promise<{ success: boolean; message: string; count: number }> {
+export async function syncResults(): Promise<{ success: boolean; message: string; count: number; finishedMatchIds: string[] }> {
   const providerName = process.env.FOOTBALL_PROVIDER || "manual";
   if (providerName === "manual") {
     await log("manual", "results", "skipped", "Manual mode");
-    return { success: false, message: "Manual mode — enter results from admin panel", count: 0 };
+    return { success: false, message: "Manual mode — enter results from admin panel", count: 0, finishedMatchIds: [] };
   }
   try {
     const provider = getProvider();
@@ -190,6 +190,7 @@ export async function syncResults(): Promise<{ success: boolean; message: string
     });
     let count = 0;
     const errors: string[] = [];
+    const finishedMatchIds: string[] = [];
 
     for (const match of pending) {
       try {
@@ -204,15 +205,18 @@ export async function syncResults(): Promise<{ success: boolean; message: string
 
         const homeScore = result.homeScore ?? null;
         const awayScore = result.awayScore ?? null;
+        // Use lowercase values ("home"/"away"/"draw") to match prediction format
         const realOutcome =
           result.status === "finished" && homeScore !== null && awayScore !== null
-            ? homeScore > awayScore ? "HOME_WIN" : awayScore > homeScore ? "AWAY_WIN" : "DRAW"
+            ? homeScore > awayScore ? "home" : awayScore > homeScore ? "away" : "draw"
             : null;
 
         await prisma.match.update({
           where: { id: match.id },
           data: { homeScore, awayScore, realOutcome, winnerTeamId, status: result.status, lastSyncedAt: new Date() },
         });
+
+        if (result.status === "finished") finishedMatchIds.push(match.id);
         count++;
       } catch (e: any) {
         errors.push(`${match.matchCode}: ${e.message}`);
@@ -222,11 +226,11 @@ export async function syncResults(): Promise<{ success: boolean; message: string
     const status = count === 0 && errors.length > 0 ? "error" : "ok";
     const message = `Updated ${count} matches${errors.length ? `, ${errors.length} errors` : ""}`;
     await log(providerName, "results", status, message, { requestCount: pending.length, updatedMatches: count });
-    return { success: true, message, count };
+    return { success: true, message, count, finishedMatchIds };
   } catch (err: any) {
     const msg = err?.message || "Unknown error";
     await log(providerName, "results", "error", msg);
-    return { success: false, message: msg, count: 0 };
+    return { success: false, message: msg, count: 0, finishedMatchIds: [] };
   }
 }
 
@@ -449,7 +453,7 @@ export async function syncMatch(matchId: string): Promise<{ success: boolean; me
     const awayScore = result.awayScore ?? null;
     const realOutcome =
       result.status === "finished" && homeScore !== null && awayScore !== null
-        ? homeScore > awayScore ? "HOME_WIN" : awayScore > homeScore ? "AWAY_WIN" : "DRAW"
+        ? homeScore > awayScore ? "home" : awayScore > homeScore ? "away" : "draw"
         : null;
 
     await prisma.match.update({

@@ -58,33 +58,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Bonus action not found or inactive" }, { status: 404 });
     }
 
-    // Check for duplicate (skip if multiple claims allowed)
-    if (!bonusAction.allowMultipleClaims) {
-      const existing = await prisma.userBonus.findFirst({
-        where: { userId: auth.userId, bonusActionId, status: { not: "rejected" } },
-      });
-      if (existing) {
-        return NextResponse.json({ error: "Bonus already claimed" }, { status: 409 });
-      }
-    }
-
     const pointsEarned = Math.floor(bonusAction.points * bonusAction.multiplier);
-    const userBonus = await prisma.userBonus.create({
-      data: {
-        userId: auth.userId,
-        bonusActionId,
-        evidenceUrl: evidenceUrl || null,
-        socialHandles: socialHandles ? JSON.stringify(socialHandles) : null,
-        status: "approved",
-        pointsEarned,
-      },
+
+    // Wrap duplicate check + create in a transaction to prevent concurrent double-claims
+    const userBonus = await prisma.$transaction(async (tx) => {
+      if (!bonusAction.allowMultipleClaims) {
+        const existing = await tx.userBonus.findFirst({
+          where: { userId: auth.userId, bonusActionId, status: { not: "rejected" } },
+        });
+        if (existing) throw new Error("409:Bonus already claimed");
+      }
+      return tx.userBonus.create({
+        data: {
+          userId: auth.userId,
+          bonusActionId,
+          evidenceUrl: evidenceUrl || null,
+          socialHandles: socialHandles ? JSON.stringify(socialHandles) : null,
+          status: "approved",
+          pointsEarned,
+        },
+      });
     });
 
-    // Award points immediately
     await calculateUserPoints(auth.userId);
 
     return NextResponse.json({ userBonus, pointsEarned }, { status: 201 });
   } catch (error) {
+    if (error instanceof Error) {
+      const m = error.message.match(/^(\d{3}):(.+)/);
+      if (m) return NextResponse.json({ error: m[2] }, { status: parseInt(m[1]) });
+    }
     console.error("Bonuses POST error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

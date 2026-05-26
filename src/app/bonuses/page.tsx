@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { LoadingScreen } from "@/components/ui/LoadingSpinner";
 import { GuidedTour } from "@/components/ui/GuidedTour";
+import { shouldShowWelcomeModal } from "@/lib/welcome-modal";
 import { PurchaseCodeSection } from "@/components/bonuses/PurchaseCodeSection";
 import { apiFetch } from "@/lib/api";
 
@@ -71,21 +72,22 @@ export default function BonusesPage() {
         return;
       }
       const meData = await meRes.json();
-      const seenKey = `bonuses_welcome_${meData.user?.id}`;
-      if (!localStorage.getItem(seenKey)) {
-        setShowWelcomeModal(true);
-        localStorage.setItem(seenKey, "1");
-      }
+      const userId = meData.user?.id;
       const [bonRes, refRes] = await Promise.all([
         apiFetch("/api/participant/bonuses"),
         apiFetch("/api/participant/referral"),
       ]);
+      let sortedBonuses: BonusAction[] = [];
       if (bonRes.ok) {
         const data = await bonRes.json();
-        const sorted = (data.bonusActions || []).sort((a: BonusAction, b: BonusAction) => b.points - a.points);
-        setBonuses(sorted);
+        sortedBonuses = (data.bonusActions || []).sort((a: BonusAction, b: BonusAction) => b.points - a.points);
+        setBonuses(sortedBonuses);
       }
       if (refRes.ok) setReferral(await refRes.json());
+      const featureUsed = sortedBonuses.some((b) => b.claimedStatus && b.claimedStatus !== "rejected");
+      if (userId && shouldShowWelcomeModal(`bonuses_welcome_${userId}`, featureUsed)) {
+        setShowWelcomeModal(true);
+      }
       setLoading(false);
     };
     init();

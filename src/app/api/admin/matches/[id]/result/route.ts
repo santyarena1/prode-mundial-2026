@@ -53,7 +53,11 @@ export async function POST(
     });
 
     const uniqueUserIds = [...new Set(affectedPredictions.map((p) => p.userId))];
-    await Promise.all(uniqueUserIds.map((userId) => calculateUserPoints(userId)));
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < uniqueUserIds.length; i += BATCH_SIZE) {
+      const batch = uniqueUserIds.slice(i, i + BATCH_SIZE);
+      await Promise.allSettled(batch.map((userId) => calculateUserPoints(userId)));
+    }
 
     return NextResponse.json({ match, recalculated: uniqueUserIds.length });
   } catch (error) {

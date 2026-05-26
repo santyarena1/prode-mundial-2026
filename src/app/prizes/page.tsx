@@ -14,6 +14,7 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { PrizeDetailModal } from "@/components/prizes/PrizeDetailModal";
 import { GuidedTour } from "@/components/ui/GuidedTour";
+import { shouldShowWelcomeModal } from "@/lib/welcome-modal";
 
 const PRIZES_TOUR = [
   { icon: "⭐", title: "Tus puntos", desc: "Arriba ves cuántos puntos tenés disponibles. Se acumulan con predicciones acertadas, acciones bonus y códigos de compra." },
@@ -35,8 +36,10 @@ interface Prize {
 }
 
 interface UserData {
+  id: string;
   totalPoints: number;
   firstName: string;
+  spentPoints: number;
 }
 
 export default function PrizesPage() {
@@ -56,10 +59,11 @@ export default function PrizesPage() {
       if (meRes.ok) {
         const userData = (await meRes.json()).user;
         setUser(userData);
-        const seenKey = `prizes_welcome_${userData?.id}`;
-        if (!localStorage.getItem(seenKey)) {
-          setShowWelcomeModal(true);
-          localStorage.setItem(seenKey, "1");
+        if (userData?.id) {
+          const featureUsed = (userData.spentPoints ?? 0) > 0;
+          if (shouldShowWelcomeModal(`prizes_welcome_${userData.id}`, featureUsed)) {
+            setShowWelcomeModal(true);
+          }
         }
       }
       if (prizesRes.ok) setPrizes((await prizesRes.json()).prizes || []);

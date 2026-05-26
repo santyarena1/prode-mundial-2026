@@ -95,7 +95,7 @@ export default function PredictionsPage() {
   const [activeElimTab, setActiveElimTab] = useState(ELIMINATORIAS_PHASES[0].key);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
-  const [changeCost, setChangeCost] = useState(150);
+  const [changeCost, setChangeCost] = useState(800);
   const [availablePoints, setAvailablePoints] = useState(0);
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [buyingChange, setBuyingChange] = useState(false);

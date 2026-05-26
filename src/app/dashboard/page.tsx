@@ -6,7 +6,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Trophy, Target, Star, Gift, Zap, ChevronRight, User, TrendingUp, CheckCircle2, BookOpen,
-  Clock, Shuffle, Package, XCircle, Users, X,
+  Clock, Shuffle, Package, XCircle, Users, X, Ticket,
 } from "lucide-react";
 import { VirtualAlbumModal } from "@/components/dashboard/VirtualAlbumModal";
 import { SponsorCTA } from "@/components/home/SponsorCTA";
@@ -246,34 +246,41 @@ export default function DashboardPage() {
       <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8">
         {/* Header */}
         <motion.div
-          className="flex items-center gap-4 mb-8"
+          className="flex items-center justify-between gap-4 mb-6"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <div className="w-14 h-14 bg-red-600/20 border border-red-600/40 rounded-full flex items-center justify-center flex-shrink-0">
-            <User className="w-7 h-7 text-red-400" />
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-red-600/20 border border-red-600/40 rounded-full flex items-center justify-center flex-shrink-0">
+              <User className="w-6 h-6 text-red-400" />
+            </div>
+            <div>
+              <p className="text-gray-500 text-xs uppercase tracking-wider">Bienvenido de vuelta</p>
+              <h1 className="text-xl sm:text-2xl font-black uppercase text-white leading-tight">
+                {user.firstName} {user.lastName}
+              </h1>
+            </div>
           </div>
-          <div>
-            <p className="text-gray-500 text-sm uppercase tracking-wider">Bienvenido de vuelta</p>
-            <h1 className="text-2xl sm:text-3xl font-black uppercase text-white">
-              Hola, {user.firstName}!
-            </h1>
-          </div>
+          {userPosition && (
+            <div className="hidden sm:flex flex-col items-center bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-2">
+              <span className="text-yellow-400 font-black text-xl">#{userPosition}</span>
+              <span className="text-gray-500 text-[10px] uppercase tracking-wider">Ranking</span>
+            </div>
+          )}
         </motion.div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           {[
-            { icon: <Trophy className="w-5 h-5 text-yellow-400" />, value: user.totalPoints, label: "Puntos totales", color: "text-yellow-400", delay: 0.1 },
-            { icon: <TrendingUp className="w-5 h-5 text-red-400" />, value: userPosition ? `#${userPosition}` : "-", label: "Posición ranking", color: "text-red-400", delay: 0.15 },
-            { icon: <Target className="w-5 h-5 text-blue-400" />, value: predictedMatches, label: "Predicciones", color: "text-blue-400", delay: 0.2 },
-            { icon: <Star className="w-5 h-5 text-green-400" />, value: user.bonusPoints, label: "Bonus pts", color: "text-green-400", delay: 0.25 },
+            { icon: <Trophy className="w-4 h-4" />, value: user.totalPoints.toLocaleString(), label: "Puntos totales", color: "text-yellow-400", bg: "bg-yellow-500/10 border-yellow-500/20", delay: 0.1 },
+            { icon: <TrendingUp className="w-4 h-4" />, value: userPosition ? `#${userPosition}` : "—", label: "En el ranking", color: "text-red-400", bg: "bg-red-500/10 border-red-500/20", delay: 0.15 },
+            { icon: <Target className="w-4 h-4" />, value: `${predictedMatches}/${totalMatches || "?"}`, label: "Predicciones", color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20", delay: 0.2 },
+            { icon: <Star className="w-4 h-4" />, value: user.bonusPoints.toLocaleString(), label: "Pts bonus", color: "text-green-400", bg: "bg-green-500/10 border-green-500/20", delay: 0.25 },
           ].map((s) => (
             <motion.div key={s.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: s.delay }}>
-              <Card className="p-5 text-center">
-                <div className="mx-auto mb-2 w-5 h-5">{s.icon}</div>
-                <div className={`text-3xl font-black ${s.color}`}>{s.value}</div>
-                <div className="text-gray-500 text-xs uppercase tracking-wider mt-1">{s.label}</div>
+              <Card className={`p-4 border ${s.bg}`}>
+                <div className={`flex items-center gap-1.5 mb-1 ${s.color}`}>{s.icon}<span className="text-[10px] uppercase tracking-wider font-bold">{s.label}</span></div>
+                <div className={`text-2xl font-black ${s.color}`}>{s.value}</div>
               </Card>
             </motion.div>
           ))}
@@ -422,6 +429,44 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="space-y-2">
+            {/* Raffle entries — always shown */}
+            {user.earlyBirdGranted ? (
+              <>
+                <Card className="p-4 flex items-center gap-4 border-amber-500/20 bg-amber-950/10">
+                  <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+                    <Ticket className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-semibold">Participación en sorteos semanales</p>
+                    <p className="text-gray-500 text-xs">Entrada base — todos los sorteos</p>
+                  </div>
+                  <Badge variant="default">1 entrada</Badge>
+                </Card>
+                <Card className="p-4 flex items-center gap-4 border-amber-500/30 bg-amber-950/15">
+                  <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+                    <Ticket className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-semibold">Participación en sorteos semanales</p>
+                    <p className="text-amber-400 text-xs font-semibold">🐣 Early Bird — entrada extra</p>
+                  </div>
+                  <Badge variant="warning">+1 entrada</Badge>
+                </Card>
+              </>
+            ) : (
+              <Card className="p-4 flex items-center gap-4 border-amber-500/20 bg-amber-950/10">
+                <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+                  <Ticket className="w-5 h-5 text-amber-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-semibold">Participación en sorteos semanales</p>
+                  <p className="text-gray-500 text-xs">Entrada base — todos los sorteos</p>
+                </div>
+                <Badge variant="default">1 entrada</Badge>
+              </Card>
+            )}
+
+            {/* Real redemptions */}
             {redemptions.length === 0 ? (
               <Card className="p-6 flex items-center gap-4">
                 <Package className="w-8 h-8 text-gray-700 flex-shrink-0" />

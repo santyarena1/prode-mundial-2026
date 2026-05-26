@@ -25,8 +25,9 @@ model User {
   referralCode      String?  @unique
   referredById      String?
   earlyBirdGranted  Boolean  @default(false)
-  hardcoreMode      Boolean  @default(false)
-  isBlocked         Boolean  @default(false)
+  hardcoreMode           Boolean  @default(false)
+  isBlocked              Boolean  @default(false)
+  emailUnsubscribed      Boolean  @default(false)
   acceptedTerms     Boolean  @default(false)
   registrationIp    String?
   createdAt         DateTime @default(now())
@@ -148,6 +149,8 @@ model Prediction {
   match Match @relation(fields: [matchId], references: [id])
 
   @@unique([userId, matchId])
+  @@index([userId])
+  @@index([matchId])
 }
 
 model GroupPrediction {
@@ -170,6 +173,7 @@ model GroupPrediction {
   thirdTeam  Team?         @relation("ThirdTeam", fields: [thirdTeamId], references: [id])
 
   @@unique([userId, groupId])
+  @@index([userId])
 }
 
 model BracketPrediction {
@@ -188,6 +192,7 @@ model BracketPrediction {
   predictedTeam Team? @relation(fields: [predictedTeamId], references: [id])
 
   @@unique([userId, phase, matchSlot])
+  @@index([userId])
 }
 
 model SpecialPrediction {
@@ -284,6 +289,9 @@ model UserBonus {
 
   user        User        @relation(fields: [userId], references: [id])
   bonusAction BonusAction @relation(fields: [bonusActionId], references: [id])
+
+  @@index([userId])
+  @@index([bonusActionId])
 }
 
 model PurchaseCode {
@@ -299,6 +307,9 @@ model PurchaseCode {
   updatedAt  DateTime  @updatedAt
 
   user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
 }
 
 model VirtualAlbumInterest {
@@ -373,6 +384,9 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   admin AdminUser @relation(fields: [adminId], references: [id])
+
+  @@index([adminId])
+  @@index([createdAt])
 }
 
 model Standing {
@@ -432,6 +446,8 @@ model MatchEvent {
   createdAt  DateTime @default(now())
 
   match Match @relation(fields: [matchId], references: [id])
+
+  @@index([matchId])
 }
 
 model AchievementRule {
@@ -516,6 +532,7 @@ model SquadMember {
   redemptions  SquadRedemption[]
 
   @@unique([squadId, userId])
+  @@index([userId])
 }
 
 model SquadInvite {
@@ -664,4 +681,7 @@ model Notification {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, read])
 }

@@ -76,11 +76,15 @@ export async function POST(request: NextRequest) {
 
     if (purchaseCode.status === "pending") {
       if (purchaseCode.userId === auth.userId) {
-        // Auto-approve their own pending code
-        const updated = await prisma.purchaseCode.update({
-          where: { id: purchaseCode.id },
+        // Atomic: only update if still pending and owned by this user
+        const result = await prisma.purchaseCode.updateMany({
+          where: { id: purchaseCode.id, status: "pending", userId: auth.userId },
           data: { status: "redeemed", redeemedAt: new Date() },
         });
+        if (result.count === 0) {
+          return NextResponse.json({ error: "Este código ya fue utilizado" }, { status: 409 });
+        }
+        const updated = await prisma.purchaseCode.findUnique({ where: { id: purchaseCode.id } });
         await calculateUserPoints(auth.userId);
         return NextResponse.json({ redemption: updated, message: "¡Puntos acreditados!" });
       }
@@ -94,15 +98,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const updated = await prisma.purchaseCode.update({
-      where: { id: purchaseCode.id },
-      data: {
-        status: "redeemed",
-        userId: auth.userId,
-        redeemedAt: new Date(),
-      },
+    // Atomic: only update if still available (prevents double-redemption under concurrent requests)
+    const result = await prisma.purchaseCode.updateMany({
+      where: { id: purchaseCode.id, status: "available" },
+      data: { status: "redeemed", userId: auth.userId, redeemedAt: new Date() },
     });
+    if (result.count === 0) {
+      return NextResponse.json({ error: "Este código ya fue utilizado" }, { status: 409 });
+    }
 
+    const updated = await prisma.purchaseCode.findUnique({ where: { id: purchaseCode.id } });
     await calculateUserPoints(auth.userId);
 
     return NextResponse.json(

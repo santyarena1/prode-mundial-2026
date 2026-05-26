@@ -38,50 +38,53 @@ export async function POST(request: NextRequest) {
 
     const { prizeId } = parsed.data;
 
-    const prize = await prisma.prize.findUnique({ where: { id: prizeId } });
-    if (!prize) return NextResponse.json({ error: "Prize not found" }, { status: 404 });
-    if (!prize.active) return NextResponse.json({ error: "Prize is not active" }, { status: 400 });
-    if (prize.stock <= 0) return NextResponse.json({ error: "Prize is out of stock" }, { status: 400 });
+    const redemption = await prisma.$transaction(async (tx) => {
+      const [prize, user] = await Promise.all([
+        tx.prize.findUnique({ where: { id: prizeId } }),
+        tx.user.findUnique({ where: { id: auth.userId } }),
+      ]);
 
-    const user = await prisma.user.findUnique({ where: { id: auth.userId } });
-    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
-    if (user.totalPoints < prize.requiredPoints) {
-      return NextResponse.json({ error: "Insufficient points" }, { status: 400 });
-    }
+      if (!prize) throw new Error("404:Prize not found");
+      if (!prize.active) throw new Error("400:Prize is not active");
+      if (!user) throw new Error("404:User not found");
+      if (user.totalPoints < prize.requiredPoints) throw new Error("400:Insufficient points");
 
-    // Check for duplicate pending redemption
-    const existing = await prisma.prizeRedemption.findFirst({
-      where: { userId: auth.userId, prizeId, status: "pending" },
-    });
-    if (existing) {
-      return NextResponse.json({ error: "You already have a pending redemption for this prize" }, { status: 409 });
-    }
+      const existing = await tx.prizeRedemption.findFirst({
+        where: { userId: auth.userId, prizeId, status: "pending" },
+      });
+      if (existing) throw new Error("409:You already have a pending redemption for this prize");
 
-    // Create redemption and deduct points in a transaction
-    const [redemption] = await prisma.$transaction([
-      prisma.prizeRedemption.create({
+      // Atomic stock decrement — only succeeds if stock > 0
+      const stockUpdate = await tx.prize.updateMany({
+        where: { id: prizeId, stock: { gt: 0 } },
+        data: { stock: { decrement: 1 } },
+      });
+      if (stockUpdate.count === 0) throw new Error("400:Prize is out of stock");
+
+      await tx.user.update({
+        where: { id: auth.userId },
+        data: {
+          spentPoints: { increment: prize.requiredPoints },
+          totalPoints: { decrement: prize.requiredPoints },
+        },
+      });
+
+      return tx.prizeRedemption.create({
         data: {
           userId: auth.userId,
           prizeId,
           pointsSpent: prize.requiredPoints,
           status: "pending",
         },
-      }),
-      prisma.prize.update({
-        where: { id: prizeId },
-        data: { stock: { decrement: 1 } },
-      }),
-      prisma.user.update({
-        where: { id: auth.userId },
-        data: {
-          spentPoints: { increment: prize.requiredPoints },
-          totalPoints: { decrement: prize.requiredPoints },
-        },
-      }),
-    ]);
+      });
+    });
 
     return NextResponse.json({ redemption }, { status: 201 });
   } catch (error) {
+    if (error instanceof Error) {
+      const m = error.message.match(/^(\d{3}):(.+)/);
+      if (m) return NextResponse.json({ error: m[2] }, { status: parseInt(m[1]) });
+    }
     console.error("Redemptions POST error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

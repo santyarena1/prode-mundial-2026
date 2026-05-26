@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { syncLive } from "@/lib/sync";
+import { syncFixtures } from "@/lib/sync";
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   const secret = req.headers.get("x-cron-secret") ?? req.nextUrl.searchParams.get("secret");
   if (!secret || secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const result = await syncLive();
+  const result = await syncFixtures();
   return NextResponse.json(result);
 }
 

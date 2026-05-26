@@ -263,6 +263,13 @@ export async function calculateUserPoints(userId: string): Promise<number> {
   // ── 3. Bracket predictions ───────────────────────────────────────────────
   const bracketPredictions = await prisma.bracketPrediction.findMany({ where: { userId } });
 
+  // Pre-fetch all finished matches indexed by matchCode to avoid N+1
+  const finishedMatches = await prisma.match.findMany({
+    where: { status: "finished" },
+    select: { matchCode: true, winnerTeamId: true, homeTeamId: true, awayTeamId: true },
+  });
+  const matchByCode = new Map(finishedMatches.map((m) => [m.matchCode, m]));
+
   const phaseRuleMap: Record<string, keyof typeof DEFAULT_POINT_RULES> = {
     ROUND_OF_32:    "ROUND_OF_32",
     ROUND_OF_16:    "ROUND_OF_16",
@@ -276,9 +283,7 @@ export async function calculateUserPoints(userId: string): Promise<number> {
       continue;
     }
 
-    const match = await prisma.match.findFirst({
-      where: { matchCode: bp.matchSlot, status: "finished" },
-    });
+    const match = matchByCode.get(bp.matchSlot) ?? null;
 
     if (!match) {
       if (bp.pointsEarned !== 0) await prisma.bracketPrediction.update({ where: { id: bp.id }, data: { pointsEarned: 0 } });

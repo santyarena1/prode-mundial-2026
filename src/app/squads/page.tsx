@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingScreen } from "@/components/ui/LoadingSpinner";
 import { GuidedTour } from "@/components/ui/GuidedTour";
+import { shouldShowWelcomeModal } from "@/lib/welcome-modal";
 import { apiFetch } from "@/lib/api";
 
 const SQUADS_TOUR = [
@@ -60,20 +61,17 @@ export default function SquadsPage() {
     try {
       const meRes = await apiFetch("/api/auth/me");
       if (meRes.status === 401) { router.push("/login"); return; }
-      if (meRes.ok) {
-        const meData = await meRes.json();
-        const seenKey = `squads_welcome_${meData.user?.id}`;
-        if (!localStorage.getItem(seenKey)) {
-          setShowWelcomeModal(true);
-          localStorage.setItem(seenKey, "1");
-        }
-      }
+      const userId = meRes.ok ? (await meRes.json()).user?.id : null;
       const res = await apiFetch("/api/participant/squads");
       if (res.status === 401) { router.push("/login"); return; }
       if (res.ok) {
         const data = await res.json();
-        setSquads(data.squads || []);
+        const loadedSquads = data.squads || [];
+        setSquads(loadedSquads);
         setInvites(data.pendingInvites || []);
+        if (userId && shouldShowWelcomeModal(`squads_welcome_${userId}`, loadedSquads.length > 0)) {
+          setShowWelcomeModal(true);
+        }
       }
     } finally {
       setLoading(false);

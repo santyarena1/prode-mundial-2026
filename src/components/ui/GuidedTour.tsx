@@ -12,26 +12,29 @@ export interface TourStep {
 
 interface Props {
   steps: TourStep[];
-  storageKey: string;        // localStorage key — tour auto-shows once, then only on button click
+  storageKey: string;
   buttonLabel?: string;
 }
 
-export function GuidedTour({ steps, storageKey, buttonLabel = "Cómo funciona" }: Props) {
+export function GuidedTour({
+  steps,
+  storageKey,
+  buttonLabel = "Cómo funciona",
+}: Props) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
 
   useEffect(() => {
-    if (!localStorage.getItem(storageKey)) {
-      // Small delay so the page has time to render first
-      const t = setTimeout(() => { setOpen(true); setStep(0); }, 600);
-      return () => clearTimeout(t);
-    }
+    if (localStorage.getItem(storageKey)) return;
+    const t = setTimeout(() => {
+      setOpen(true);
+      setStep(0);
+      localStorage.setItem(storageKey, "1");
+    }, 600);
+    return () => clearTimeout(t);
   }, [storageKey]);
 
-  const close = () => {
-    localStorage.setItem(storageKey, "1");
-    setOpen(false);
-  };
+  const close = () => setOpen(false);
 
   const openTour = () => {
     setStep(0);
@@ -43,7 +46,6 @@ export function GuidedTour({ steps, storageKey, buttonLabel = "Cómo funciona" }
 
   return (
     <>
-      {/* Trigger button */}
       <button
         onClick={openTour}
         className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 px-2 rounded-lg border border-[#2a2a2a] hover:border-[#444] bg-[#111]"
@@ -70,7 +72,6 @@ export function GuidedTour({ steps, storageKey, buttonLabel = "Cómo funciona" }
               className="fixed bottom-0 inset-x-0 z-50 flex justify-center p-4 pb-safe pointer-events-none"
             >
               <div className="bg-[#111] border border-[#2a2a2a] rounded-2xl shadow-2xl w-full max-w-md p-6 pointer-events-auto">
-                {/* Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex gap-1">
                     {steps.map((_, i) => (
@@ -88,7 +89,6 @@ export function GuidedTour({ steps, storageKey, buttonLabel = "Cómo funciona" }
                   </button>
                 </div>
 
-                {/* Step content */}
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={step}
@@ -104,7 +104,6 @@ export function GuidedTour({ steps, storageKey, buttonLabel = "Cómo funciona" }
                   </motion.div>
                 </AnimatePresence>
 
-                {/* Navigation */}
                 <div className="flex items-center justify-between gap-3">
                   <button
                     onClick={() => setStep((s) => s - 1)}
@@ -113,11 +112,7 @@ export function GuidedTour({ steps, storageKey, buttonLabel = "Cómo funciona" }
                   >
                     <ChevronLeft className="w-4 h-4" /> Anterior
                   </button>
-
-                  <span className="text-xs text-gray-600">
-                    {step + 1} / {steps.length}
-                  </span>
-
+                  <span className="text-xs text-gray-600">{step + 1} / {steps.length}</span>
                   {isLast ? (
                     <button
                       onClick={close}

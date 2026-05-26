@@ -9,7 +9,7 @@ export async function POST() {
 
     // Get cost from settings
     const costSetting = await prisma.setting.findUnique({ where: { key: "prediction_change_cost" } });
-    const cost = parseInt(costSetting?.value || "150", 10);
+    const cost = parseInt(costSetting?.value || "800", 10);
 
     const user = await prisma.user.findUnique({ where: { id: auth.userId } });
     if (!user) return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
@@ -67,7 +67,7 @@ export async function GET() {
       prisma.user.findUnique({ where: { id: auth.userId } }),
     ]);
 
-    const cost = parseInt(costSetting?.value || "150", 10);
+    const cost = parseInt(costSetting?.value || "800", 10);
     const available = user ? user.totalPoints - user.spentPoints : 0;
 
     return NextResponse.json({ cost, available, canAfford: available >= cost });

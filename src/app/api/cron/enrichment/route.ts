@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { syncMatchEvents, syncResults } from "@/lib/sync";
+import { syncMatchEvents } from "@/lib/sync";
 
-// Runs every 15 min: syncs results for in-progress matches + events for just-finished ones
+export const maxDuration = 60;
+
+// Syncs match events (goals, cards) for recently finished matches
 export async function GET(req: NextRequest) {
   const secret = req.headers.get("x-cron-secret") ?? req.nextUrl.searchParams.get("secret");
   if (!secret || secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // 1. Sync results for non-finished matches
-  const resultsResult = await syncResults();
-
-  // 2. Sync events for recently finished matches (last 3 hours)
   const recentlyFinished = await prisma.match.findMany({
     where: {
       status: "finished",
@@ -27,10 +25,7 @@ export async function GET(req: NextRequest) {
     if (r.success) eventResults.push(`${match.matchCode}: ${r.message}`);
   }
 
-  return NextResponse.json({
-    results: resultsResult,
-    events: { synced: eventResults.length, details: eventResults },
-  });
+  return NextResponse.json({ synced: eventResults.length, details: eventResults });
 }
 
 export async function POST(req: NextRequest) {
