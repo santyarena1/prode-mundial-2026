@@ -57,7 +57,8 @@ export default function AdminBonusPage() {
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(emptyEdit);
-  const [claimsFilter, setClaimsFilter] = useState<"all" | "approved" | "rejected">("all");
+  const [claimsFilter, setClaimsFilter] = useState<"all" | "pending" | "approved" | "rejected">("pending");
+  const [approvingAll, setApprovingAll] = useState(false);
   const [nameSearch, setNameSearch] = useState("");
 
   useEffect(() => {
@@ -184,6 +185,19 @@ export default function AdminBonusPage() {
     } finally {
       setUpdating((prev) => ({ ...prev, [id]: false }));
     }
+  };
+
+  const approveAllPending = async () => {
+    if (!confirm("¿Aprobar todos los bonuses pendientes?")) return;
+    setApprovingAll(true);
+    try {
+      const res = await fetch("/api/admin/user-bonuses", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { toast.error("Error"); return; }
+      setUserBonuses((prev) => prev.map((b) => b.status === "pending" ? { ...b, status: "approved" } : b));
+      toast.success(`${data.approved} bonuses aprobados`);
+    } catch { toast.error("Error de conexión"); }
+    finally { setApprovingAll(false); }
   };
 
   if (loading) return <LoadingScreen />;
@@ -437,17 +451,28 @@ export default function AdminBonusPage() {
             <div className="flex gap-2 flex-wrap">
               {[
                 { key: "all" as const, label: `Todos (${userBonuses.length})` },
+                { key: "pending" as const, label: `Pendientes (${userBonuses.filter(b => b.status === "pending").length})` },
                 { key: "approved" as const, label: `Aprobados (${userBonuses.filter(b => b.status === "approved").length})` },
                 { key: "rejected" as const, label: `Rechazados (${userBonuses.filter(b => b.status === "rejected").length})` },
               ].map((f) => (
                 <button
                   key={f.key}
                   onClick={() => setClaimsFilter(f.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${claimsFilter === f.key ? "bg-red-600 text-white" : "bg-[#111] border border-[#222] text-gray-500 hover:text-gray-300"}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                    claimsFilter === f.key
+                      ? f.key === "pending" ? "bg-yellow-600 text-white" : "bg-red-600 text-white"
+                      : "bg-[#111] border border-[#222] text-gray-500 hover:text-gray-300"
+                  }`}
                 >
                   {f.label}
                 </button>
               ))}
+              {userBonuses.some(b => b.status === "pending") && (
+                <Button variant="primary" size="sm" loading={approvingAll} onClick={approveAllPending}
+                  className="bg-green-600 hover:bg-green-500">
+                  <CheckCircle2 className="w-3 h-3" /> Aprobar todas
+                </Button>
+              )}
             </div>
           </div>
 
