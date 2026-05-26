@@ -431,7 +431,7 @@ export default function DashboardPage() {
           <div className="space-y-2">
             {/* Raffle entries — single row with total count */}
             {(() => {
-              const raffleCount = redemptions.filter(r => r.prize.prizeType === "raffle").length;
+              const raffleCount = redemptions.filter(r => r.prize.prizeType === "raffle" && r.status !== "rejected").length;
               const total = 1 + (user.earlyBirdGranted ? 1 : 0) + raffleCount;
               const parts: string[] = ["1 base"];
               if (user.earlyBirdGranted) parts.push("1 Early Bird");
@@ -453,7 +453,7 @@ export default function DashboardPage() {
             })()}
 
             {/* Physical prize redemptions */}
-            {redemptions.filter(r => r.prize.prizeType !== "raffle").length === 0 ? (
+            {redemptions.filter(r => r.prize.prizeType !== "raffle" && r.status !== "rejected").length === 0 ? (
               <Card className="p-6 flex items-center gap-4">
                 <Package className="w-8 h-8 text-gray-700 flex-shrink-0" />
                 <div>
@@ -465,7 +465,7 @@ export default function DashboardPage() {
                 </Link>
               </Card>
             ) : (
-              redemptions.filter(r => r.prize.prizeType !== "raffle").map((red) => {
+              redemptions.filter(r => r.prize.prizeType !== "raffle" && r.status !== "rejected").map((red) => {
                 const st = REDEMPTION_STATUS[red.status] ?? { label: red.status, icon: null };
                 return (
                   <Card key={red.id} className="p-4 flex items-center gap-4">
