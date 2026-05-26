@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, CheckCircle2, Clock, XCircle, Link as LinkIcon, X, Shuffle, AlertTriangle, Shield, Copy, Users, ExternalLink, Ticket } from "lucide-react";
+import { Zap, CheckCircle2, Clock, XCircle, Link as LinkIcon, X, Shuffle, AlertTriangle, Shield, Copy, Users, ExternalLink, Ticket, Download } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Card } from "@/components/ui/Card";
@@ -341,7 +341,18 @@ export default function BonusesPage() {
                 {/* Reference image / template */}
                 {modalBonus.imageUrl && (
                   <div className="mb-5">
-                    <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-2">Plantilla de referencia</p>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider">Plantilla de referencia</p>
+                      <a
+                        href={modalBonus.imageUrl}
+                        download="plantilla-historia.jpg"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 font-semibold transition-colors bg-blue-400/10 hover:bg-blue-400/20 px-2.5 py-1 rounded-lg"
+                      >
+                        <Download className="w-3.5 h-3.5" /> Descargar
+                      </a>
+                    </div>
                     <div className="rounded-xl overflow-hidden border border-[#2a2a2a] bg-[#1a1a1a]">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -350,7 +361,7 @@ export default function BonusesPage() {
                         className="w-full h-auto object-contain max-h-72"
                       />
                     </div>
-                    <p className="text-gray-600 text-[10px] mt-1.5 text-center">Podés usar esta imagen como guía para completar la acción</p>
+                    <p className="text-gray-600 text-[10px] mt-1.5 text-center">Usá esta imagen como plantilla para tu historia</p>
                   </div>
                 )}
 
