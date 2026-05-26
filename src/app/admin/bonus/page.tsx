@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Plus, Trash2, CheckCircle2, XCircle, Pencil, Save, X as XIcon, ExternalLink } from "lucide-react";
+import { Plus, Trash2, CheckCircle2, XCircle, Pencil, Save, X as XIcon, ExternalLink, Upload, Image as ImageIcon } from "lucide-react";
+import { upload } from "@vercel/blob/client";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -27,6 +28,7 @@ interface BonusAction {
   requiresEvidence: boolean;
   actionUrl?: string | null;
   requiredHandles?: string | null;
+  imageUrl?: string | null;
   active: boolean;
 }
 
@@ -41,7 +43,7 @@ interface UserBonus {
   bonusAction: { name: string; points: number };
 }
 
-const emptyEdit = { name: "", description: "", points: "", actionUrl: "", requiredHandles: [] as string[], active: true };
+const emptyEdit = { name: "", description: "", points: "", actionUrl: "", requiredHandles: [] as string[], imageUrl: "", active: true };
 
 export default function AdminBonusPage() {
   const [actions, setActions] = useState<BonusAction[]>([]);
@@ -119,7 +121,7 @@ export default function AdminBonusPage() {
     setEditingId(a.id);
     let handles: string[] = [];
     try { handles = a.requiredHandles ? JSON.parse(a.requiredHandles) : []; } catch { handles = []; }
-    setEditForm({ name: a.name, description: a.description, points: String(a.points), actionUrl: a.actionUrl || "", requiredHandles: handles, active: a.active });
+    setEditForm({ name: a.name, description: a.description, points: String(a.points), actionUrl: a.actionUrl || "", requiredHandles: handles, imageUrl: a.imageUrl || "", active: a.active });
   };
 
   const saveEdit = async () => {
@@ -135,6 +137,7 @@ export default function AdminBonusPage() {
           points: parseInt(editForm.points),
           actionUrl: editForm.actionUrl.trim() || null,
           requiredHandles: editForm.requiredHandles.length > 0 ? JSON.stringify(editForm.requiredHandles) : null,
+          imageUrl: editForm.imageUrl.trim() || null,
           active: editForm.active,
         }),
       });
@@ -192,6 +195,75 @@ export default function AdminBonusPage() {
       const full = `${b.user.firstName} ${b.user.lastName}`.toLowerCase();
       return full.includes(nameSearch.toLowerCase().trim());
     });
+
+  const BonusImageUploader = ({ value, onChange }: { value: string; onChange: (url: string) => void }) => {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const inputRef = useRef<HTMLInputElement>(null);
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const [uploading, setUploading] = useState(false);
+
+    const handleFile = async (file: File) => {
+      setUploading(true);
+      try {
+        const blob = await upload(file.name, file, {
+          access: "public",
+          handleUploadUrl: "/api/admin/bonus-actions/upload-image",
+        });
+        onChange(blob.url);
+        toast.success("Imagen subida");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Error al subir");
+      } finally {
+        setUploading(false);
+      }
+    };
+
+    const removeImage = async () => {
+      if (value?.includes("blob.vercel-storage.com")) {
+        await fetch("/api/admin/bonus-actions/upload-image", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: value }),
+        });
+      }
+      onChange("");
+    };
+
+    return (
+      <div>
+        <p className="text-gray-500 text-xs uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+          <ImageIcon className="w-3.5 h-3.5" /> Imagen de referencia (plantilla/ejemplo para el usuario)
+        </p>
+        <input ref={inputRef} type="file" accept="image/*" className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
+        {value ? (
+          <div className="relative inline-flex group">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={value} alt="Referencia" className="h-32 w-auto max-w-full object-contain rounded-xl bg-[#1a1a1a] border border-[#333] p-2" />
+            <button type="button" onClick={removeImage}
+              className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <XIcon className="w-3.5 h-3.5 text-white" />
+            </button>
+          </div>
+        ) : (
+          <div onClick={() => inputRef.current?.click()}
+            className="flex flex-col items-center justify-center gap-2 h-20 border-2 border-dashed border-[#333] hover:border-blue-500/50 rounded-xl cursor-pointer transition-colors bg-[#1a1a1a] hover:bg-[#1e1e1e] max-w-xs">
+            {uploading ? (
+              <div className="flex items-center gap-2 text-gray-400 text-xs">
+                <div className="w-4 h-4 border-2 border-gray-600 border-t-blue-500 rounded-full animate-spin" />
+                Subiendo...
+              </div>
+            ) : (
+              <>
+                <Upload className="w-4 h-4 text-gray-600" />
+                <p className="text-gray-600 text-xs text-center">Subir imagen de referencia<br /><span className="text-gray-700">JPG, PNG, WebP</span></p>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const HandlesCheckboxes = ({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) => (
     <div>
@@ -288,6 +360,7 @@ export default function AdminBonusPage() {
                         <Input placeholder="URL de la acción (para redirigir al usuario)" value={editForm.actionUrl} onChange={(e) => setEditForm((p) => ({ ...p, actionUrl: e.target.value }))} className="sm:col-span-2" />
                       </div>
                       <HandlesCheckboxes value={editForm.requiredHandles} onChange={(v) => setEditForm((p) => ({ ...p, requiredHandles: v }))} />
+                      <BonusImageUploader value={editForm.imageUrl} onChange={(url) => setEditForm((p) => ({ ...p, imageUrl: url }))} />
                       <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
                         <input type="checkbox" checked={editForm.active} onChange={(e) => setEditForm((p) => ({ ...p, active: e.target.checked }))} />
                         Activo (visible para usuarios)
@@ -326,6 +399,12 @@ export default function AdminBonusPage() {
                           </a>
                         ) : (
                           <span className="text-gray-700 text-xs mt-0.5 inline-block">Sin URL de redirección</span>
+                        )}
+                        {a.imageUrl && (
+                          <div className="mt-2">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={a.imageUrl} alt="Referencia" className="h-16 w-auto object-contain rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] p-1.5" />
+                          </div>
                         )}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">

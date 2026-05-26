@@ -263,6 +263,7 @@ model BonusAction {
   actionUrl           String?
   requiredHandles     String?
   allowMultipleClaims Boolean  @default(false)
+  imageUrl            String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

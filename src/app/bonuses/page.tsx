@@ -36,6 +36,7 @@ interface BonusAction {
   requiresEvidence: boolean;
   actionUrl?: string | null;
   requiredHandles?: string | null;
+  imageUrl?: string | null;
   active: boolean;
   claimedStatus: string | null;
   sponsor?: { name: string };
@@ -331,10 +332,26 @@ export default function BonusesPage() {
                 </div>
 
                 {/* What to do */}
-                <div className="p-3.5 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl mb-5">
+                <div className="p-3.5 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl mb-4">
                   <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-1">Qué tenés que hacer</p>
                   <p className="text-gray-200 text-sm leading-relaxed">{modalBonus.description}</p>
                 </div>
+
+                {/* Reference image / template */}
+                {modalBonus.imageUrl && (
+                  <div className="mb-5">
+                    <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-2">Plantilla de referencia</p>
+                    <div className="rounded-xl overflow-hidden border border-[#2a2a2a] bg-[#1a1a1a]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={modalBonus.imageUrl}
+                        alt="Plantilla de referencia"
+                        className="w-full h-auto object-contain max-h-72"
+                      />
+                    </div>
+                    <p className="text-gray-600 text-[10px] mt-1.5 text-center">Podés usar esta imagen como guía para completar la acción</p>
+                  </div>
+                )}
 
                 {/* Info cards */}
                 <div className="space-y-3 mb-6">

@@ -14,6 +14,7 @@ const createBonusActionSchema = z.object({
   actionUrl: z.string().optional(),
   requiredHandles: z.string().optional(),
   allowMultipleClaims: z.boolean().optional(),
+  imageUrl: z.string().optional(),
 });
 
 export async function GET() {
