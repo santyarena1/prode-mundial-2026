@@ -452,7 +452,8 @@ export default function PredictionsPage() {
               }`}
             >
               <Flame className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{hardcoreMode ? "Hardcore ON" : "Hardcore"}</span>
+              <span className="hidden sm:inline">{hardcoreMode ? "Hardcore: ON" : "Activar modo hardcore"}</span>
+              <span className="sm:hidden">{hardcoreMode ? "HC: ON" : "Hardcore"}</span>
             </button>
             <button
               onClick={() => setShowPointsModal(true)}

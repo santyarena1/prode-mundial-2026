@@ -44,10 +44,21 @@ export default function SquadsPage() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: "", description: "", isHardcore: false });
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
+      const meRes = await apiFetch("/api/auth/me");
+      if (meRes.status === 401) { router.push("/login"); return; }
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        const seenKey = `squads_welcome_${meData.user?.id}`;
+        if (!localStorage.getItem(seenKey)) {
+          setShowWelcomeModal(true);
+          localStorage.setItem(seenKey, "1");
+        }
+      }
       const res = await apiFetch("/api/participant/squads");
       if (res.status === 401) { router.push("/login"); return; }
       if (res.ok) {
@@ -268,6 +279,50 @@ export default function SquadsPage() {
                     Crear
                   </Button>
                 </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* First-time welcome modal */}
+      <AnimatePresence>
+        {showWelcomeModal && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/80 z-50 backdrop-blur-sm" onClick={() => setShowWelcomeModal(false)} />
+            <motion.div initial={{ opacity: 0, scale: 0.92, y: 24 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 24 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+              <div className="bg-[#111] border border-orange-500/30 rounded-2xl shadow-2xl max-w-md w-full p-6 pointer-events-auto max-h-[85vh] overflow-y-auto">
+                <div className="text-center mb-5">
+                  <div className="text-4xl mb-3">👥</div>
+                  <h2 className="text-white font-black text-xl mb-1">¡Jugá con tus amigos!</h2>
+                  <p className="text-gray-400 text-sm">Los grupos son tu competencia privada entre amigos, familia o trabajo</p>
+                </div>
+                <div className="space-y-3 mb-4">
+                  {[
+                    { icon: "🏆", title: "Tu ranking privado", desc: "Dentro del grupo se arma un ranking propio. Comparan sus predicciones entre ustedes." },
+                    { icon: "⚽", title: "Cada uno predice", desc: "Los integrantes hacen sus predicciones de partidos, grupos y eliminatorias. Todo igual que el prode global." },
+                    { icon: "🎯", title: "Puntos internos", desc: "Los puntos del grupo son independientes. No afectan ni suman al ranking global del torneo." },
+                    { icon: "🔗", title: "Invitá con código", desc: "Una vez que creás el grupo, podés invitar a quien quieras con un código único." },
+                  ].map((item) => (
+                    <div key={item.title} className="flex gap-3 bg-[#1a1a1a] rounded-xl p-3 border border-[#222]">
+                      <span className="text-xl flex-shrink-0">{item.icon}</span>
+                      <div>
+                        <p className="text-white font-bold text-sm">{item.title}</p>
+                        <p className="text-gray-500 text-xs mt-0.5">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-center mb-4">
+                  <p className="text-amber-400 text-xs font-bold">⚠️ Los puntos de los grupos NO influyen en el ranking global ni en los premios del torneo. Son solo para divertirse entre amigos.</p>
+                </div>
+                <button onClick={() => setShowWelcomeModal(false)}
+                  className="w-full py-3 bg-orange-600 hover:bg-orange-500 text-white font-black rounded-xl transition-colors text-sm uppercase tracking-wider">
+                  ¡Entendido, a jugar!
+                </button>
               </div>
             </motion.div>
           </>

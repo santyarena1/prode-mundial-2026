@@ -70,10 +70,16 @@ export function Navbar() {
     if (pathname !== "/predictions") {
       const pending = sessionStorage.getItem("pred_unsaved") === "1";
       setHasPendingPreds(pending);
-      if (pending) setShowUnsavedModal(true);
+      // Show modal once per "leave from predictions" event
+      if (pending && !sessionStorage.getItem("pred_unsaved_modal_shown")) {
+        setShowUnsavedModal(true);
+        sessionStorage.setItem("pred_unsaved_modal_shown", "1");
+      }
     } else {
+      // Back on predictions — reset so modal can show again next time they leave
       setHasPendingPreds(false);
       setShowUnsavedModal(false);
+      sessionStorage.removeItem("pred_unsaved_modal_shown");
     }
   }, [pathname]);
 
@@ -186,12 +192,15 @@ export function Navbar() {
                     <Trophy className="w-3 h-3 mr-1" />
                     {user.totalPoints} pts
                   </Badge>
-                  <Link href="/notifications" className="relative text-gray-500 hover:text-white transition-colors" title="Notificaciones">
-                    <Bell className="w-4 h-4" />
+                  <Link href="/notifications" className="relative p-1 text-gray-400 hover:text-white transition-colors" title="Notificaciones">
+                    <Bell className={`w-5 h-5 transition-colors ${unreadCount > 0 ? "text-amber-400" : ""}`} />
                     {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-600 text-white text-[8px] font-black flex items-center justify-center">
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                      </span>
+                      <>
+                        <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-black flex items-center justify-center z-10">
+                          {unreadCount > 9 ? "9+" : unreadCount}
+                        </span>
+                        <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 animate-ping opacity-75" />
+                      </>
                     )}
                   </Link>
                   <button
@@ -210,14 +219,18 @@ export function Navbar() {
                 </Link>
               )}
             </div>
+
             <div className="md:hidden flex items-center gap-2">
               {user && (
-                <Link href="/notifications" className="relative text-white/80 hover:text-white p-1" title="Notificaciones">
-                  <Bell className="w-5 h-5" />
+                <Link href="/notifications" className="relative p-1 text-white/80 hover:text-white" title="Notificaciones">
+                  <Bell className={`w-5 h-5 ${unreadCount > 0 ? "text-amber-400" : ""}`} />
                   {unreadCount > 0 && (
-                    <span className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-red-600 text-white text-[8px] font-black flex items-center justify-center">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
+                    <>
+                      <span className="absolute top-0 right-0 w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-black flex items-center justify-center z-10">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                      <span className="absolute top-0 right-0 w-4 h-4 rounded-full bg-red-500 animate-ping opacity-75" />
+                    </>
                   )}
                 </Link>
               )}
@@ -315,12 +328,15 @@ export function Navbar() {
                     <Trophy className="w-3 h-3 mr-1" />
                     {user.totalPoints} pts
                   </Badge>
-                  <Link href="/notifications" className="relative text-gray-500 hover:text-white transition-colors" title="Notificaciones">
-                    <Bell className="w-4 h-4" />
+                  <Link href="/notifications" className="relative p-1 text-gray-400 hover:text-white transition-colors" title="Notificaciones">
+                    <Bell className={`w-5 h-5 transition-colors ${unreadCount > 0 ? "text-amber-400" : ""}`} />
                     {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-600 text-white text-[8px] font-black flex items-center justify-center">
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                      </span>
+                      <>
+                        <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-black flex items-center justify-center z-10">
+                          {unreadCount > 9 ? "9+" : unreadCount}
+                        </span>
+                        <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 animate-ping opacity-75" />
+                      </>
                     )}
                   </Link>
                   <button
@@ -342,12 +358,15 @@ export function Navbar() {
 
             <div className="md:hidden flex items-center gap-2">
               {user && (
-                <Link href="/notifications" className="relative text-white/80 hover:text-white p-1" title="Notificaciones">
-                  <Bell className="w-5 h-5" />
+                <Link href="/notifications" className="relative p-1 text-white/80 hover:text-white" title="Notificaciones">
+                  <Bell className={`w-5 h-5 ${unreadCount > 0 ? "text-amber-400" : ""}`} />
                   {unreadCount > 0 && (
-                    <span className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-red-600 text-white text-[8px] font-black flex items-center justify-center">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
+                    <>
+                      <span className="absolute top-0 right-0 w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-black flex items-center justify-center z-10">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                      <span className="absolute top-0 right-0 w-4 h-4 rounded-full bg-red-500 animate-ping opacity-75" />
+                    </>
                   )}
                 </Link>
               )}

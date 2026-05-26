@@ -52,6 +52,7 @@ export default function BonusesPage() {
   const [activeTab, setActiveTab] = useState<"codes" | "actions" | "referral">("codes");
   const [copied, setCopied] = useState(false);
   const [socialHandles, setSocialHandles] = useState<Record<string, Record<string, string>>>({});
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -59,6 +60,12 @@ export default function BonusesPage() {
       if (!meRes.ok) {
         router.replace("/login");
         return;
+      }
+      const meData = await meRes.json();
+      const seenKey = `bonuses_welcome_${meData.user?.id}`;
+      if (!localStorage.getItem(seenKey)) {
+        setShowWelcomeModal(true);
+        localStorage.setItem(seenKey, "1");
       }
       const [bonRes, refRes] = await Promise.all([
         apiFetch("/api/participant/bonuses"),
@@ -133,7 +140,7 @@ export default function BonusesPage() {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-black uppercase text-white">
-            BONUS <span className="text-green-400">EXTRA</span>
+            GANÁ PUNTOS <span className="text-green-400">EXTRA</span>
           </h1>
           <p className="text-gray-500 mt-1 text-sm">Sumá puntos adicionales fuera del prode</p>
         </div>
@@ -437,6 +444,51 @@ export default function BonusesPage() {
                     {modalBonus.actionUrl ? "Ya lo hice, confirmar" : "Entendido, participar"}
                   </Button>
                 </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* First-time welcome modal */}
+      <AnimatePresence>
+        {showWelcomeModal && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/80 z-50 backdrop-blur-sm" onClick={() => setShowWelcomeModal(false)} />
+            <motion.div initial={{ opacity: 0, scale: 0.92, y: 24 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 24 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+              <div className="bg-[#111] border border-green-500/30 rounded-2xl shadow-2xl max-w-md w-full p-6 pointer-events-auto max-h-[85vh] overflow-y-auto">
+                <div className="text-center mb-5">
+                  <div className="text-4xl mb-3">⚡</div>
+                  <h2 className="text-white font-black text-xl mb-1">¡Ganá puntos extra!</h2>
+                  <p className="text-gray-400 text-sm">Esta sección es tu forma de sumar puntos más allá del prode</p>
+                </div>
+                <div className="space-y-3 mb-5">
+                  {[
+                    { icon: "🛒", title: "Códigos de compra", desc: "Comprá en la tienda y registrá el código para sumar puntos automáticamente.", pts: "Variable" },
+                    { icon: "⚽", title: "Acciones bonus", desc: "Seguinos en redes, compartí contenido, participá en encuestas y más.", pts: "Hasta 2.000 pts" },
+                    { icon: "👥", title: "Invitá amigos", desc: "Cada amigo que se registra con tu código te da puntos extra.", pts: "Puntos por referido" },
+                  ].map((item) => (
+                    <div key={item.title} className="flex gap-3 bg-[#1a1a1a] rounded-xl p-3 border border-[#222]">
+                      <span className="text-2xl flex-shrink-0">{item.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-bold text-sm">{item.title}</p>
+                        <p className="text-gray-500 text-xs mt-0.5">{item.desc}</p>
+                        <p className="text-green-400 font-bold text-xs mt-1">{item.pts}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3 text-center mb-4">
+                  <p className="text-green-400 text-sm font-bold">💡 Más puntos = más chances de ganar premios</p>
+                  <p className="text-green-600 text-xs mt-0.5">Participar activamente puede darte miles de puntos adicionales</p>
+                </div>
+                <button onClick={() => setShowWelcomeModal(false)}
+                  className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-black rounded-xl transition-colors text-sm uppercase tracking-wider">
+                  ¡Empezar a sumar puntos!
+                </button>
               </div>
             </motion.div>
           </>

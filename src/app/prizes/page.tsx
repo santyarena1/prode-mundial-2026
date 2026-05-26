@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
+
 import { Gift, Star, Lock } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -36,6 +37,7 @@ export default function PrizesPage() {
   const [loading, setLoading] = useState(true);
   const [redeeming, setRedeeming] = useState<Record<string, boolean>>({});
   const [selectedPrize, setSelectedPrize] = useState<Prize | null>(null);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -43,7 +45,15 @@ export default function PrizesPage() {
         apiFetch("/api/auth/me"),
         fetch("/api/public/prizes"),
       ]);
-      if (meRes.ok) setUser((await meRes.json()).user);
+      if (meRes.ok) {
+        const userData = (await meRes.json()).user;
+        setUser(userData);
+        const seenKey = `prizes_welcome_${userData?.id}`;
+        if (!localStorage.getItem(seenKey)) {
+          setShowWelcomeModal(true);
+          localStorage.setItem(seenKey, "1");
+        }
+      }
       if (prizesRes.ok) setPrizes((await prizesRes.json()).prizes || []);
       setLoading(false);
     };
@@ -88,7 +98,7 @@ export default function PrizesPage() {
         <div className="text-center mb-10">
           <Gift className="w-12 h-12 text-red-500 mx-auto mb-3" />
           <h1 className="text-3xl sm:text-4xl font-black uppercase text-white">
-            PREMIOS <span className="text-red-500">GAMING</span>
+            CANJEÁ TUS <span className="text-red-500">PREMIOS</span>
           </h1>
           <p className="text-gray-500 mt-1">Canjeá tus puntos por productos exclusivos</p>
           {user && (
@@ -195,6 +205,51 @@ export default function PrizesPage() {
               setSelectedPrize(null);
             }}
           />
+        )}
+      </AnimatePresence>
+
+      {/* First-time welcome modal */}
+      <AnimatePresence>
+        {showWelcomeModal && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/80 z-50 backdrop-blur-sm" onClick={() => setShowWelcomeModal(false)} />
+            <motion.div initial={{ opacity: 0, scale: 0.92, y: 24 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 24 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+              <div className="bg-[#111] border border-purple-500/30 rounded-2xl shadow-2xl max-w-md w-full p-6 pointer-events-auto max-h-[85vh] overflow-y-auto">
+                <div className="text-center mb-5">
+                  <div className="text-4xl mb-3">🎁</div>
+                  <h2 className="text-white font-black text-xl mb-1">¡Bienvenido a los premios!</h2>
+                  <p className="text-gray-400 text-sm">Acá podés canjear tus puntos por productos gaming exclusivos</p>
+                </div>
+                <div className="space-y-3 mb-5">
+                  {[
+                    { icon: "🎯", title: "Acumulá puntos", desc: "Predecí partidos, hacé acciones bonus y referí amigos para juntar puntos." },
+                    { icon: "🎁", title: "Elegí tu premio", desc: "Con tus puntos podés canjear productos gaming reales. Tocá cualquier premio para ver los detalles." },
+                    { icon: "🎟️", title: "Chances de sorteo", desc: "Algunos premios son entradas para participar en los sorteos semanales. Cuantos más canjees, más chances tenés." },
+                    { icon: "✅", title: "Te contactamos", desc: "Una vez canjeado, te contactamos para coordinar la entrega del premio." },
+                  ].map((item) => (
+                    <div key={item.title} className="flex gap-3 bg-[#1a1a1a] rounded-xl p-3 border border-[#222]">
+                      <span className="text-xl flex-shrink-0">{item.icon}</span>
+                      <div>
+                        <p className="text-white font-bold text-sm">{item.title}</p>
+                        <p className="text-gray-500 text-xs mt-0.5">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3 text-center mb-4">
+                  <p className="text-purple-400 text-sm font-bold">🏆 ¡Los premios son reales y cercanos!</p>
+                  <p className="text-purple-600 text-xs mt-0.5">Muchos jugadores ya canjearon y ganaron premios. ¡Vos podés ser el próximo!</p>
+                </div>
+                <button onClick={() => setShowWelcomeModal(false)}
+                  className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-black rounded-xl transition-colors text-sm uppercase tracking-wider">
+                  ¡Ver los premios!
+                </button>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>

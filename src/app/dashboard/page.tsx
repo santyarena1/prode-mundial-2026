@@ -6,7 +6,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Trophy, Target, Star, Gift, Zap, ChevronRight, User, TrendingUp, CheckCircle2, BookOpen,
-  Clock, Shuffle, Package, XCircle, Users,
+  Clock, Shuffle, Package, XCircle, Users, X,
 } from "lucide-react";
 import { VirtualAlbumModal } from "@/components/dashboard/VirtualAlbumModal";
 import { SponsorCTA } from "@/components/home/SponsorCTA";
@@ -64,12 +64,22 @@ interface WeeklyRaffle {
   winnerInstagram?: string | null;
 }
 
-const RAFFLE_STATUS: Record<string, { label: string; variant: "info" | "warning" | "success" | "error" | "default" }> = {
-  upcoming: { label: "Próximo", variant: "info" },
-  live: { label: "EN VIVO", variant: "warning" },
-  completed: { label: "Realizado", variant: "success" },
-  cancelled: { label: "Cancelado", variant: "error" },
-};
+function getRaffleDisplayStatus(raffle: WeeklyRaffle): { label: string; variant: "info" | "warning" | "success" | "error" | "default" } {
+  if (raffle.status === "completed") return { label: "Realizado ✓", variant: "success" };
+  if (raffle.status === "cancelled") return { label: "Cancelado", variant: "error" };
+  const now = new Date();
+  const date = new Date(raffle.scheduledAt);
+  const today = now.toDateString();
+  const raffleDay = date.toDateString();
+  if (today === raffleDay) {
+    const diffMs = date.getTime() - now.getTime();
+    if (Math.abs(diffMs) < 2 * 60 * 60 * 1000) return { label: "🔴 EN VIVO", variant: "warning" };
+    if (diffMs > 0) return { label: "¡Es hoy! 🎯", variant: "warning" };
+    return { label: "Vencido", variant: "default" };
+  }
+  if (date < now) return { label: "Vencido", variant: "default" };
+  return { label: "Próximo", variant: "info" };
+}
 
 const REDEMPTION_STATUS: Record<string, { label: string; icon: React.ReactNode }> = {
   pending: { label: "Pendiente", icon: <Clock className="w-3 h-3" /> },
@@ -105,7 +115,7 @@ const actionCards = [
   {
     href: "/prizes",
     icon: <Gift className="w-6 h-6" />,
-    title: "Canjear premios",
+    title: "Canjeá tus premios",
     description: "Tus puntos por productos gaming",
     color: "text-purple-400",
     bg: "bg-purple-600/10 border-purple-600/20",
@@ -113,7 +123,7 @@ const actionCards = [
   {
     href: "/bonuses",
     icon: <Zap className="w-6 h-6" />,
-    title: "Ganar bonus",
+    title: "Ganá puntos extra",
     description: "Código de compra y acciones bonus",
     color: "text-green-400",
     bg: "bg-green-600/10 border-green-600/20",
@@ -140,6 +150,7 @@ export default function DashboardPage() {
   const [raffles, setRaffles] = useState<WeeklyRaffle[]>([]);
   const [showEarlyBird, setShowEarlyBird] = useState(false);
   const [earlyBirdMode, setEarlyBirdMode] = useState<"claim" | "confirmed">("confirmed");
+  const [selectedRaffle, setSelectedRaffle] = useState<WeeklyRaffle | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -187,10 +198,10 @@ export default function DashboardPage() {
         }
         if (fixRes.ok) {
           const fixData = await fixRes.json();
-          const total = (fixData.fixture || []).reduce(
-            (sum: number, f: { matches: FixtureMatch[] }) => sum + f.matches.length,
-            0
-          );
+          // Only count GROUP_STAGE matches (the only phase where predictions can be made)
+          const total = (fixData.fixture || [])
+            .filter((f: { phase: string; matches: FixtureMatch[] }) => f.phase === "GROUP_STAGE")
+            .reduce((sum: number, f: { phase: string; matches: FixtureMatch[] }) => sum + f.matches.length, 0);
           setTotalMatches(total);
         }
         if (redRes.ok) {
@@ -214,8 +225,19 @@ export default function DashboardPage() {
   if (!user) return null;
 
   const progressPct = totalMatches > 0 ? Math.round((predictedMatches / totalMatches) * 100) : 0;
-  const upcomingRaffles = raffles.filter((r) => r.status === "upcoming" || r.status === "live");
-  const pastRaffles = raffles.filter((r) => r.status === "completed" || r.status === "cancelled");
+
+  const now = new Date();
+  const upcomingRaffles = raffles.filter((r) => {
+    if (r.status === "completed" || r.status === "cancelled") return false;
+    const date = new Date(r.scheduledAt);
+    // Show as upcoming if within 2 hours past or still in future
+    return date.getTime() > now.getTime() - 2 * 60 * 60 * 1000;
+  });
+  const pastRaffles = raffles.filter((r) => {
+    if (r.status === "completed" || r.status === "cancelled") return true;
+    const date = new Date(r.scheduledAt);
+    return date.getTime() <= now.getTime() - 2 * 60 * 60 * 1000;
+  });
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
@@ -336,41 +358,54 @@ export default function DashboardPage() {
                 </Card>
               )}
 
-              {upcomingRaffles.map((r) => (
-                <Card key={r.id} className={`p-4 ${r.status === "live" ? "border-amber-500/40 bg-amber-950/10" : ""}`}>
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="text-white font-bold text-sm leading-tight">{r.title}</h3>
-                    <Badge variant={RAFFLE_STATUS[r.status]?.variant ?? "default"} className="flex-shrink-0 text-[10px]">
-                      {RAFFLE_STATUS[r.status]?.label ?? r.status}
-                    </Badge>
-                  </div>
-                  <p className="text-red-400 text-xs font-semibold mb-2">🎁 {r.prize}</p>
-                  {r.description && <p className="text-gray-500 text-xs mb-2">{r.description}</p>}
-                  <div className="flex items-center gap-1 text-gray-600 text-xs">
-                    <Clock className="w-3 h-3 flex-shrink-0" />
-                    {new Date(r.scheduledAt).toLocaleDateString("es-AR", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                </Card>
-              ))}
+              {upcomingRaffles.map((r) => {
+                const ds = getRaffleDisplayStatus(r);
+                const isLive = ds.label.includes("EN VIVO") || ds.label.includes("Es hoy");
+                return (
+                  <button key={r.id} onClick={() => setSelectedRaffle(r)} className="w-full text-left">
+                    <Card className={`p-4 transition-all hover:scale-[1.01] hover:shadow-lg cursor-pointer ${isLive ? "border-amber-500/40 bg-amber-950/10" : ""}`}>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h3 className="text-white font-bold text-sm leading-tight">{r.title}</h3>
+                        <Badge variant={ds.variant} className="flex-shrink-0 text-[10px]">{ds.label}</Badge>
+                      </div>
+                      <p className="text-red-400 text-xs font-semibold mb-2">🎁 {r.prize}</p>
+                      {r.description && <p className="text-gray-500 text-xs mb-2 line-clamp-2">{r.description}</p>}
+                      <div className="flex items-center gap-1 text-gray-600 text-xs">
+                        <Clock className="w-3 h-3 flex-shrink-0" />
+                        {new Date(r.scheduledAt).toLocaleDateString("es-AR", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    </Card>
+                  </button>
+                );
+              })}
+
+              {/* Early bird entry notice */}
+              {user.earlyBirdGranted && upcomingRaffles.length > 0 && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold">
+                  🎟️ Tenés +1 entrada extra en todos los sorteos (Early Bird)
+                </div>
+              )}
 
               {pastRaffles.length > 0 && (
                 <div>
                   <p className="text-xs font-bold uppercase tracking-widest text-gray-700 mb-2 mt-4">Anteriores</p>
                   {pastRaffles.slice(0, 3).map((r) => (
-                    <Card key={r.id} className="p-4 mb-2 opacity-75">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <h3 className="text-gray-300 font-semibold text-sm">{r.title}</h3>
-                        <Badge variant="default" className="flex-shrink-0 text-[10px]">Realizado</Badge>
-                      </div>
-                      <p className="text-gray-600 text-xs mb-1">{r.prize}</p>
-                      {r.winnerName && (
-                        <div className="flex items-center gap-1 text-green-400 text-xs font-semibold">
-                          <Trophy className="w-3 h-3" />
-                          {r.winnerName}
-                          {r.winnerInstagram && <span className="text-gray-500 font-normal">(@{r.winnerInstagram})</span>}
+                    <button key={r.id} onClick={() => setSelectedRaffle(r)} className="w-full text-left">
+                      <Card className="p-4 mb-2 opacity-75 hover:opacity-100 transition-opacity cursor-pointer">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <h3 className="text-gray-300 font-semibold text-sm">{r.title}</h3>
+                          <Badge variant="default" className="flex-shrink-0 text-[10px]">Realizado</Badge>
                         </div>
-                      )}
-                    </Card>
+                        <p className="text-gray-600 text-xs mb-1">{r.prize}</p>
+                        {r.winnerName && (
+                          <div className="flex items-center gap-1 text-green-400 text-xs font-semibold">
+                            <Trophy className="w-3 h-3" />
+                            {r.winnerName}
+                            {r.winnerInstagram && <span className="text-gray-500 font-normal">(@{r.winnerInstagram})</span>}
+                          </div>
+                        )}
+                      </Card>
+                    </button>
                   ))}
                 </div>
               )}
@@ -383,25 +418,11 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xs font-bold uppercase tracking-widest text-gray-600">Mis premios canjeados</h2>
             <Link href="/prizes" className="text-xs text-red-400 hover:text-red-300 font-semibold">
-              Canjear más →
+              Canjeá más →
             </Link>
           </div>
           <div className="space-y-2">
-            {/* Early bird ticket */}
-            {user.earlyBirdGranted && (
-              <Card className="p-4 flex items-center gap-4 border-amber-500/20 bg-amber-500/5">
-                <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0 text-xl">
-                  🎟️
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-amber-200 text-sm font-bold">Ticket Early Bird</p>
-                  <p className="text-amber-600 text-xs mt-0.5">Tenés una entrada extra en todos los sorteos 🎉</p>
-                </div>
-                <Badge variant="warning" className="flex-shrink-0 text-[10px]">+1 entrada</Badge>
-              </Card>
-            )}
-
-            {redemptions.length === 0 && !user.earlyBirdGranted ? (
+            {redemptions.length === 0 ? (
               <Card className="p-6 flex items-center gap-4">
                 <Package className="w-8 h-8 text-gray-700 flex-shrink-0" />
                 <div>
@@ -482,6 +503,73 @@ export default function DashboardPage() {
             setUser(u => u ? { ...u, earlyBirdGranted: true, earlyBirdEligible: false } : u);
           }}
         />
+      )}
+
+      {/* Raffle detail modal */}
+      {selectedRaffle && (
+        <>
+          <div className="fixed inset-0 bg-black/75 z-50 backdrop-blur-sm" onClick={() => setSelectedRaffle(null)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 24 }}
+              className="bg-[#111] border border-[#2a2a2a] rounded-2xl shadow-2xl max-w-sm w-full p-6 pointer-events-auto"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <p className="text-gray-500 text-[10px] uppercase tracking-widest mb-1">Sorteo</p>
+                  <h2 className="text-white font-black text-lg leading-tight">{selectedRaffle.title}</h2>
+                </div>
+                <button onClick={() => setSelectedRaffle(null)} className="text-gray-600 hover:text-white p-1">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="space-y-3">
+                {(() => {
+                  const ds = getRaffleDisplayStatus(selectedRaffle);
+                  return (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-500 text-xs">Estado:</span>
+                      <Badge variant={ds.variant} className="text-[10px]">{ds.label}</Badge>
+                    </div>
+                  );
+                })()}
+                <div className="bg-[#1a1a1a] rounded-xl p-4 border border-[#222]">
+                  <p className="text-gray-500 text-[10px] uppercase tracking-wider mb-1">Premio</p>
+                  <p className="text-red-400 font-bold text-sm">🎁 {selectedRaffle.prize}</p>
+                </div>
+                {selectedRaffle.description && (
+                  <div className="bg-[#1a1a1a] rounded-xl p-4 border border-[#222]">
+                    <p className="text-gray-500 text-[10px] uppercase tracking-wider mb-1">Descripción</p>
+                    <p className="text-gray-300 text-sm leading-relaxed">{selectedRaffle.description}</p>
+                  </div>
+                )}
+                <div className="bg-[#1a1a1a] rounded-xl p-4 border border-[#222]">
+                  <p className="text-gray-500 text-[10px] uppercase tracking-wider mb-1">Fecha del sorteo</p>
+                  <p className="text-white text-sm font-semibold">
+                    {new Date(selectedRaffle.scheduledAt).toLocaleDateString("es-AR", { weekday: "long", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                </div>
+                {user.earlyBirdGranted && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold">
+                    🎟️ Tenés +1 entrada por Early Bird en este sorteo
+                  </div>
+                )}
+                {selectedRaffle.winnerName && (
+                  <div className="flex items-center gap-2 text-green-400 text-sm font-semibold">
+                    <Trophy className="w-4 h-4" />
+                    Ganador: {selectedRaffle.winnerName}
+                    {selectedRaffle.winnerInstagram && <span className="text-gray-500 font-normal">(@{selectedRaffle.winnerInstagram})</span>}
+                  </div>
+                )}
+              </div>
+              <button onClick={() => setSelectedRaffle(null)} className="mt-5 w-full py-2.5 text-gray-500 hover:text-gray-300 font-semibold text-sm transition-colors">
+                Cerrar
+              </button>
+            </motion.div>
+          </div>
+        </>
       )}
     </div>
   );
