@@ -67,11 +67,17 @@ export async function DELETE(
     const r = await prisma.prizeRedemption.findUnique({ where: { id } });
     if (!r) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    await prisma.prizeRedemption.delete({ where: { id } });
-    await prisma.user.update({
-      where: { id: r.userId },
-      data: { spentPoints: { decrement: r.pointsSpent }, totalPoints: { increment: r.pointsSpent } },
-    });
+    await prisma.$transaction([
+      prisma.prizeRedemption.delete({ where: { id } }),
+      prisma.user.update({
+        where: { id: r.userId },
+        data: { spentPoints: { decrement: r.pointsSpent }, totalPoints: { increment: r.pointsSpent } },
+      }),
+      prisma.prize.update({
+        where: { id: r.prizeId },
+        data: { stock: { increment: 1 } },
+      }),
+    ]);
 
     return NextResponse.json({ ok: true });
   } catch (error) {

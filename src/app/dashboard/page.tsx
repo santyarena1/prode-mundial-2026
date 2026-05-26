@@ -429,49 +429,35 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="space-y-2">
-            {/* Raffle entries — always shown */}
-            {user.earlyBirdGranted ? (
-              <>
+            {/* Raffle entries — single row with total count */}
+            {(() => {
+              const raffleCount = redemptions.filter(r => r.prize.prizeType === "raffle").length;
+              const total = 1 + (user.earlyBirdGranted ? 1 : 0) + raffleCount;
+              const parts: string[] = ["1 base"];
+              if (user.earlyBirdGranted) parts.push("1 Early Bird");
+              if (raffleCount > 0) parts.push(`${raffleCount} canjeada${raffleCount > 1 ? "s" : ""}`);
+              return (
                 <Card className="p-4 flex items-center gap-4 border-amber-500/20 bg-amber-950/10">
                   <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
                     <Ticket className="w-5 h-5 text-amber-400" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-semibold">Participación en sorteos semanales</p>
-                    <p className="text-gray-500 text-xs">Entrada base — todos los sorteos</p>
+                    <p className="text-gray-500 text-xs">{parts.join(" + ")}</p>
                   </div>
-                  <Badge variant="default">1 entrada</Badge>
+                  <Badge variant={total > 1 ? "warning" : "default"} className="text-sm font-black px-3 py-1">
+                    {total} {total === 1 ? "ENTRADA" : "ENTRADAS"}
+                  </Badge>
                 </Card>
-                <Card className="p-4 flex items-center gap-4 border-amber-500/30 bg-amber-950/15">
-                  <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
-                    <Ticket className="w-5 h-5 text-amber-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-sm font-semibold">Participación en sorteos semanales</p>
-                    <p className="text-amber-400 text-xs font-semibold">🐣 Early Bird — entrada extra</p>
-                  </div>
-                  <Badge variant="warning">+1 entrada</Badge>
-                </Card>
-              </>
-            ) : (
-              <Card className="p-4 flex items-center gap-4 border-amber-500/20 bg-amber-950/10">
-                <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
-                  <Ticket className="w-5 h-5 text-amber-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-semibold">Participación en sorteos semanales</p>
-                  <p className="text-gray-500 text-xs">Entrada base — todos los sorteos</p>
-                </div>
-                <Badge variant="default">1 entrada</Badge>
-              </Card>
-            )}
+              );
+            })()}
 
-            {/* Real redemptions */}
-            {redemptions.length === 0 ? (
+            {/* Physical prize redemptions */}
+            {redemptions.filter(r => r.prize.prizeType !== "raffle").length === 0 ? (
               <Card className="p-6 flex items-center gap-4">
                 <Package className="w-8 h-8 text-gray-700 flex-shrink-0" />
                 <div>
-                  <p className="text-gray-400 text-sm font-semibold">Todavía no canjeaste ningún premio</p>
+                  <p className="text-gray-400 text-sm font-semibold">Todavía no canjeaste ningún premio físico</p>
                   <p className="text-gray-600 text-xs mt-0.5">Acumulá puntos y canjeá productos gaming exclusivos.</p>
                 </div>
                 <Link href="/prizes" className="ml-auto flex-shrink-0">
@@ -479,7 +465,7 @@ export default function DashboardPage() {
                 </Link>
               </Card>
             ) : (
-              redemptions.map((red) => {
+              redemptions.filter(r => r.prize.prizeType !== "raffle").map((red) => {
                 const st = REDEMPTION_STATUS[red.status] ?? { label: red.status, icon: null };
                 return (
                   <Card key={red.id} className="p-4 flex items-center gap-4">
@@ -498,18 +484,10 @@ export default function DashboardPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
-                      {red.prize.prizeType === "raffle" ? (
-                        <Badge variant="warning" className="flex items-center gap-1 text-sm px-3 py-1">
-                          <Ticket className="w-3.5 h-3.5" /> 1 ENTRADA
-                        </Badge>
-                      ) : (
-                        <>
-                          <span className="text-red-400 font-black text-sm">-{red.pointsSpent} pts</span>
-                          <Badge variant={red.status === "delivered" ? "success" : red.status === "rejected" ? "error" : "warning"}>
-                            <span className="flex items-center gap-1">{st.icon}{st.label}</span>
-                          </Badge>
-                        </>
-                      )}
+                      <span className="text-red-400 font-black text-sm">-{red.pointsSpent} pts</span>
+                      <Badge variant={red.status === "delivered" ? "success" : red.status === "rejected" ? "error" : "warning"}>
+                        <span className="flex items-center gap-1">{st.icon}{st.label}</span>
+                      </Badge>
                     </div>
                   </Card>
                 );
