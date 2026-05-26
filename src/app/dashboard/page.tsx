@@ -498,15 +498,18 @@ export default function DashboardPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
-                      {red.prize.prizeType === "raffle" && (
-                        <Badge variant="default" className="flex items-center gap-1">
-                          <Ticket className="w-3 h-3" /> 1 entrada
+                      {red.prize.prizeType === "raffle" ? (
+                        <Badge variant="warning" className="flex items-center gap-1 text-sm px-3 py-1">
+                          <Ticket className="w-3.5 h-3.5" /> 1 ENTRADA
                         </Badge>
+                      ) : (
+                        <>
+                          <span className="text-red-400 font-black text-sm">-{red.pointsSpent} pts</span>
+                          <Badge variant={red.status === "delivered" ? "success" : red.status === "rejected" ? "error" : "warning"}>
+                            <span className="flex items-center gap-1">{st.icon}{st.label}</span>
+                          </Badge>
+                        </>
                       )}
-                      <span className="text-red-400 font-black text-sm">-{red.pointsSpent} pts</span>
-                      <Badge variant={red.status === "delivered" ? "success" : red.status === "rejected" ? "error" : "warning"}>
-                        <span className="flex items-center gap-1">{st.icon}{st.label}</span>
-                      </Badge>
                     </div>
                   </Card>
                 );
