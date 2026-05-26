@@ -13,7 +13,16 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingScreen } from "@/components/ui/LoadingSpinner";
+import { GuidedTour } from "@/components/ui/GuidedTour";
 import { apiFetch } from "@/lib/api";
+
+const SQUADS_TOUR = [
+  { icon: "👥", title: "Grupos privados", desc: "Los grupos son tu competencia interna con amigos, familia o trabajo. Cada grupo tiene su propio ranking." },
+  { icon: "🏆", title: "Puntos independientes", desc: "Los puntos del grupo son completamente independientes del ranking global. No afectan ni suman al prode general ni a los premios oficiales." },
+  { icon: "🎯", title: "Predicciones del grupo", desc: "Dentro de cada grupo hacés predicciones propias que se usan para el ranking interno. Son separadas de tus predicciones globales." },
+  { icon: "🔗", title: "Invitá con código", desc: "Cuando creás un grupo recibís un código único. Compartilo con quien quieras para que se unan desde su perfil." },
+  { icon: "🔥", title: "Modo Hardcore", desc: "Podés crear grupos con modo Hardcore donde hay que acertar el marcador exacto. Más difícil, más emocionante." },
+];
 
 interface Squad {
   id: string;
@@ -127,9 +136,12 @@ export default function SquadsPage() {
               <h1 className="text-2xl font-black text-white">Mis Grupos</h1>
               <p className="text-gray-500 text-sm">Competí con tus amigos</p>
             </div>
-            <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
-              <Plus className="w-4 h-4" /> Crear grupo
-            </Button>
+            <div className="flex items-center gap-2">
+              <GuidedTour steps={SQUADS_TOUR} storageKey="squads_list_tour" buttonLabel="Ayuda" />
+              <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+                <Plus className="w-4 h-4" /> Crear grupo
+              </Button>
+            </div>
           </div>
 
           {/* Pending invites */}

@@ -26,6 +26,12 @@ export async function GET() {
         _count: {
           select: { predictions: true },
         },
+        squadMemberships: {
+          select: {
+            role: true,
+            squad: { select: { id: true, name: true } },
+          },
+        },
       },
     });
 

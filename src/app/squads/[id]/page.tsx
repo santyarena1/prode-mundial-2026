@@ -5,8 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Trophy, Users, Plus, X, Mail, Trash2, Settings, Gift, Target,
-  Copy, ChevronRight, Crown, LogOut, Zap,
+  Users, Plus, X, Mail, Trash2, Gift, Target,
+  Copy, Crown, LogOut, Zap, AlertTriangle, Check,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Navbar } from "@/components/layout/Navbar";
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingScreen } from "@/components/ui/LoadingSpinner";
+import { GuidedTour } from "@/components/ui/GuidedTour";
 import { apiFetch } from "@/lib/api";
 
 interface Member {
@@ -37,6 +38,12 @@ interface Prize {
   _count: { redemptions: number };
 }
 
+interface DeleteRequest {
+  id: string;
+  requestedBy: string;
+  votes: { userId: string; approve: boolean }[];
+}
+
 interface Squad {
   id: string;
   name: string;
@@ -47,9 +54,18 @@ interface Squad {
   creator: { id: string; firstName: string; lastName: string };
   members: Member[];
   prizes: Prize[];
+  deleteRequest: DeleteRequest | null;
 }
 
 type Tab = "ranking" | "prizes" | "settings";
+
+const TOUR_STEPS = [
+  { icon: "🏆", title: "Ranking del grupo", desc: "Acá ves el ranking interno de todos los miembros. Los puntos del grupo son independientes del ranking global." },
+  { icon: "🎯", title: "Predicciones del grupo", desc: "Con 'Mis preds' podés hacer tus predicciones específicas para este grupo. Son independientes de las predicciones globales." },
+  { icon: "🎁", title: "Premios internos", desc: "El admin del grupo puede crear premios que se canjean con los puntos del grupo. Son diferentes a los premios globales." },
+  { icon: "🔗", title: "Invitá amigos", desc: "Compartí el código del grupo o invitá por email. Cualquier participante del prode puede unirse a tu grupo." },
+  { icon: "⚙️", title: "Configuración", desc: "El admin puede personalizar los puntos por tipo de predicción. Esto permite hacer grupos más o menos competitivos." },
+];
 
 export default function SquadDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -57,6 +73,7 @@ export default function SquadDetailPage() {
   const [squad, setSquad] = useState<Squad | null>(null);
   const [myMemberId, setMyMemberId] = useState("");
   const [myRole, setMyRole] = useState("member");
+  const [myUserId, setMyUserId] = useState("");
   const [rules, setRules] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("ranking");
@@ -76,15 +93,25 @@ export default function SquadDetailPage() {
 
   // Leave/dissolve
   const [leaving, setLeaving] = useState(false);
+  const [votingDelete, setVotingDelete] = useState(false);
+  const [initiatingDelete, setInitiatingDelete] = useState(false);
+  const [cancellingDelete, setCancellingDelete] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch(`/api/participant/squads/${id}`);
-      if (res.status === 401) { router.push("/login"); return; }
-      if (res.status === 403) { router.push("/squads"); return; }
-      if (res.ok) {
-        const data = await res.json();
+      const [meRes, squadRes] = await Promise.all([
+        apiFetch("/api/auth/me"),
+        apiFetch(`/api/participant/squads/${id}`),
+      ]);
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        setMyUserId(meData.user?.id ?? "");
+      }
+      if (squadRes.status === 401) { router.push("/login"); return; }
+      if (squadRes.status === 403) { router.push("/squads"); return; }
+      if (squadRes.ok) {
+        const data = await squadRes.json();
         setSquad(data.squad);
         setMyMemberId(data.myMemberId);
         setMyRole(data.myRole);
@@ -159,21 +186,74 @@ export default function SquadDetailPage() {
     }
   };
 
-  const leaveOrDissolve = async () => {
-    const isCreator = squad?.createdBy === squad?.members.find((m) => m.id === myMemberId)?.userId;
-    const msg = isCreator
-      ? "¿Disolver el grupo? Se eliminará para todos los miembros."
-      : "¿Salir del grupo?";
-    if (!confirm(msg)) return;
+  const leaveGroup = async () => {
+    if (!confirm("¿Salir del grupo?")) return;
     setLeaving(true);
     try {
       const res = await apiFetch(`/api/participant/squads/${id}`, { method: "DELETE" });
       if (res.ok) {
-        toast.success(isCreator ? "Grupo disuelto" : "Saliste del grupo");
+        toast.success("Saliste del grupo");
         router.push("/squads");
       }
     } finally {
       setLeaving(false);
+    }
+  };
+
+  const initiateDissolve = async () => {
+    if (!confirm("¿Querés solicitar disolver el grupo? Se pedirá confirmación a todos los miembros.")) return;
+    setInitiatingDelete(true);
+    try {
+      const res = await apiFetch(`/api/participant/squads/${id}/delete-request`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || "Error"); return; }
+      if (data.dissolved) {
+        toast.success("Grupo disuelto");
+        router.push("/squads");
+      } else {
+        toast.success(`Solicitud enviada. Esperando ${data.pendingVotes} voto(s).`);
+        load();
+      }
+    } finally {
+      setInitiatingDelete(false);
+    }
+  };
+
+  const cancelDissolveRequest = async () => {
+    setCancellingDelete(true);
+    try {
+      const res = await apiFetch(`/api/participant/squads/${id}/delete-request`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Solicitud cancelada");
+        load();
+      }
+    } finally {
+      setCancellingDelete(false);
+    }
+  };
+
+  const voteDelete = async (approve: boolean) => {
+    setVotingDelete(true);
+    try {
+      const res = await apiFetch(`/api/participant/squads/${id}/delete-request/vote`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approve }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || "Error"); return; }
+      if (data.result === "dissolved") {
+        toast.success("El grupo fue disuelto");
+        router.push("/squads");
+      } else if (data.result === "rejected") {
+        toast.success("Solicitud de disolución rechazada. El grupo continúa.");
+        load();
+      } else {
+        toast.success(`Voto registrado. Faltan ${data.pendingVotes} voto(s).`);
+        load();
+      }
+    } finally {
+      setVotingDelete(false);
     }
   };
 
@@ -188,7 +268,12 @@ export default function SquadDetailPage() {
 
   const isAdmin = myRole === "admin";
   const myMember = squad.members.find((m) => m.id === myMemberId);
+  const isCreator = squad.createdBy === myMember?.userId;
   const availablePoints = (myMember?.totalPoints ?? 0) - (myMember?.spentPoints ?? 0);
+  const deleteRequest = squad.deleteRequest;
+  const myVote = deleteRequest?.votes.find((v) => v.userId === myUserId);
+  const alreadyVoted = !!myVote;
+  const approvedCount = deleteRequest?.votes.filter((v) => v.approve).length ?? 0;
 
   const RULE_META: Record<string, { label: string; desc: string }> = {
     GROUP_SIGN:       { label: "Acertar el resultado", desc: "Ganaste puntos si predijiste quién ganó o si fue empate (sin importar el marcador exacto)" },
@@ -230,7 +315,8 @@ export default function SquadDetailPage() {
                   <Users className="w-3 h-3 inline mr-1" />{squad.members.length} miembros
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap justify-end">
+                <GuidedTour steps={TOUR_STEPS} storageKey={`squad_tour_${id}`} buttonLabel="Ayuda" />
                 <Button variant="ghost" size="sm" onClick={() => setShowInvite(true)}>
                   <Mail className="w-4 h-4" /> Invitar
                 </Button>
@@ -248,6 +334,57 @@ export default function SquadDetailPage() {
               </button>
             </div>
           </div>
+
+          {/* Pending delete request banner */}
+          {deleteRequest && (
+            <div className="mb-5 bg-red-900/20 border border-red-600/40 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-red-300 font-bold text-sm">Solicitud de disolución pendiente</p>
+                  <p className="text-red-400/70 text-xs mt-0.5">
+                    El admin quiere disolver el grupo. Se necesita el voto de todos los miembros.
+                    {approvedCount > 0 && ` ${approvedCount}/${squad.members.length} votos a favor.`}
+                  </p>
+                  {!alreadyVoted && !isCreator && (
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        loading={votingDelete}
+                        onClick={() => voteDelete(true)}
+                        className="bg-red-700 hover:bg-red-600"
+                      >
+                        <Check className="w-3 h-3" /> Sí, disolver
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        loading={votingDelete}
+                        onClick={() => voteDelete(false)}
+                      >
+                        <X className="w-3 h-3" /> No, mantener
+                      </Button>
+                    </div>
+                  )}
+                  {alreadyVoted && !isCreator && (
+                    <p className="text-green-400 text-xs mt-2">✓ Ya votaste</p>
+                  )}
+                  {isCreator && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      loading={cancellingDelete}
+                      onClick={cancelDissolveRequest}
+                      className="mt-3 text-xs"
+                    >
+                      Cancelar solicitud
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Tabs */}
           <div className="flex gap-1 bg-[#111] border border-[#222] rounded-xl p-1 mb-5">
@@ -388,15 +525,46 @@ export default function SquadDetailPage() {
                 <h3 className="text-sm font-bold uppercase tracking-wider text-red-600 mb-3">
                   Zona peligrosa
                 </h3>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  loading={leaving}
-                  onClick={leaveOrDissolve}
-                >
-                  <LogOut className="w-4 h-4" />
-                  {squad.createdBy === myMember?.userId ? "Disolver grupo" : "Salir del grupo"}
-                </Button>
+                {isCreator ? (
+                  <div className="space-y-2">
+                    <p className="text-gray-500 text-xs mb-3">
+                      Para disolver el grupo se requiere que todos los miembros confirmen.
+                    </p>
+                    {deleteRequest ? (
+                      <div className="flex items-center gap-3">
+                        <span className="text-amber-400 text-xs">Solicitud pendiente ({approvedCount}/{squad.members.length})</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          loading={cancellingDelete}
+                          onClick={cancelDissolveRequest}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        loading={initiatingDelete}
+                        onClick={initiateDissolve}
+                      >
+                        <AlertTriangle className="w-4 h-4" />
+                        Solicitar disolución
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    loading={leaving}
+                    onClick={leaveGroup}
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Salir del grupo
+                  </Button>
+                )}
               </Card>
             </div>
           )}

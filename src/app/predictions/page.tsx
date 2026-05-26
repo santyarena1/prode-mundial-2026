@@ -12,7 +12,16 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/Button";
 import { LoadingScreen } from "@/components/ui/LoadingSpinner";
+import { GuidedTour } from "@/components/ui/GuidedTour";
 import { apiFetch } from "@/lib/api";
+
+const PREDICTIONS_TOUR = [
+  { icon: "⚽", title: "Predecí los partidos", desc: "En la pestaña 'Partidos' elegís el resultado de cada partido de la fase de grupos: local, visitante o empate. Tenés hasta que el partido empiece." },
+  { icon: "🏅", title: "Posiciones de grupos", desc: "En 'Grupos' predecís qué equipos salen 1°, 2° y 3° en cada uno de los 12 grupos del Mundial 2026. ¡Más difícil, más puntos!" },
+  { icon: "🏆", title: "Eliminatorias y campeón", desc: "En 'Eliminatorias' predecís quién avanza ronda a ronda hasta el campeón. Estas predicciones se bloquean cuando arranca el torneo." },
+  { icon: "🔥", title: "Modo Hardcore", desc: "Activando Hardcore tenés que acertar el marcador exacto de cada partido. Si acertás, ganás puntos extra además de los normales." },
+  { icon: "💾", title: "Guardá tus predicciones", desc: "El botón de guardar aparece cuando tenés cambios pendientes. No te olvides de guardar antes de salir, ¡o perdés tus selecciones!" },
+];
 import {
   getMatchPredictionClosedReason,
   getMatchPredictionDeadlineHint,
@@ -441,7 +450,8 @@ export default function PredictionsPage() {
             </h1>
             <p className="text-gray-500 mt-1">Predecí resultados, clasificados y campeón</p>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+            <GuidedTour steps={PREDICTIONS_TOUR} storageKey="predictions_tour" />
             <button
               onClick={handleToggleHardcore}
               disabled={togglingHardcore}

@@ -24,6 +24,7 @@ interface Participant {
   hasPassword?: boolean;
   createdAt: string;
   _count?: { predictions: number };
+  squadMemberships?: { role: string; squad: { id: string; name: string } }[];
 }
 
 type PredictionResetType = "matches" | "groups" | "bracket";
@@ -296,6 +297,7 @@ export default function AdminParticipantsPage() {
                   { label: "Instagram", field: null },
                   { label: "Puntos", field: "points" as SortField },
                   { label: "Predicciones", field: "predictions" as SortField },
+                  { label: "Grupos", field: null },
                   { label: "Estado", field: "status" as SortField },
                   { label: "Creado", field: "createdAt" as SortField },
                   { label: "Acciones", field: null },
@@ -338,6 +340,27 @@ export default function AdminParticipantsPage() {
                   </td>
                   <td className="px-4 py-3 text-gray-400 text-sm">
                     {p._count?.predictions ?? "-"}
+                  </td>
+                  <td className="px-4 py-3">
+                    {p.squadMemberships && p.squadMemberships.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {p.squadMemberships.map((sm) => (
+                          <span
+                            key={sm.squad.id}
+                            className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                              sm.role === "admin"
+                                ? "bg-yellow-500/20 text-yellow-400"
+                                : "bg-[#2a2a2a] text-gray-400"
+                            }`}
+                            title={sm.role === "admin" ? "Admin del grupo" : "Miembro"}
+                          >
+                            {sm.squad.name}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-gray-700 text-xs">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant={p.isBlocked ? "error" : "success"}>

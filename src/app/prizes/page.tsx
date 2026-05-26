@@ -13,6 +13,14 @@ import { LoadingScreen } from "@/components/ui/LoadingSpinner";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { PrizeDetailModal } from "@/components/prizes/PrizeDetailModal";
+import { GuidedTour } from "@/components/ui/GuidedTour";
+
+const PRIZES_TOUR = [
+  { icon: "⭐", title: "Tus puntos", desc: "Arriba ves cuántos puntos tenés disponibles. Se acumulan con predicciones acertadas, acciones bonus y códigos de compra." },
+  { icon: "🎁", title: "Elegí un premio", desc: "Tocá cualquier premio para ver sus detalles y decidir si querés canjearlo. El costo en puntos aparece en cada tarjeta." },
+  { icon: "🎟️", title: "Premios de sorteo", desc: "Algunos premios son entradas para sorteos. Cuantas más entradas canjees, más chances tenés de ganar en el sorteo semanal." },
+  { icon: "✅", title: "Coordinación de entrega", desc: "Una vez que canjeás, te contactamos para coordinar cómo recibís el premio. ¡Es real y cercano!" },
+];
 
 interface Prize {
   id: string;
@@ -95,7 +103,10 @@ export default function PrizesPage() {
       <Navbar />
 
       <div className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-8">
-        <div className="text-center mb-10">
+        <div className="text-center mb-10 relative">
+          <div className="absolute top-0 right-0">
+            <GuidedTour steps={PRIZES_TOUR} storageKey="prizes_tour" />
+          </div>
           <Gift className="w-12 h-12 text-red-500 mx-auto mb-3" />
           <h1 className="text-3xl sm:text-4xl font-black uppercase text-white">
             CANJEÁ TUS <span className="text-red-500">PREMIOS</span>

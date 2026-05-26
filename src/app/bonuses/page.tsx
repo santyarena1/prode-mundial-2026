@@ -12,8 +12,16 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { LoadingScreen } from "@/components/ui/LoadingSpinner";
+import { GuidedTour } from "@/components/ui/GuidedTour";
 import { PurchaseCodeSection } from "@/components/bonuses/PurchaseCodeSection";
 import { apiFetch } from "@/lib/api";
+
+const BONUSES_TOUR = [
+  { icon: "🎟️", title: "Códigos de compra", desc: "Si compraste un producto en The Gamer Shop, tenés un código único. Ingresalo acá para sumar puntos instantáneamente." },
+  { icon: "⚡", title: "Acciones bonus", desc: "Seguí a nuestras cuentas en redes, mencioná el prode o completá otras acciones para ganar puntos. Cargá el comprobante y esperá la aprobación." },
+  { icon: "👥", title: "Invitá amigos", desc: "Compartí tu código de referido. Cuando alguien se registra con tu código y completa su perfil, ambos ganan puntos de bonificación." },
+  { icon: "✅", title: "Aprobación rápida", desc: "Las acciones que requieren evidencia son revisadas por el equipo. Generalmente se aprueban dentro de 24-48 horas." },
+];
 
 const HANDLE_LABELS: Record<string, string> = {
   instagram: "Instagram", tiktok: "TikTok", youtube: "YouTube",
@@ -138,11 +146,16 @@ export default function BonusesPage() {
       <div className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-8">
 
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-black uppercase text-white">
-            GANÁ PUNTOS <span className="text-green-400">EXTRA</span>
-          </h1>
-          <p className="text-gray-500 mt-1 text-sm">Sumá puntos adicionales fuera del prode</p>
+        <div className="mb-6 flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-black uppercase text-white">
+              GANÁ PUNTOS <span className="text-green-400">EXTRA</span>
+            </h1>
+            <p className="text-gray-500 mt-1 text-sm">Sumá puntos adicionales fuera del prode</p>
+          </div>
+          <div className="flex-shrink-0 mt-1">
+            <GuidedTour steps={BONUSES_TOUR} storageKey="bonuses_tour" />
+          </div>
         </div>
 
         {/* Tabs */}

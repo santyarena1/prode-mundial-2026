@@ -492,8 +492,9 @@ model Squad {
   creator    User             @relation("SquadCreator", fields: [createdBy], references: [id])
   members    SquadMember[]
   invites    SquadInvite[]
-  prizes     SquadPrize[]
-  pointRules SquadPointRule[]
+  prizes        SquadPrize[]
+  pointRules    SquadPointRule[]
+  deleteRequest SquadDeleteRequest?
 }
 
 model SquadMember {
@@ -625,6 +626,28 @@ model SquadRedemption {
 
   member SquadMember @relation(fields: [memberId], references: [id])
   prize  SquadPrize  @relation(fields: [prizeId], references: [id])
+}
+
+model SquadDeleteRequest {
+  id          String   @id @default(cuid())
+  squadId     String   @unique
+  requestedBy String
+  createdAt   DateTime @default(now())
+
+  squad Squad             @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  votes SquadDeleteVote[]
+}
+
+model SquadDeleteVote {
+  id        String   @id @default(cuid())
+  requestId String
+  userId    String
+  approve   Boolean
+  createdAt DateTime @default(now())
+
+  request SquadDeleteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@unique([requestId, userId])
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────

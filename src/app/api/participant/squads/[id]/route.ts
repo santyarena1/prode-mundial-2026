@@ -28,6 +28,9 @@ export async function GET(
         orderBy: { totalPoints: "desc" },
       },
       prizes: { where: { active: true }, orderBy: { pointsCost: "asc" } },
+      deleteRequest: {
+        include: { votes: { select: { userId: true, approve: true } } },
+      },
     },
   });
   if (!squad) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -66,13 +69,23 @@ export async function DELETE(
   });
   if (!member) return NextResponse.json({ error: "Not a member" }, { status: 403 });
 
-  const squad = await prisma.squad.findUnique({ where: { id } });
+  const squad = await prisma.squad.findUnique({
+    where: { id },
+    include: { members: true },
+  });
   if (!squad) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if (squad.createdBy === auth.userId) {
-    // Creator dissolves the whole squad
-    await prisma.squad.delete({ where: { id } });
-    return NextResponse.json({ dissolved: true });
+    // Creator: use consensus flow (redirect to delete-request)
+    const otherMembers = squad.members.filter((m) => m.userId !== auth.userId);
+    if (otherMembers.length === 0) {
+      await prisma.squad.delete({ where: { id } });
+      return NextResponse.json({ dissolved: true });
+    }
+    return NextResponse.json(
+      { error: "USE_CONSENSUS", message: "Usá el flujo de consenso para disolver el grupo" },
+      { status: 422 }
+    );
   }
 
   // Regular member leaves
