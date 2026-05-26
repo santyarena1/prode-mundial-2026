@@ -63,6 +63,7 @@ export default function BonusesPage() {
   const [copied, setCopied] = useState(false);
   const [socialHandles, setSocialHandles] = useState<Record<string, Record<string, string>>>({});
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [sharingImage, setSharingImage] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -123,6 +124,21 @@ export default function BonusesPage() {
     } finally {
       setClaiming((prev) => ({ ...prev, [bonusId]: false }));
     }
+  };
+
+  const handleShareImage = async (url: string) => {
+    setSharingImage(true);
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const file = new File([blob], "plantilla-historia.jpg", { type: blob.type });
+      if (navigator.share && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Plantilla de historia" });
+        return;
+      }
+    } catch { /* fall through */ }
+    finally { setSharingImage(false); }
+    window.open(url, "_blank");
   };
 
   const copyReferralCode = () => {
@@ -343,27 +359,23 @@ export default function BonusesPage() {
                 {/* Reference image / template */}
                 {modalBonus.imageUrl && (
                   <div className="mb-5">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider">Plantilla de referencia</p>
-                      <a
-                        href={modalBonus.imageUrl}
-                        download="plantilla-historia.jpg"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 font-semibold transition-colors bg-blue-400/10 hover:bg-blue-400/20 px-2.5 py-1 rounded-lg"
-                      >
-                        <Download className="w-3.5 h-3.5" /> Descargar
-                      </a>
-                    </div>
-                    <div className="rounded-xl overflow-hidden border border-[#2a2a2a] bg-[#1a1a1a]">
+                    <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-2">Plantilla de referencia</p>
+                    <div className="rounded-xl overflow-hidden border border-[#2a2a2a] bg-[#1a1a1a] mb-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={modalBonus.imageUrl}
                         alt="Plantilla de referencia"
-                        className="w-full h-auto object-contain max-h-72"
+                        className="w-full h-auto object-contain"
                       />
                     </div>
-                    <p className="text-gray-600 text-[10px] mt-1.5 text-center">Usá esta imagen como plantilla para tu historia</p>
+                    <button
+                      onClick={() => handleShareImage(modalBonus.imageUrl!)}
+                      disabled={sharingImage}
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold rounded-xl transition-colors text-sm"
+                    >
+                      <Download className="w-4 h-4" />
+                      {sharingImage ? "Cargando..." : "Guardar imagen"}
+                    </button>
                   </div>
                 )}
 
