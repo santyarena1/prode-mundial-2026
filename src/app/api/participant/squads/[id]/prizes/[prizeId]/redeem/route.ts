@@ -21,7 +21,7 @@ export async function POST(
     return NextResponse.json({ error: "Premio no disponible" }, { status: 404 });
   }
 
-  if (prize.stock >= 0) {
+  if (prize.stock > 0) {
     const redeemed = await prisma.squadRedemption.count({
       where: { prizeId, status: "approved" },
     });

@@ -49,17 +49,20 @@ export async function POST(request: NextRequest) {
       if (!user) throw new Error("404:User not found");
       if (user.totalPoints < prize.requiredPoints) throw new Error("400:Insufficient points");
 
-      const existing = await tx.prizeRedemption.findFirst({
-        where: { userId: auth.userId, prizeId, status: "pending" },
-      });
-      if (existing) throw new Error("409:You already have a pending redemption for this prize");
+      if (prize.stock > 0) {
+        // Limited stock: block duplicate pending and decrement atomically
+        const existing = await tx.prizeRedemption.findFirst({
+          where: { userId: auth.userId, prizeId, status: "pending" },
+        });
+        if (existing) throw new Error("409:You already have a pending redemption for this prize");
 
-      // Atomic stock decrement — only succeeds if stock > 0
-      const stockUpdate = await tx.prize.updateMany({
-        where: { id: prizeId, stock: { gt: 0 } },
-        data: { stock: { decrement: 1 } },
-      });
-      if (stockUpdate.count === 0) throw new Error("400:Prize is out of stock");
+        const stockUpdate = await tx.prize.updateMany({
+          where: { id: prizeId, stock: { gt: 0 } },
+          data: { stock: { decrement: 1 } },
+        });
+        if (stockUpdate.count === 0) throw new Error("400:Prize is out of stock");
+      }
+      // stock === 0 means unlimited — allow multiple redemptions freely
 
       await tx.user.update({
         where: { id: auth.userId },

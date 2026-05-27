@@ -108,22 +108,26 @@ export function EarlyBirdModal({ mode, onClose, onClaimed }: Props) {
           ) : (
             <>
               <h2 className="text-2xl font-black uppercase text-white mb-2">
-                ¡Llegaste a tiempo!
+                ¡Bienvenido al Prode!
               </h2>
               <p className="text-yellow-400 font-bold text-sm uppercase tracking-wider mb-4">
-                Participante early bird
+                1 participación de sorteo incluida
               </p>
 
               <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-5">
                 <p className="text-gray-200 text-sm leading-relaxed">
-                  Te registraste <strong className="text-white">antes del inicio del Mundial</strong>, así que te regalamos{" "}
-                  <strong className="text-yellow-400">una entrada automática al primer sorteo semanal</strong>.
+                  Al registrarte recibís{" "}
+                  <strong className="text-yellow-400">1 participación base en el sorteo semanal</strong>{" "}
+                  de forma automática.
+                </p>
+                <p className="text-gray-500 text-xs mt-2">
+                  Podés sumar más participaciones canjeando puntos en la sección Premios.
                 </p>
               </div>
 
               <div className="flex items-center justify-center gap-2 text-gray-400 text-xs mb-6">
                 <Zap className="w-3.5 h-3.5 text-green-400" />
-                Tu entrada ya está registrada — no necesitás hacer nada más.
+                Tu participación ya está registrada — no necesitás hacer nada más.
               </div>
 
               <button

@@ -167,9 +167,9 @@ export default function DashboardPage() {
           // Eligible but not yet claimed — show every visit until claimed
           setEarlyBirdMode("claim");
           setShowEarlyBird(true);
-        } else if (meData.user.earlyBirdGranted) {
-          // Already granted — show confirmation once
-          const shownKey = `earlyBirdShown_${meData.user.id}`;
+        } else {
+          // Show welcome raffle modal once for all registered users
+          const shownKey = `raffleWelcomeShown_${meData.user.id}`;
           if (!localStorage.getItem(shownKey)) {
             setEarlyBirdMode("confirmed");
             setShowEarlyBird(true);

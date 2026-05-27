@@ -44,7 +44,7 @@ function validate(data: FormData): FormErrors {
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email))
     errors.email = "Email inválido";
   if (!data.password) errors.password = "La contraseña es requerida";
-  else if (data.password.length < 6) errors.password = "Mínimo 6 caracteres";
+  else if (data.password.length < 8) errors.password = "Mínimo 8 caracteres";
   if (!data.confirmPassword) errors.confirmPassword = "Repetí la contraseña";
   else if (data.password !== data.confirmPassword)
     errors.confirmPassword = "Las contraseñas no coinciden";
@@ -213,7 +213,7 @@ export default function RegisterPage() {
               <Input
                 label="Contraseña"
                 type={showPassword ? "text" : "password"}
-                placeholder="••••••"
+                placeholder="••••••••"
                 value={form.password}
                 onChange={(e) => handleChange("password", e.target.value)}
                 error={errors.password}
@@ -232,7 +232,7 @@ export default function RegisterPage() {
               <Input
                 label="Repetí la contraseña"
                 type={showConfirmPassword ? "text" : "password"}
-                placeholder="••••••"
+                placeholder="••••••••"
                 value={form.confirmPassword}
                 onChange={(e) => handleChange("confirmPassword", e.target.value)}
                 error={errors.confirmPassword}

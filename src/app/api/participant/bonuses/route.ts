@@ -58,6 +58,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Bonus action not found or inactive" }, { status: 404 });
     }
 
+    // Completar todo el prode: require predictions for ALL matches in DB
+    if (bonusAction.name === "Completar todo el prode inicial") {
+      const [totalMatches, userPredictions] = await Promise.all([
+        prisma.match.count(),
+        prisma.prediction.count({ where: { userId: auth.userId } }),
+      ]);
+      if (userPredictions < totalMatches) {
+        return NextResponse.json(
+          { error: `Completá todas las predicciones antes de reclamar este bonus (${userPredictions}/${totalMatches} partidos completados).` },
+          { status: 400 }
+        );
+      }
+    }
+
     const pointsEarned = Math.floor(bonusAction.points * bonusAction.multiplier);
 
     // Wrap duplicate check + create in a transaction to prevent concurrent double-claims

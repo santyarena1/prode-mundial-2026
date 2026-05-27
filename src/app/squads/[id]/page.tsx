@@ -6,7 +6,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, Plus, X, Mail, Trash2, Gift, Target,
-  Copy, Crown, LogOut, Zap, AlertTriangle, Check,
+  Copy, Crown, LogOut, Zap, AlertTriangle, Check, Share2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Navbar } from "@/components/layout/Navbar";
@@ -263,6 +263,13 @@ export default function SquadDetailPage() {
     toast.success("Código copiado");
   };
 
+  const shareWhatsApp = () => {
+    if (!squad) return;
+    const appUrl = window.location.origin;
+    const msg = `¡Sumate al Prode Mundial Gamer 2026! 🌍⚽\n\nUníte al grupo *${squad.name}* usando el código:\n*${squad.inviteCode}*\n\nRegistrate en: ${appUrl}/register\n_(Si ya tenés cuenta, ingresá el código desde la sección Grupos)_`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+  };
+
   if (loading) return <LoadingScreen />;
   if (!squad) return null;
 
@@ -329,8 +336,15 @@ export default function SquadDetailPage() {
             </div>
             <div className="mt-2 flex items-center gap-2">
               <span className="text-gray-600 text-xs font-mono">{squad.inviteCode}</span>
-              <button onClick={copyCode} className="text-gray-600 hover:text-white">
+              <button onClick={copyCode} className="text-gray-600 hover:text-white" title="Copiar código">
                 <Copy className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={shareWhatsApp}
+                className="text-green-600 hover:text-green-400 transition-colors"
+                title="Compartir por WhatsApp"
+              >
+                <Share2 className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
@@ -595,6 +609,28 @@ export default function SquadDetailPage() {
                     <X className="w-5 h-5" />
                   </button>
                 </div>
+
+                {/* WhatsApp share */}
+                <div className="mb-4 p-3 bg-green-900/20 border border-green-700/30 rounded-xl">
+                  <p className="text-gray-400 text-xs mb-2">Compartí el código del grupo por WhatsApp:</p>
+                  <button
+                    onClick={shareWhatsApp}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg transition-colors text-sm"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Compartir por WhatsApp
+                  </button>
+                  <p className="text-gray-600 text-xs mt-1.5 text-center">
+                    Código: <span className="font-mono text-gray-400">{squad.inviteCode}</span>
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="flex-1 h-px bg-[#2a2a2a]" />
+                  <span className="text-gray-600 text-xs">o invitá por email</span>
+                  <div className="flex-1 h-px bg-[#2a2a2a]" />
+                </div>
+
                 <Input
                   label="Email del amigo"
                   type="email"
@@ -608,7 +644,7 @@ export default function SquadDetailPage() {
                     Cancelar
                   </Button>
                   <Button variant="primary" size="sm" loading={inviting} onClick={sendInvite} className="flex-1">
-                    Invitar
+                    <Mail className="w-3.5 h-3.5" /> Invitar
                   </Button>
                 </div>
               </div>
@@ -643,7 +679,7 @@ export default function SquadDetailPage() {
                 <div className="space-y-3 mb-4">
                   <Input
                     label="Nombre del premio"
-                    placeholder="Ej: Cerveza gratis"
+                    placeholder="Ej: Pack de stickers TGS"
                     value={prizeForm.name}
                     onChange={(e) => setPrizeForm((p) => ({ ...p, name: e.target.value }))}
                   />
