@@ -1,20 +1,5 @@
-import nodemailer from "nodemailer";
 import { Resend } from "resend";
 import { createHmac } from "crypto";
-
-function createTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: parseInt(process.env.SMTP_PORT || "465"),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-}
-
-const FROM = `"${process.env.EMAIL_FROM_NAME || "The Gamer Shop"}" <${process.env.EMAIL_FROM_ADDRESS || "ventas@thegamershop.com"}>`;
 
 // ─── Templates ────────────────────────────────────────────────────────────────
 
@@ -302,56 +287,29 @@ function welcomeTemplate(firstName: string, lastName: string, email: string): st
 
 // ─── Send functions ────────────────────────────────────────────────────────────
 
-async function createDevTransporter() {
-  // Ethereal: catch-all test inbox, no real delivery, shows preview URL in console
-  const testAccount = await nodemailer.createTestAccount();
-  const transport = nodemailer.createTransport({
-    host: "smtp.ethereal.email",
-    port: 587,
-    secure: false,
-    auth: { user: testAccount.user, pass: testAccount.pass },
-  });
-  return { transport, testAccount };
-}
-
 export async function sendWelcomeEmail(user: {
   firstName: string;
   lastName: string;
   email: string;
 }): Promise<void> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("[email] RESEND_API_KEY not set — skipping welcome email");
+    return;
+  }
+
   const html = welcomeTemplate(user.firstName, user.lastName, user.email);
   const subject = `¡Bienvenido al Prode Mundial Gamer 2026, ${user.firstName}! 🎮⚽`;
+  const from = process.env.RESEND_FROM || "Prode Mundial Gamer <no-reply@thegamershop-premios.com>";
 
-  // ── Production: real SMTP ──────────────────────────────────────────────────
-  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-    const transporter = createTransporter();
-    await transporter.sendMail({ from: FROM, to: user.email, subject, html });
-    console.log(`[email] ✅ Welcome email sent to ${user.email}`);
-    return;
+  const r = new Resend(process.env.RESEND_API_KEY.replace(/^﻿/, "").trim());
+  const { error } = await r.emails.send({ from, to: user.email, subject, html });
+
+  if (error) {
+    console.error("[email] Failed to send welcome email:", error);
+    throw new Error(error.message);
   }
 
-  // ── Development: Ethereal preview (no real delivery) ──────────────────────
-  if (process.env.NODE_ENV !== "production") {
-    try {
-      const { transport } = await createDevTransporter();
-      const info = await transport.sendMail({
-        from: FROM,
-        to: user.email,
-        subject,
-        html,
-      });
-      const previewUrl = nodemailer.getTestMessageUrl(info);
-      console.log("\n─────────────────────────────────────────────");
-      console.log("[email] 📧 DEV PREVIEW — abrí este link para ver el mail:");
-      console.log(`[email] 👉  ${previewUrl}`);
-      console.log("─────────────────────────────────────────────\n");
-    } catch (err) {
-      console.warn("[email] Ethereal preview failed:", err);
-    }
-    return;
-  }
-
-  console.warn("[email] SMTP not configured — skipping welcome email");
+  console.log(`[email] ✅ Welcome email sent to ${user.email}`);
 }
 
 // ─── Announcements via Resend ──────────────────────────────────────────────────
