@@ -451,13 +451,17 @@ export async function sendAnnouncement(params: {
 
     try {
       const result = await resend.batch.send(emails);
-      const data = result.data;
-      if (data) {
-        sent += data.length;
+      if (result.error) {
+        console.error("[resend] batch error:", JSON.stringify(result.error));
+        failed += chunk.length;
+      } else if (result.data) {
+        sent += result.data.length;
       } else {
+        console.error("[resend] batch returned no data and no error");
         failed += chunk.length;
       }
-    } catch {
+    } catch (err) {
+      console.error("[resend] batch exception:", err);
       failed += chunk.length;
     }
   }
