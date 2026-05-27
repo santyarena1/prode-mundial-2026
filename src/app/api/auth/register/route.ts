@@ -10,9 +10,9 @@ import { calculateUserPoints } from "@/lib/points";
 const registerSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  phone: z.string().min(6),
+  phone: z.string().min(8, { message: "El teléfono debe tener al menos 8 dígitos" }),
   email: z.string().email(),
-  password: z.string().min(8, { message: "La contraseña debe tener al menos 8 caracteres" }),
+  password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres" }),
   instagram: z.string().optional(),
   inviteCode: z.string().optional(),
   acceptedTerms: z.boolean().refine((v) => v === true, {
