@@ -106,6 +106,8 @@ export default function PredictionsPage() {
   const [togglingHardcore, setTogglingHardcore] = useState(false);
   const [pendingScores, setPendingScores] = useState<Record<string, { home?: number; away?: number }>>({});
   const [savedScores, setSavedScores] = useState<Record<string, { home: number; away: number }>>({});
+  const [pendingBracketScores, setPendingBracketScores] = useState<Record<string, { home?: number; away?: number }>>({});
+  const [savedBracketScores, setSavedBracketScores] = useState<Record<string, { home: number; away: number }>>({});
   const [showHardcoreSpotlight, setShowHardcoreSpotlight] = useState(false);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [pendingNavUrl, setPendingNavUrl] = useState<string | null>(null);
@@ -168,9 +170,17 @@ export default function PredictionsPage() {
 
       if (bracketRes.ok) {
         const data = await bracketRes.json();
-        for (const p of data.bracketPredictions || [])
+        const bracketScores: Record<string, { home: number; away: number }> = {};
+        for (const p of data.bracketPredictions || []) {
           if (p.predictedTeamId && p.isLocked) sb[`${p.phase}:${p.matchSlot}`] = p.predictedTeamId;
+          if (p.predictedHomeScore !== null && p.predictedHomeScore !== undefined &&
+              p.predictedAwayScore !== null && p.predictedAwayScore !== undefined) {
+            const matchNum = Math.ceil(parseInt(p.matchSlot) / 2);
+            bracketScores[`${p.phase}:${matchNum}`] = { home: p.predictedHomeScore, away: p.predictedAwayScore };
+          }
+        }
         setSavedBracket(sb);
+        setSavedBracketScores(bracketScores);
       }
 
       if (changeRes.ok) {
@@ -310,6 +320,11 @@ export default function PredictionsPage() {
     setPendingBracket(prev => ({ ...prev, [key]: teamId }));
   }, [savedBracket]);
 
+  const handlePickBracketScore = useCallback((phase: string, matchNum: number, side: "home" | "away", value: number) => {
+    const key = `${phase}:${matchNum}`;
+    setPendingBracketScores(prev => ({ ...prev, [key]: { ...prev[key], [side]: value } }));
+  }, []);
+
   const handleSaveCurrentPhase = useCallback(async () => {
     const phasePending = Object.entries(pendingBracket).filter(([k]) => k.startsWith(`${activeElimTab}:`));
     if (phasePending.length === 0) return;
@@ -318,21 +333,31 @@ export default function PredictionsPage() {
     for (const [key, teamId] of phasePending) {
       if (savedBracket[key]) continue;
       const [phase, slot] = key.split(":");
+      const matchNum = Math.ceil(parseInt(slot) / 2);
+      const score = hardcoreMode ? pendingBracketScores[`${phase}:${matchNum}`] : undefined;
+      const scorePayload = (score?.home !== undefined && score?.away !== undefined)
+        ? { predictedHomeScore: score.home, predictedAwayScore: score.away }
+        : {};
       try {
         const res = await apiFetch("/api/participant/bracket-predictions", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phase, matchSlot: slot, predictedTeamId: teamId }),
+          body: JSON.stringify({ phase, matchSlot: slot, predictedTeamId: teamId, ...scorePayload }),
         });
         if (res.ok) {
           setSavedBracket(prev => ({ ...prev, [key]: teamId }));
           setPendingBracket(prev => { const n = { ...prev }; delete n[key]; return n; });
+          if (score?.home !== undefined && score?.away !== undefined) {
+            const scoreKey = `${phase}:${matchNum}`;
+            setSavedBracketScores(prev => ({ ...prev, [scoreKey]: { home: score.home!, away: score.away! } }));
+            setPendingBracketScores(prev => { const n = { ...prev }; delete n[scoreKey]; return n; });
+          }
           ok++;
         } else { const d = await res.json(); toast.error(d.error || "Error"); }
       } catch { toast.error("Error de conexión"); }
     }
     if (ok > 0) toast.success(`${ok} selección${ok > 1 ? "es" : ""} confirmada${ok > 1 ? "s" : ""} ✓`);
     setSavingBracket(false);
-  }, [pendingBracket, savedBracket, activeElimTab]);
+  }, [pendingBracket, savedBracket, activeElimTab, hardcoreMode, pendingBracketScores]);
 
   const handleToggleHardcore = useCallback(async () => {
     setTogglingHardcore(true);
@@ -377,7 +402,8 @@ export default function PredictionsPage() {
     Object.keys(pendingPreds).length > 0 ||
     Object.keys(pendingBracket).length > 0 ||
     Object.values(pendingGroupPreds).some((g) => g.first || g.second) ||
-    Object.values(pendingScores).some((s) => s.home !== undefined || s.away !== undefined);
+    Object.values(pendingScores).some((s) => s.home !== undefined || s.away !== undefined) ||
+    Object.values(pendingBracketScores).some((s) => s.home !== undefined || s.away !== undefined);
 
   // Persist unsaved state to sessionStorage so other pages can warn the user
   useEffect(() => {
@@ -916,6 +942,10 @@ export default function PredictionsPage() {
                             allTeams={allTeams}
                             savedBracket={savedBracket}
                             pendingBracket={pendingBracket}
+                            hardcoreMode={hardcoreMode}
+                            pendingBracketScore={pendingBracketScores[`${currentPhase.key}:${i + 1}`]}
+                            savedBracketScore={savedBracketScores[`${currentPhase.key}:${i + 1}`]}
+                            onPickBracketScore={(side, value) => handlePickBracketScore(currentPhase.key, i + 1, side, value)}
                             delay={i * 0.06}
                             onOpenSlot={(phase, slot) => setSelectionModal({ phase, slot })}
                           />
@@ -1690,11 +1720,17 @@ function MatchCard({
 
 function BracketMatchCard({
   matchNum, leftSlot, rightSlot, phase, allTeams,
-  savedBracket, pendingBracket, onOpenSlot, delay = 0,
+  savedBracket, pendingBracket, hardcoreMode,
+  pendingBracketScore, savedBracketScore, onPickBracketScore,
+  onOpenSlot, delay = 0,
 }: {
   matchNum: number; leftSlot: string; rightSlot: string;
   phase: string; allTeams: Team[];
   savedBracket: Record<string, string>; pendingBracket: Record<string, string>;
+  hardcoreMode: boolean;
+  pendingBracketScore?: { home?: number; away?: number };
+  savedBracketScore?: { home: number; away: number };
+  onPickBracketScore: (side: "home" | "away", value: number) => void;
   onOpenSlot: (phase: string, slot: string) => void;
   delay?: number;
 }) {
@@ -1706,6 +1742,8 @@ function BracketMatchCard({
   const rightLocked = !!savedBracket[rKey];
   const bothLocked  = leftLocked && rightLocked;
   const bothFilled  = !!(savedBracket[lKey] || pendingBracket[lKey]) && !!(savedBracket[rKey] || pendingBracket[rKey]);
+
+  const hasPendingScore = pendingBracketScore?.home !== undefined && pendingBracketScore?.away !== undefined;
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
@@ -1734,6 +1772,82 @@ function BracketMatchCard({
           onOpen={() => onOpenSlot(phase, rightSlot)}
         />
       </div>
+
+      {/* Hardcore score inputs */}
+      {hardcoreMode && (
+        <div className="px-4 pb-3 border-t border-[#191919] mt-0.5 pt-2.5">
+          {bothLocked && savedBracketScore ? (
+            <div className="flex items-center justify-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-600 text-[9px] font-bold uppercase truncate max-w-[40px]">
+                  {leftTeam?.code ?? "LOC"}
+                </span>
+                <div className="w-9 h-8 rounded-lg bg-green-600/15 border border-green-500/30 flex items-center justify-center">
+                  <span className="text-green-400 font-black text-base">{savedBracketScore.home}</span>
+                </div>
+              </div>
+              <span className="text-gray-700 font-black text-sm">—</span>
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-8 rounded-lg bg-green-600/15 border border-green-500/30 flex items-center justify-center">
+                  <span className="text-green-400 font-black text-base">{savedBracketScore.away}</span>
+                </div>
+                <span className="text-gray-600 text-[9px] font-bold uppercase truncate max-w-[40px]">
+                  {rightTeam?.code ?? "VIS"}
+                </span>
+              </div>
+              <Lock className="w-3 h-3 text-green-700 ml-1" />
+            </div>
+          ) : bothFilled ? (
+            <>
+              <p className="text-[9px] text-orange-500/70 font-bold uppercase tracking-widest text-center mb-2">
+                🔥 Marcador del partido
+              </p>
+              <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600 text-[9px] font-bold uppercase truncate max-w-[40px]">
+                    {leftTeam?.code ?? "LOC"}
+                  </span>
+                  <input
+                    type="number" min={0} max={30}
+                    value={pendingBracketScore?.home ?? ""}
+                    onChange={e => onPickBracketScore("home", Math.max(0, Math.min(30, parseInt(e.target.value) || 0)))}
+                    placeholder="0"
+                    className="w-11 h-9 rounded-lg bg-[#1a1a1a] border border-[#333] text-white text-center font-black text-base focus:outline-none focus:border-orange-500/70 transition-colors"
+                  />
+                </div>
+                <span className="text-gray-700 font-black text-sm">—</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" min={0} max={30}
+                    value={pendingBracketScore?.away ?? ""}
+                    onChange={e => onPickBracketScore("away", Math.max(0, Math.min(30, parseInt(e.target.value) || 0)))}
+                    placeholder="0"
+                    className="w-11 h-9 rounded-lg bg-[#1a1a1a] border border-[#333] text-white text-center font-black text-base focus:outline-none focus:border-orange-500/70 transition-colors"
+                  />
+                  <span className="text-gray-600 text-[9px] font-bold uppercase truncate max-w-[40px]">
+                    {rightTeam?.code ?? "VIS"}
+                  </span>
+                </div>
+              </div>
+              {hasPendingScore && (
+                <p className={`text-center text-[9px] font-bold mt-1.5 ${
+                  pendingBracketScore!.home! > pendingBracketScore!.away! ? "text-red-400/80" :
+                  pendingBracketScore!.away! > pendingBracketScore!.home! ? "text-blue-400/80" :
+                  "text-amber-500/80"
+                }`}>
+                  → {pendingBracketScore!.home! > pendingBracketScore!.away!
+                    ? `Gana ${leftTeam?.code ?? "local"}`
+                    : pendingBracketScore!.away! > pendingBracketScore!.home!
+                    ? `Gana ${rightTeam?.code ?? "visita"}`
+                    : "Empate (sin penales)"}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-[9px] text-gray-800 text-center py-0.5">Elegí los equipos para ingresar el marcador</p>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }

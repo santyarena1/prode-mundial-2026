@@ -7,6 +7,8 @@ const bracketPredictionSchema = z.object({
   phase: z.string().min(1),
   matchSlot: z.string().min(1),
   predictedTeamId: z.string().optional(),
+  predictedHomeScore: z.number().int().min(0).max(30).optional(),
+  predictedAwayScore: z.number().int().min(0).max(30).optional(),
 });
 
 export async function GET() {
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Validation error", details: parsed.error.issues }, { status: 400 });
     }
 
-    const { phase, matchSlot, predictedTeamId } = parsed.data;
+    const { phase, matchSlot, predictedTeamId, predictedHomeScore, predictedAwayScore } = parsed.data;
 
     // Check if locked
     const existing = await prisma.bracketPrediction.findUnique({
@@ -52,10 +54,13 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date();
+    const scoreFields = predictedHomeScore !== undefined && predictedAwayScore !== undefined
+      ? { predictedHomeScore, predictedAwayScore }
+      : {};
     const prediction = await prisma.bracketPrediction.upsert({
       where: { userId_phase_matchSlot: { userId: auth.userId, phase, matchSlot } },
-      update: { predictedTeamId, isLocked: true, lockedAt: now },
-      create: { userId: auth.userId, phase, matchSlot, predictedTeamId, isLocked: true, lockedAt: now },
+      update: { predictedTeamId, ...scoreFields, isLocked: true, lockedAt: now },
+      create: { userId: auth.userId, phase, matchSlot, predictedTeamId, ...scoreFields, isLocked: true, lockedAt: now },
     });
 
     return NextResponse.json({ prediction });

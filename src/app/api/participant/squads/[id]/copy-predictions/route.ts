@@ -63,8 +63,17 @@ export async function POST(
       .map((bp) =>
         prisma.squadBracketPrediction.upsert({
           where: { memberId_phase_matchSlot: { memberId: member.id, phase: bp.phase, matchSlot: bp.matchSlot } },
-          create: { memberId: member.id, phase: bp.phase, matchSlot: bp.matchSlot, predictedTeamId: bp.predictedTeamId! },
-          update: { predictedTeamId: bp.predictedTeamId! },
+          create: {
+            memberId: member.id, phase: bp.phase, matchSlot: bp.matchSlot,
+            predictedTeamId: bp.predictedTeamId!,
+            predictedHomeScore: bp.predictedHomeScore ?? null,
+            predictedAwayScore: bp.predictedAwayScore ?? null,
+          },
+          update: {
+            predictedTeamId: bp.predictedTeamId!,
+            predictedHomeScore: bp.predictedHomeScore ?? null,
+            predictedAwayScore: bp.predictedAwayScore ?? null,
+          },
         })
       ),
   ]);

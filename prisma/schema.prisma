@@ -177,16 +177,18 @@ model GroupPrediction {
 }
 
 model BracketPrediction {
-  id              String    @id @default(cuid())
-  userId          String
-  phase           String
-  matchSlot       String
-  predictedTeamId String?
-  pointsEarned    Int       @default(0)
-  isLocked        Boolean   @default(false)
-  lockedAt        DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  userId             String
+  phase              String
+  matchSlot          String
+  predictedTeamId    String?
+  predictedHomeScore Int?
+  predictedAwayScore Int?
+  pointsEarned       Int       @default(0)
+  isLocked           Boolean   @default(false)
+  lockedAt           DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   user          User  @relation(fields: [userId], references: [id])
   predictedTeam Team? @relation(fields: [predictedTeamId], references: [id])
@@ -602,15 +604,17 @@ model SquadGroupPrediction {
 }
 
 model SquadBracketPrediction {
-  id              String   @id @default(cuid())
-  memberId        String
-  phase           String
-  matchSlot       String
-  predictedTeamId String?
-  pointsEarned    Int      @default(0)
-  isLocked        Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  memberId           String
+  phase              String
+  matchSlot          String
+  predictedTeamId    String?
+  predictedHomeScore Int?
+  predictedAwayScore Int?
+  pointsEarned       Int      @default(0)
+  isLocked           Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   member        SquadMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
   predictedTeam Team?       @relation(fields: [predictedTeamId], references: [id])
