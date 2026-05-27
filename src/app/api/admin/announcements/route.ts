@@ -70,12 +70,13 @@ export async function GET(request: NextRequest) {
 
 const schema = z.object({
   subject: z.string().min(1).max(200),
-  message: z.string().min(1).max(5000),
+  message: z.string().min(1),
   ctaUrl: z.string().url().optional().or(z.literal("")),
   ctaLabel: z.string().max(60).optional(),
   filterType: z.enum(["all", "prize", "bonus", "individual"]).default("all"),
   filterId: z.string().optional(),
   userIds: z.array(z.string()).optional(),
+  rawHtml: z.boolean().optional().default(false),
 });
 
 export async function POST(request: NextRequest) {
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Validation error", details: parsed.error.issues }, { status: 400 });
     }
 
-    const { subject, message, ctaUrl, ctaLabel, filterType, filterId, userIds } = parsed.data;
+    const { subject, message, ctaUrl, ctaLabel, filterType, filterId, userIds, rawHtml } = parsed.data;
 
     const users = await resolveUsers(filterType, filterId ?? null, userIds ?? []);
 
@@ -103,6 +104,7 @@ export async function POST(request: NextRequest) {
       message,
       ctaUrl: ctaUrl || undefined,
       ctaLabel: ctaLabel || undefined,
+      rawHtml,
     });
 
     return NextResponse.json({ ...result, total: users.length });

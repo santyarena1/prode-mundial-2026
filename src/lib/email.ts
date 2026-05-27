@@ -391,8 +391,9 @@ export async function sendAnnouncement(params: {
   message: string;
   ctaUrl?: string;
   ctaLabel?: string;
+  rawHtml?: boolean;
 }): Promise<{ sent: number; failed: number }> {
-  const { users, subject, message, ctaUrl, ctaLabel } = params;
+  const { users, subject, message, ctaUrl, ctaLabel, rawHtml } = params;
   let sent = 0;
   let failed = 0;
 
@@ -404,7 +405,9 @@ export async function sendAnnouncement(params: {
       from: RESEND_FROM,
       to: u.email,
       subject,
-      html: buildAnnouncementHtml({ subject, message, ctaUrl, ctaLabel, userId: u.id, firstName: u.firstName }),
+      html: rawHtml
+        ? message
+        : buildAnnouncementHtml({ subject, message, ctaUrl, ctaLabel, userId: u.id, firstName: u.firstName }),
     }));
 
     try {

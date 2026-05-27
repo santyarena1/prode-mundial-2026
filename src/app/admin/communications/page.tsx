@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import toast from "react-hot-toast";
-import { Send, Users, Link as LinkIcon, AlertTriangle, Search, X, ChevronDown } from "lucide-react";
+import { Send, Users, Link as LinkIcon, AlertTriangle, Search, X, ChevronDown, Code2, AlignLeft } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -44,6 +44,7 @@ export default function CommunicationsPage() {
   const [message, setMessage] = useState("");
   const [ctaUrl, setCtaUrl] = useState("");
   const [ctaLabel, setCtaLabel] = useState("");
+  const [rawHtml, setRawHtml] = useState(false);
   const [sending, setSending] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -85,9 +86,10 @@ export default function CommunicationsPage() {
       const body: Record<string, unknown> = {
         subject,
         message,
-        ctaUrl: ctaUrl || undefined,
-        ctaLabel: ctaLabel || undefined,
+        ctaUrl: rawHtml ? undefined : ctaUrl || undefined,
+        ctaLabel: rawHtml ? undefined : ctaLabel || undefined,
         filterType: audienceType,
+        rawHtml,
       };
       if (audienceType === "prize") body.filterId = selectedPrizeId;
       if (audienceType === "bonus") body.filterId = selectedBonusId;
@@ -295,40 +297,81 @@ export default function CommunicationsPage() {
           <div className="text-right text-xs text-gray-600">{subject.length}/200</div>
         </div>
 
-        <div className="space-y-1">
-          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Mensaje *</label>
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Escribí el cuerpo del email. Podés usar saltos de línea."
-            maxLength={5000}
-            rows={8}
-            className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-red-500/50 resize-none"
-          />
-          <div className="text-right text-xs text-gray-600">{message.length}/5000</div>
+        {/* Mode toggle */}
+        <div className="flex items-center gap-2 p-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg w-fit">
+          <button
+            onClick={() => { setRawHtml(false); setMessage(""); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+              !rawHtml ? "bg-red-600 text-white" : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            <AlignLeft className="w-3.5 h-3.5" />
+            Con plantilla
+          </button>
+          <button
+            onClick={() => { setRawHtml(true); setMessage(""); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+              rawHtml ? "bg-red-600 text-white" : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            <Code2 className="w-3.5 h-3.5" />
+            HTML libre
+          </button>
         </div>
 
-        <div className="border border-[#2a2a2a] rounded-lg p-4 space-y-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            <LinkIcon className="w-3.5 h-3.5" />
-            Botón de acción (opcional)
+        {rawHtml ? (
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              HTML del email *
+            </label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder={"<!DOCTYPE html>\n<html>\n<body>\n  ...\n</body>\n</html>"}
+              rows={16}
+              spellCheck={false}
+              className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg px-4 py-3 text-green-400 text-xs font-mono placeholder-gray-700 focus:outline-none focus:border-red-500/50 resize-y"
+            />
+            <p className="text-xs text-gray-600">El HTML se envía tal cual, sin ninguna plantilla alrededor.</p>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+        ) : (
+          <>
             <div className="space-y-1">
-              <label className="text-xs text-gray-500">URL</label>
-              <Input value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} placeholder="https://..." />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-gray-500">Texto del botón</label>
-              <Input
-                value={ctaLabel}
-                onChange={(e) => setCtaLabel(e.target.value)}
-                placeholder="Ver mis predicciones"
-                maxLength={60}
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Mensaje *</label>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Escribí el cuerpo del email. Podés usar saltos de línea."
+                maxLength={5000}
+                rows={8}
+                className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-red-500/50 resize-none"
               />
+              <div className="text-right text-xs text-gray-600">{message.length}/5000</div>
             </div>
-          </div>
-        </div>
+
+            <div className="border border-[#2a2a2a] rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <LinkIcon className="w-3.5 h-3.5" />
+                Botón de acción (opcional)
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-500">URL</label>
+                  <Input value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} placeholder="https://..." />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-500">Texto del botón</label>
+                  <Input
+                    value={ctaLabel}
+                    onChange={(e) => setCtaLabel(e.target.value)}
+                    placeholder="Ver mis predicciones"
+                    maxLength={60}
+                  />
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         <Button
           onClick={() => setShowConfirm(true)}
