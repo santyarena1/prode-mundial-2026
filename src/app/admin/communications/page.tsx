@@ -1,14 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import toast from "react-hot-toast";
-import { Send, Users, Link as LinkIcon, AlertTriangle } from "lucide-react";
+import { Send, Users, Link as LinkIcon, AlertTriangle, Search, X, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { apiFetch } from "@/lib/api";
 
+type AudienceType = "all" | "prize" | "bonus" | "individual";
+
+interface Prize {
+  id: string;
+  name: string;
+}
+
+interface BonusAction {
+  id: string;
+  name: string;
+}
+
+interface Participant {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
 export default function CommunicationsPage() {
+  // Audience state
+  const [audienceType, setAudienceType] = useState<AudienceType>("all");
+  const [prizes, setPrizes] = useState<Prize[]>([]);
+  const [bonusActions, setBonusActions] = useState<BonusAction[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [selectedPrizeId, setSelectedPrizeId] = useState("");
+  const [selectedBonusId, setSelectedBonusId] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [userSearch, setUserSearch] = useState("");
+
+  // Email state
   const [recipientCount, setRecipientCount] = useState<number | null>(null);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -17,20 +47,57 @@ export default function CommunicationsPage() {
   const [sending, setSending] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  // Load options once
   useEffect(() => {
-    apiFetch("/api/admin/announcements")
+    apiFetch("/api/admin/prizes").then((r) => r.json()).then((d) => setPrizes(d.prizes ?? []));
+    apiFetch("/api/admin/bonus-actions").then((r) => r.json()).then((d) => setBonusActions(d.bonusActions ?? []));
+    apiFetch("/api/admin/participants").then((r) => r.json()).then((d) => setParticipants(d.users ?? []));
+  }, []);
+
+  // Recount recipients when filter changes
+  const fetchCount = useCallback(() => {
+    setRecipientCount(null);
+    const params = new URLSearchParams({ filterType: audienceType });
+    if (audienceType === "prize" && selectedPrizeId) params.set("filterId", selectedPrizeId);
+    if (audienceType === "bonus" && selectedBonusId) params.set("filterId", selectedBonusId);
+    if (audienceType === "individual" && selectedUserIds.length > 0)
+      params.set("userIds", selectedUserIds.join(","));
+
+    apiFetch(`/api/admin/announcements?${params}`)
       .then((r) => r.json())
       .then((d) => setRecipientCount(d.recipientCount ?? 0));
-  }, []);
+  }, [audienceType, selectedPrizeId, selectedBonusId, selectedUserIds]);
+
+  useEffect(() => {
+    if (audienceType === "prize" && !selectedPrizeId) return;
+    if (audienceType === "bonus" && !selectedBonusId) return;
+    if (audienceType === "individual" && selectedUserIds.length === 0) {
+      setRecipientCount(0);
+      return;
+    }
+    fetchCount();
+  }, [audienceType, selectedPrizeId, selectedBonusId, selectedUserIds, fetchCount]);
 
   const handleSend = async () => {
     setShowConfirm(false);
     setSending(true);
     try {
+      const body: Record<string, unknown> = {
+        subject,
+        message,
+        ctaUrl: ctaUrl || undefined,
+        ctaLabel: ctaLabel || undefined,
+        filterType: audienceType,
+      };
+      if (audienceType === "prize") body.filterId = selectedPrizeId;
+      if (audienceType === "bonus") body.filterId = selectedBonusId;
+      if (audienceType === "individual") body.userIds = selectedUserIds;
+
       const res = await apiFetch("/api/admin/announcements", {
         method: "POST",
-        body: JSON.stringify({ subject, message, ctaUrl: ctaUrl || undefined, ctaLabel: ctaLabel || undefined }),
+        body: JSON.stringify(body),
       }).then((r) => r.json());
+
       toast.success(`✅ Enviado a ${res.sent} participantes${res.failed > 0 ? ` (${res.failed} fallaron)` : ""}`);
       setSubject("");
       setMessage("");
@@ -43,30 +110,179 @@ export default function CommunicationsPage() {
     }
   };
 
-  const canSend = subject.trim().length > 0 && message.trim().length > 0;
+  const toggleUser = (id: string) =>
+    setSelectedUserIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const filteredParticipants = participants.filter((p) => {
+    const q = userSearch.toLowerCase();
+    return (
+      p.firstName.toLowerCase().includes(q) ||
+      p.lastName.toLowerCase().includes(q) ||
+      p.email.toLowerCase().includes(q)
+    );
+  });
+
+  const canSend =
+    subject.trim().length > 0 &&
+    message.trim().length > 0 &&
+    (audienceType !== "prize" || !!selectedPrizeId) &&
+    (audienceType !== "bonus" || !!selectedBonusId) &&
+    (audienceType !== "individual" || selectedUserIds.length > 0) &&
+    (recipientCount ?? 0) > 0;
+
+  const audienceLabel =
+    audienceType === "all"
+      ? "Todos los participantes"
+      : audienceType === "prize"
+      ? prizes.find((p) => p.id === selectedPrizeId)?.name ?? "Premio seleccionado"
+      : audienceType === "bonus"
+      ? bonusActions.find((b) => b.id === selectedBonusId)?.name ?? "Bonus seleccionado"
+      : `${selectedUserIds.length} usuario${selectedUserIds.length !== 1 ? "s" : ""} seleccionado${selectedUserIds.length !== 1 ? "s" : ""}`;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      {/* Header */}
       <div>
         <h2 className="text-xl font-bold text-white">Comunicaciones</h2>
-        <p className="text-sm text-gray-500 mt-1">Enviá un email a todos los participantes registrados</p>
+        <p className="text-sm text-gray-500 mt-1">Enviá un email masivo o segmentado a participantes</p>
       </div>
 
-      {/* Recipient count */}
-      <Card className="p-4 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-blue-600/15 border border-blue-600/20 flex items-center justify-center">
-          <Users className="w-5 h-5 text-blue-400" />
+      {/* Audience selector */}
+      <Card className="p-5 space-y-4">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Audiencia</p>
+
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {(["all", "prize", "bonus", "individual"] as AudienceType[]).map((type) => (
+            <button
+              key={type}
+              onClick={() => {
+                setAudienceType(type);
+                setSelectedPrizeId("");
+                setSelectedBonusId("");
+                setSelectedUserIds([]);
+                setUserSearch("");
+              }}
+              className={`py-2 px-3 rounded-lg text-xs font-semibold border transition-colors ${
+                audienceType === type
+                  ? "bg-red-600 border-red-600 text-white"
+                  : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-400 hover:border-gray-500"
+              }`}
+            >
+              {type === "all" && "Todos"}
+              {type === "prize" && "Por premio"}
+              {type === "bonus" && "Por bonus"}
+              {type === "individual" && "Individual"}
+            </button>
+          ))}
         </div>
-        <div>
-          <div className="text-white font-bold text-lg">
-            {recipientCount === null ? "..." : recipientCount.toLocaleString()}
+
+        {/* Prize selector */}
+        {audienceType === "prize" && (
+          <div className="relative">
+            <select
+              value={selectedPrizeId}
+              onChange={(e) => setSelectedPrizeId(e.target.value)}
+              className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-red-500/50 appearance-none"
+            >
+              <option value="">Seleccioná un premio...</option>
+              {prizes.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-3.5 w-4 h-4 text-gray-500 pointer-events-none" />
           </div>
-          <div className="text-xs text-gray-500">destinatarios activos (sin desuscriptos ni bloqueados)</div>
+        )}
+
+        {/* Bonus selector */}
+        {audienceType === "bonus" && (
+          <div className="relative">
+            <select
+              value={selectedBonusId}
+              onChange={(e) => setSelectedBonusId(e.target.value)}
+              className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-red-500/50 appearance-none"
+            >
+              <option value="">Seleccioná un bonus...</option>
+              {bonusActions.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-3.5 w-4 h-4 text-gray-500 pointer-events-none" />
+          </div>
+        )}
+
+        {/* Individual user picker */}
+        {audienceType === "individual" && (
+          <div className="space-y-3">
+            {selectedUserIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {selectedUserIds.map((id) => {
+                  const u = participants.find((p) => p.id === id);
+                  return (
+                    <span
+                      key={id}
+                      className="flex items-center gap-1 bg-red-600/20 border border-red-600/30 text-red-400 text-xs px-2 py-1 rounded-full"
+                    >
+                      {u ? `${u.firstName} ${u.lastName}` : id}
+                      <button onClick={() => toggleUser(id)}>
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
+              <input
+                type="text"
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                placeholder="Buscar por nombre o email..."
+                className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg pl-9 pr-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-red-500/50"
+              />
+            </div>
+            <div className="max-h-48 overflow-y-auto rounded-lg border border-[#2a2a2a] divide-y divide-[#1e1e1e]">
+              {filteredParticipants.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-4">Sin resultados</p>
+              ) : (
+                filteredParticipants.map((p) => (
+                  <label
+                    key={p.id}
+                    className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-white/5 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedUserIds.includes(p.id)}
+                      onChange={() => toggleUser(p.id)}
+                      className="accent-red-600"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm text-white font-medium truncate">
+                        {p.firstName} {p.lastName}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">{p.email}</p>
+                    </div>
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Recipient count */}
+        <div className="flex items-center gap-3 bg-[#1a1a1a] rounded-lg px-4 py-3 border border-[#2a2a2a]">
+          <Users className="w-4 h-4 text-blue-400 shrink-0" />
+          <div>
+            <span className="text-white font-bold">
+              {recipientCount === null ? "..." : recipientCount.toLocaleString()}
+            </span>
+            <span className="text-gray-500 text-sm ml-1.5">
+              destinatario{recipientCount !== 1 ? "s" : ""} · {audienceLabel}
+            </span>
+          </div>
         </div>
       </Card>
 
-      {/* Form */}
+      {/* Email form */}
       <Card className="p-6 space-y-5">
         <div className="space-y-1">
           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Asunto *</label>
@@ -92,7 +308,6 @@ export default function CommunicationsPage() {
           <div className="text-right text-xs text-gray-600">{message.length}/5000</div>
         </div>
 
-        {/* Optional CTA */}
         <div className="border border-[#2a2a2a] rounded-lg p-4 space-y-3">
           <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
             <LinkIcon className="w-3.5 h-3.5" />
@@ -101,11 +316,7 @@ export default function CommunicationsPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-xs text-gray-500">URL</label>
-              <Input
-                value={ctaUrl}
-                onChange={(e) => setCtaUrl(e.target.value)}
-                placeholder="https://..."
-              />
+              <Input value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} placeholder="https://..." />
             </div>
             <div className="space-y-1">
               <label className="text-xs text-gray-500">Texto del botón</label>
@@ -121,11 +332,11 @@ export default function CommunicationsPage() {
 
         <Button
           onClick={() => setShowConfirm(true)}
-          disabled={!canSend || sending || recipientCount === 0}
+          disabled={!canSend || sending}
           className="w-full"
         >
           <Send className="w-4 h-4 mr-2" />
-          {sending ? "Enviando..." : `Enviar a ${recipientCount ?? "..."} participantes`}
+          {sending ? "Enviando..." : `Enviar a ${recipientCount ?? "..."} destinatarios`}
         </Button>
       </Card>
 
@@ -138,14 +349,13 @@ export default function CommunicationsPage() {
               <div>
                 <p className="text-white font-bold">Confirmar envío</p>
                 <p className="text-sm text-gray-400 mt-1">
-                  Se enviará un email a <strong className="text-white">{recipientCount}</strong> participantes.
+                  Se enviará un email a{" "}
+                  <strong className="text-white">{recipientCount}</strong> {audienceLabel.toLowerCase()}.
                   Esta acción no se puede deshacer.
                 </p>
               </div>
             </div>
-            <p className="text-sm text-gray-300 bg-[#1a1a1a] rounded-lg p-3 font-medium">
-              "{subject}"
-            </p>
+            <p className="text-sm text-gray-300 bg-[#1a1a1a] rounded-lg p-3 font-medium">"{subject}"</p>
             <div className="flex gap-3">
               <Button variant="secondary" className="flex-1" onClick={() => setShowConfirm(false)}>
                 Cancelar

@@ -357,7 +357,7 @@ export async function sendWelcomeEmail(user: {
 // ─── Announcements via Resend ──────────────────────────────────────────────────
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const RESEND_FROM = process.env.RESEND_FROM || "Prode Mundial Gamer <no-reply@thegamershop.com.ar>";
+const RESEND_FROM = process.env.RESEND_FROM || "Prode Mundial Gamer <no-reply@thegamershop-premios.com>";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://prode-mundial-2026-ten-blue.vercel.app";
 
 export function generateUnsubscribeToken(userId: string): string {

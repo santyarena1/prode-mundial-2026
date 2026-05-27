@@ -4,28 +4,79 @@ import prisma from "@/lib/db";
 import { getAdminFromCookies } from "@/lib/cookies";
 import { sendAnnouncement } from "@/lib/email";
 
-const schema = z.object({
-  subject: z.string().min(1).max(200),
-  message: z.string().min(1).max(5000),
-  ctaUrl: z.string().url().optional().or(z.literal("")),
-  ctaLabel: z.string().max(60).optional(),
-});
+const BASE_WHERE = { emailUnsubscribed: false, isBlocked: false };
 
-export async function GET() {
+async function resolveUsers(
+  filterType: string,
+  filterId: string | null,
+  userIds: string[]
+): Promise<Array<{ id: string; email: string; firstName: string }>> {
+  if (filterType === "prize" && filterId) {
+    const redemptions = await prisma.prizeRedemption.findMany({
+      where: { prizeId: filterId },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
+    const ids = redemptions.map((r) => r.userId);
+    return prisma.user.findMany({
+      where: { ...BASE_WHERE, id: { in: ids } },
+      select: { id: true, email: true, firstName: true },
+    });
+  }
+
+  if (filterType === "bonus" && filterId) {
+    const bonuses = await prisma.userBonus.findMany({
+      where: { bonusActionId: filterId, status: "approved" },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
+    const ids = bonuses.map((b) => b.userId);
+    return prisma.user.findMany({
+      where: { ...BASE_WHERE, id: { in: ids } },
+      select: { id: true, email: true, firstName: true },
+    });
+  }
+
+  if (filterType === "individual" && userIds.length > 0) {
+    return prisma.user.findMany({
+      where: { ...BASE_WHERE, id: { in: userIds } },
+      select: { id: true, email: true, firstName: true },
+    });
+  }
+
+  return prisma.user.findMany({
+    where: BASE_WHERE,
+    select: { id: true, email: true, firstName: true },
+  });
+}
+
+export async function GET(request: NextRequest) {
   try {
     const auth = await getAdminFromCookies();
     if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const count = await prisma.user.count({
-      where: { emailUnsubscribed: false, isBlocked: false },
-    });
+    const { searchParams } = new URL(request.url);
+    const filterType = searchParams.get("filterType") || "all";
+    const filterId = searchParams.get("filterId");
+    const userIds = searchParams.get("userIds")?.split(",").filter(Boolean) ?? [];
 
-    return NextResponse.json({ recipientCount: count });
+    const users = await resolveUsers(filterType, filterId, userIds);
+    return NextResponse.json({ recipientCount: users.length });
   } catch (error) {
     console.error("Announcements GET error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+const schema = z.object({
+  subject: z.string().min(1).max(200),
+  message: z.string().min(1).max(5000),
+  ctaUrl: z.string().url().optional().or(z.literal("")),
+  ctaLabel: z.string().max(60).optional(),
+  filterType: z.enum(["all", "prize", "bonus", "individual"]).default("all"),
+  filterId: z.string().optional(),
+  userIds: z.array(z.string()).optional(),
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,12 +89,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Validation error", details: parsed.error.issues }, { status: 400 });
     }
 
-    const { subject, message, ctaUrl, ctaLabel } = parsed.data;
+    const { subject, message, ctaUrl, ctaLabel, filterType, filterId, userIds } = parsed.data;
 
-    const users = await prisma.user.findMany({
-      where: { emailUnsubscribed: false, isBlocked: false },
-      select: { id: true, email: true, firstName: true },
-    });
+    const users = await resolveUsers(filterType, filterId ?? null, userIds ?? []);
 
     if (users.length === 0) {
       return NextResponse.json({ sent: 0, failed: 0, message: "No recipients" });
