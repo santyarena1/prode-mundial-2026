@@ -43,17 +43,6 @@ export async function POST(request: NextRequest) {
     const group = await prisma.worldCupGroup.findUnique({ where: { id: groupId } });
     if (!group) return NextResponse.json({ error: "Grupo no encontrado" }, { status: 404 });
 
-    // Check if locked
-    const existing = await prisma.groupPrediction.findUnique({
-      where: { userId_groupId: { userId: auth.userId, groupId } },
-    });
-    if (existing?.isLocked) {
-      return NextResponse.json({
-        error: "Tu predicción de grupo ya está bloqueada. Canjeá un cambio de predicción para modificarla.",
-        locked: true,
-      }, { status: 403 });
-    }
-
     const now = new Date();
     const prediction = await prisma.groupPrediction.upsert({
       where: { userId_groupId: { userId: auth.userId, groupId } },

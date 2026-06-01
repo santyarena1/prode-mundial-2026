@@ -17,7 +17,7 @@ import { apiFetch } from "@/lib/api";
 
 const PREDICTIONS_TOUR = [
   { icon: "⚽", title: "Predecí los partidos", desc: "En la pestaña 'Partidos' elegís el resultado de cada partido de la fase de grupos: local, visitante o empate. Tenés hasta que el partido empiece." },
-  { icon: "🏅", title: "Posiciones de grupos", desc: "En 'Grupos' predecís qué equipos salen 1°, 2° y 3° en cada uno de los 12 grupos del Mundial 2026. ¡Más difícil, más puntos!" },
+  { icon: "🏅", title: "Tabla proyectada", desc: "En 'Grupos' ves la tabla de posiciones que se arma automáticamente en base a tus predicciones de partidos. ¡No hace falta elegirlas manualmente!" },
   { icon: "🏆", title: "Eliminatorias y campeón", desc: "En 'Eliminatorias' predecís quién avanza ronda a ronda hasta el campeón. Estas predicciones se bloquean cuando arranca el torneo." },
   { icon: "🔥", title: "Modo Hardcore", desc: "Activando Hardcore tenés que acertar el marcador exacto de cada partido. Si acertás, ganás puntos extra además de los normales." },
   { icon: "💾", title: "Guardá tus predicciones", desc: "El botón de guardar aparece cuando tenés cambios pendientes. No te olvides de guardar antes de salir, ¡o perdés tus selecciones!" },
@@ -81,11 +81,10 @@ export default function PredictionsPage() {
   const [allTeams, setAllTeams] = useState<Team[]>([]);
 
   const [savedPreds, setSavedPreds] = useState<Record<string, Outcome>>({});
-  const [savedGroupPreds, setSavedGroupPreds] = useState<Record<string, { first?: string; second?: string }>>({});
+  const [savedGroupPreds, setSavedGroupPreds] = useState<Record<string, { first?: string; second?: string; third?: string }>>({});
   const [savedBracket, setSavedBracket] = useState<Record<string, string>>({});
 
   const [pendingPreds, setPendingPreds] = useState<Record<string, Outcome>>({});
-  const [pendingGroupPreds, setPendingGroupPreds] = useState<Record<string, { first?: string; second?: string }>>({});
   const [pendingBracket, setPendingBracket] = useState<Record<string, string>>({});
 
   const [savingGroup, setSavingGroup] = useState<Record<string, boolean>>({});
@@ -97,8 +96,10 @@ export default function PredictionsPage() {
 
   const [changeCost, setChangeCost] = useState(800);
   const [availablePoints, setAvailablePoints] = useState(0);
+  const [changesRemaining, setChangesRemaining] = useState(0);
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [buyingChange, setBuyingChange] = useState(false);
+  const [usingChange, setUsingChange] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showPointsModal, setShowPointsModal] = useState(false);
 
@@ -130,9 +131,9 @@ export default function PredictionsPage() {
         apiFetch("/api/participant/prediction-change"),
       ]);
 
-      let sp: Record<string, Outcome> = {};
-      let sg: Record<string, { first?: string; second?: string }> = {};
-      let sb: Record<string, string> = {};
+      const sp: Record<string, Outcome> = {};
+      const sg: Record<string, { first?: string; second?: string; third?: string }> = {};
+      const sb: Record<string, string> = {};
 
       if (groupsRes.ok) {
         const data = await groupsRes.json();
@@ -164,7 +165,7 @@ export default function PredictionsPage() {
       if (groupPredRes.ok) {
         const data = await groupPredRes.json();
         for (const p of data.groupPredictions || [])
-          if (p.isLocked) sg[p.groupId] = { first: p.firstTeamId || undefined, second: p.secondTeamId || undefined };
+          sg[p.groupId] = { first: p.firstTeamId || undefined, second: p.secondTeamId || undefined, third: p.thirdTeamId || undefined };
         setSavedGroupPreds(sg);
       }
 
@@ -187,10 +188,11 @@ export default function PredictionsPage() {
         const data = await changeRes.json();
         setChangeCost(data.cost);
         setAvailablePoints(data.available);
+        setChangesRemaining(data.changesRemaining ?? 0);
       }
 
-      const hasSeenOnboarding = typeof window !== "undefined" && sessionStorage.getItem("pred_onboarding_seen");
-      const hasSeenHardcoreSpotlight = typeof window !== "undefined" && sessionStorage.getItem("hardcore_spotlight_seen");
+      const hasSeenOnboarding = typeof window !== "undefined" && localStorage.getItem("pred_onboarding_seen");
+      const hasSeenHardcoreSpotlight = typeof window !== "undefined" && localStorage.getItem("hardcore_spotlight_seen");
       const missingAny =
         Object.keys(sp).length === 0 ||
         Object.keys(sg).length === 0 ||
@@ -242,6 +244,8 @@ export default function PredictionsPage() {
   const handleSaveGroupMatches = useCallback(async (groupId: string, matches: Match[]) => {
     setSavingGroup(prev => ({ ...prev, [groupId]: true }));
     let ok = 0;
+    let derived: { firstTeamId: string | null; secondTeamId: string | null; thirdTeamId: string | null } | null = null;
+
     for (const match of matches) {
       if (savedPreds[match.id]) continue;
       if (!isMatchPredictionWindowOpen(match.startDate)) continue;
@@ -255,11 +259,13 @@ export default function PredictionsPage() {
             body: JSON.stringify({ matchId: match.id, predictedHomeScore: score.home, predictedAwayScore: score.away }),
           });
           if (res.ok) {
+            const data = await res.json();
             const outcome = score.home > score.away ? "home" : score.away > score.home ? "away" : "draw";
             setSavedPreds(prev => ({ ...prev, [match.id]: outcome as Outcome }));
             setSavedScores(prev => ({ ...prev, [match.id]: { home: score.home!, away: score.away! } }));
             setPendingScores(prev => { const n = { ...prev }; delete n[match.id]; return n; });
             ok++;
+            if (data.derivedGroup) derived = data.derivedGroup;
           } else { const d = await res.json(); toast.error(d.error || "Error"); }
         } catch { toast.error("Error de conexión"); }
       } else {
@@ -271,48 +277,31 @@ export default function PredictionsPage() {
             body: JSON.stringify({ matchId: match.id, predictedOutcome: outcome }),
           });
           if (res.ok) {
+            const data = await res.json();
             setSavedPreds(prev => ({ ...prev, [match.id]: outcome }));
             setPendingPreds(prev => { const n = { ...prev }; delete n[match.id]; return n; });
             ok++;
+            if (data.derivedGroup) derived = data.derivedGroup;
           } else { const d = await res.json(); toast.error(d.error || "Error"); }
         } catch { toast.error("Error de conexión"); }
       }
     }
     if (ok > 0) {
       toast.success(`${ok} predicción${ok > 1 ? "es" : ""} confirmada${ok > 1 ? "s" : ""} ✓`);
+      if (derived) {
+        setSavedGroupPreds(prev => ({
+          ...prev,
+          [groupId]: {
+            first:  derived!.firstTeamId  ?? undefined,
+            second: derived!.secondTeamId ?? undefined,
+            third:  derived!.thirdTeamId  ?? undefined,
+          },
+        }));
+      }
     }
     setSavingGroup(prev => ({ ...prev, [groupId]: false }));
   }, [pendingPreds, pendingScores, savedPreds, hardcoreMode]);
 
-  const handleToggleGroupTeam = useCallback((groupId: string, teamId: string) => {
-    if (savedGroupPreds[groupId]) return;
-    setPendingGroupPreds(prev => {
-      const cur = prev[groupId] || {};
-      if (cur.first === teamId) return { ...prev, [groupId]: { ...cur, first: undefined } };
-      if (cur.second === teamId) return { ...prev, [groupId]: { ...cur, second: undefined } };
-      if (!cur.first) return { ...prev, [groupId]: { ...cur, first: teamId } };
-      return { ...prev, [groupId]: { ...cur, second: teamId } };
-    });
-  }, [savedGroupPreds]);
-
-  const handleSaveGroupClassification = useCallback(async (groupId: string) => {
-    const pending = pendingGroupPreds[groupId];
-    if (!pending?.first || !pending?.second) return;
-    if (savedGroupPreds[groupId]) return;
-    setSavingGroup(prev => ({ ...prev, [`g_${groupId}`]: true }));
-    try {
-      const res = await apiFetch("/api/participant/group-predictions", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groupId, firstTeamId: pending.first, secondTeamId: pending.second }),
-      });
-      if (res.ok) {
-        setSavedGroupPreds(prev => ({ ...prev, [groupId]: pending }));
-        setPendingGroupPreds(prev => { const n = { ...prev }; delete n[groupId]; return n; });
-        toast.success("Clasificados confirmados ✓");
-      } else { const d = await res.json(); toast.error(d.error || "Error"); }
-    } catch { toast.error("Error de conexión"); }
-    finally { setSavingGroup(prev => ({ ...prev, [`g_${groupId}`]: false })); }
-  }, [pendingGroupPreds, savedGroupPreds]);
 
   const handlePickBracket = useCallback((phase: string, slot: string, teamId: string) => {
     const key = `${phase}:${slot}`;
@@ -390,18 +379,44 @@ export default function PredictionsPage() {
       const data = await res.json();
       if (!res.ok) { toast.error(data.error || "Error"); return; }
       toast.success(data.message);
-      setSavedPreds({}); setSavedGroupPreds({}); setSavedBracket({});
       setAvailablePoints(p => p - changeCost);
+      setChangesRemaining(data.changesRemaining ?? 0);
       setShowChangeModal(false);
+      window.dispatchEvent(new CustomEvent("pointsUpdated"));
     } catch { toast.error("Error de conexión"); }
     finally { setBuyingChange(false); }
   }, [changeCost]);
+
+  const handleUseChange = useCallback(async (type: "match" | "group" | "bracket", id: string) => {
+    if (changesRemaining <= 0) { toast.error("No tenés créditos disponibles"); return; }
+    setUsingChange(true);
+    try {
+      const res = await apiFetch("/api/participant/prediction-change/use", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, id }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || "Error"); return; }
+      setChangesRemaining(data.changesRemaining ?? 0);
+      // Unlock in local state
+      if (type === "match") {
+        setSavedPreds(prev => { const n = { ...prev }; delete n[id]; return n; });
+        setSavedScores(prev => { const n = { ...prev }; delete n[id]; return n; });
+      } else if (type === "group") {
+        setSavedGroupPreds(prev => { const n = { ...prev }; delete n[id]; return n; });
+      } else if (type === "bracket") {
+        setSavedBracket(prev => { const n = { ...prev }; delete n[id]; return n; });
+      }
+      toast.success("¡Predicción desbloqueada! Podés modificarla ahora.");
+    } catch { toast.error("Error de conexión"); }
+    finally { setUsingChange(false); }
+  }, [changesRemaining]);
 
   // Unsaved changes detection
   const hasUnsaved =
     Object.keys(pendingPreds).length > 0 ||
     Object.keys(pendingBracket).length > 0 ||
-    Object.values(pendingGroupPreds).some((g) => g.first || g.second) ||
     Object.values(pendingScores).some((s) => s.home !== undefined || s.away !== undefined) ||
     Object.values(pendingBracketScores).some((s) => s.home !== undefined || s.away !== undefined);
 
@@ -458,15 +473,17 @@ export default function PredictionsPage() {
       <Navbar />
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8">
 
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-black uppercase text-white">
-              Mis <span className="text-red-500">Predicciones</span>
-            </h1>
-            <p className="text-gray-500 mt-1">Predecí resultados, clasificados y campeón</p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+        <div className="mb-6">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black uppercase text-white leading-tight">
+                Mis <span className="text-red-500">Predicciones</span>
+              </h1>
+              <p className="text-gray-500 mt-1 text-sm">Predecí resultados, clasificados y campeón</p>
+            </div>
             <GuidedTour steps={PREDICTIONS_TOUR} storageKey="predictions_tour" />
+          </div>
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={handleToggleHardcore}
               disabled={togglingHardcore}
@@ -477,16 +494,14 @@ export default function PredictionsPage() {
               }`}
             >
               <Flame className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{hardcoreMode ? "Hardcore: ON" : "Activar modo hardcore"}</span>
-              <span className="sm:hidden">{hardcoreMode ? "HC: ON" : "Hardcore"}</span>
+              {hardcoreMode ? "Hardcore: ON" : "Modo Hardcore"}
             </button>
             <button
               onClick={() => setShowPointsModal(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 rounded-xl text-yellow-400 text-xs font-bold uppercase tracking-wider transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 rounded-xl text-yellow-400 text-xs font-bold uppercase tracking-wider transition-colors"
             >
               <Zap className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Puntos y logros</span>
-              <span className="sm:hidden">Pts</span>
+              Puntos y logros
             </button>
           </div>
         </div>
@@ -505,22 +520,32 @@ export default function PredictionsPage() {
           </motion.div>
         )}
 
+        {/* Credits banner */}
+        {changesRemaining > 0 && (
+          <div className="mb-3 bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 flex items-center gap-3">
+            <Gift className="w-4 h-4 text-green-400 flex-shrink-0" />
+            <p className="text-green-300 text-sm font-bold flex-1">
+              Tenés <span className="text-green-400">{changesRemaining} crédito{changesRemaining !== 1 ? "s" : ""}</span> para cambiar predicciones
+            </p>
+            <span className="text-green-600 text-xs">Tocá "Cambiar" en cualquier predicción bloqueada</span>
+          </div>
+        )}
+
         {/* Disclaimer */}
         <div className="mb-5 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex gap-3 items-start">
           <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <p className="text-amber-300 text-sm font-bold">⚠️ Una vez confirmada, tu predicción queda bloqueada</p>
             <p className="text-amber-500/80 text-xs mt-1 leading-relaxed">
-              No podrás cambiarla después de confirmar. Para modificarla necesitás canjear un{" "}
-              <span className="text-amber-400 font-semibold">Cambio de predicción ({changeCost} pts)</span>.
+              No podrás cambiarla después de confirmar. Canjear <span className="text-amber-400 font-semibold">{changeCost} pts</span> te da <strong className="text-amber-400">3 créditos</strong> para cambiar predicciones individuales.
             </p>
           </div>
-          {hasAnyLocked && (
+          {hasAnyLocked && changesRemaining === 0 && (
             <button
               onClick={() => setShowChangeModal(true)}
               className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/40 text-amber-400 text-xs font-semibold hover:bg-amber-500/10 transition-colors"
             >
-              <Gift className="w-3.5 h-3.5" /> Cambiar
+              <Gift className="w-3.5 h-3.5" /> Obtener créditos
             </button>
           )}
         </div>
@@ -631,15 +656,18 @@ export default function PredictionsPage() {
                                 savedScore={savedScores[match.id]}
                                 onPick={handlePickMatch}
                                 onPickScore={handlePickScore}
+                                changesRemaining={changesRemaining}
+                                onUseChange={handleUseChange}
+                                usingChange={usingChange}
                               />
                             </motion.div>
                           ))}
                           {pendingCount > 0 && (
-                            <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="pt-1">
-                              <Button variant="primary" size="sm" loading={savingGroup[group.id]}
-                                onClick={() => handleSaveGroupMatches(group.id, group.matches)} className="w-full"
+                            <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="pt-2">
+                              <Button variant="primary" size="lg" loading={savingGroup[group.id]}
+                                onClick={() => handleSaveGroupMatches(group.id, group.matches)} className="w-full text-base font-black py-4"
                                 data-save-predictions>
-                                <Save className="w-4 h-4" />
+                                <Save className="w-5 h-5" />
                                 {`Confirmar ${pendingCount} predicción${pendingCount !== 1 ? "es" : ""} del Grupo ${group.name}`}
                               </Button>
                             </motion.div>
@@ -657,155 +685,136 @@ export default function PredictionsPage() {
         {/* ── GRUPOS ───────────────────────────────────────────────────────── */}
         {activeTab === "groups" && (
           <div className="space-y-4">
-            {/* Points info */}
-            <div className="bg-[#0f1a0f] border border-green-500/20 rounded-xl p-4">
-              <p className="text-green-400 text-xs font-black uppercase tracking-widest mb-3">¿Cuántos puntos ganás?</p>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <div className="flex items-center gap-2 bg-[#111] border border-[#1e1e1e] rounded-lg px-3 py-2">
-                  <span className="text-lg leading-none">✅</span>
-                  <div>
-                    <p className="text-white font-bold text-xs">Equipo clasificado</p>
-                    <p className="text-yellow-400 font-black text-sm">400 pts</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 bg-[#111] border border-[#1e1e1e] rounded-lg px-3 py-2">
-                  <span className="text-lg leading-none">🥇</span>
-                  <div>
-                    <p className="text-white font-bold text-xs">Posición exacta</p>
-                    <p className="text-yellow-400 font-black text-sm">+600 pts</p>
-                  </div>
-                </div>
+            {/* Info banner */}
+            <div className="bg-[#0f1a0f] border border-green-500/20 rounded-xl p-4 flex items-start gap-3">
+              <span className="text-xl leading-none flex-shrink-0">🤖</span>
+              <div>
+                <p className="text-green-400 text-xs font-black uppercase tracking-widest mb-1">Tabla automática</p>
+                <p className="text-gray-400 text-xs leading-relaxed">
+                  Las posiciones de cada grupo se calculan automáticamente en base a tus predicciones de partidos.
+                  Clasifican los 2 primeros de cada grupo (24 equipos) + los 8 mejores terceros.
+                </p>
               </div>
-            </div>
-            <div className="bg-[#161616] border border-[#222] rounded-xl p-4">
-              <p className="text-white text-sm font-bold mb-1">¿Cómo funciona?</p>
-              <p className="text-gray-500 text-xs leading-relaxed">
-                Predecí el <span className="text-yellow-400 font-semibold">1°</span> y <span className="text-gray-200 font-semibold">2°</span> de cada grupo.
-                Necesitás completar todos los grupos para desbloquear la fase eliminatoria.
-                En 2026 hay 12 grupos: clasifican los 2 primeros de cada grupo (24) + los 8 mejores terceros.
-              </p>
             </div>
 
             {groups.map(group => {
-              const saved = savedGroupPreds[group.id];
-              const pending = pendingGroupPreds[group.id] || {};
-              const isLocked = !!saved;
-              const firstId  = isLocked ? saved?.first  : pending.first;
-              const secondId = isLocked ? saved?.second : pending.second;
-              const firstTeam  = group.teams.find(t => t.id === firstId);
-              const secondTeam = group.teams.find(t => t.id === secondId);
-              const hasBothPending = !isLocked && pending.first && pending.second;
+              // Compute implied standings from saved predictions
+              const stats: Record<string, { pts: number; gd: number; gf: number; w: number; d: number; l: number }> = {};
+              for (const t of group.teams) stats[t.id] = { pts: 0, gd: 0, gf: 0, w: 0, d: 0, l: 0 };
+
+              let predictedCount = 0;
+              const groupMatches = group.matches.filter(m => m.phase === "GROUP_STAGE");
+
+              for (const m of groupMatches) {
+                if (!m.homeTeam?.id || !m.awayTeam?.id) continue;
+                const outcome = savedPreds[m.id];
+                if (!outcome) continue;
+                predictedCount++;
+
+                const h = m.homeTeam.id, a = m.awayTeam.id;
+                if (!stats[h]) stats[h] = { pts: 0, gd: 0, gf: 0, w: 0, d: 0, l: 0 };
+                if (!stats[a]) stats[a] = { pts: 0, gd: 0, gf: 0, w: 0, d: 0, l: 0 };
+
+                if (outcome === "home") {
+                  stats[h].pts += 3; stats[h].w++;
+                  stats[a].l++;
+                } else if (outcome === "away") {
+                  stats[a].pts += 3; stats[a].w++;
+                  stats[h].l++;
+                } else {
+                  stats[h].pts += 1; stats[h].d++;
+                  stats[a].pts += 1; stats[a].d++;
+                }
+
+                const score = savedScores[m.id];
+                if (score) {
+                  stats[h].gd += score.home - score.away;
+                  stats[a].gd += score.away - score.home;
+                  stats[h].gf += score.home;
+                  stats[a].gf += score.away;
+                }
+              }
+
+              const sorted = group.teams
+                .map(t => ({ team: t, ...stats[t.id] ?? { pts: 0, gd: 0, gf: 0, w: 0, d: 0, l: 0 } }))
+                .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+
+              const isComplete = predictedCount >= groupMatches.length && groupMatches.length > 0;
+              const rankEmoji = ["🥇", "🥈", "🥉", "4°"];
+              const rankColors = [
+                "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+                "text-gray-300 bg-[#1e1e1e] border-[#333]",
+                "text-amber-700 bg-[#181512] border-[#2a1e0f]",
+                "text-gray-700 bg-[#111] border-[#1a1a1a]",
+              ];
 
               return (
                 <motion.div key={group.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                  className={`rounded-2xl border overflow-hidden ${isLocked ? "border-green-500/20" : "border-[#222]"}`}>
+                  className={`rounded-2xl border overflow-hidden ${isComplete ? "border-green-500/20" : "border-[#222]"}`}>
 
                   {/* Header */}
-                  <div className={`px-5 py-4 flex items-center gap-3 ${isLocked ? "bg-[#0d110d]" : "bg-[#111]"}`}>
-                    <span className="w-9 h-9 rounded-xl bg-red-600 flex items-center justify-center text-white font-black text-sm flex-shrink-0">
+                  <div className={`px-5 py-3.5 flex items-center gap-3 ${isComplete ? "bg-[#0d110d]" : "bg-[#111]"}`}>
+                    <span className="w-8 h-8 rounded-xl bg-red-600 flex items-center justify-center text-white font-black text-sm flex-shrink-0">
                       {group.name}
                     </span>
                     <div>
-                      <h3 className="text-white font-bold">Grupo {group.name}</h3>
-                      <p className="text-gray-600 text-xs">{group.teams.map(t => t.name).join(" · ")}</p>
+                      <h3 className="text-white font-bold text-sm">Grupo {group.name}</h3>
+                      <p className="text-gray-600 text-[11px]">{predictedCount}/{groupMatches.length} partidos predichos</p>
                     </div>
-                    {isLocked && (
+                    {isComplete && (
                       <span className="ml-auto flex items-center gap-1 text-xs text-green-400 font-semibold">
-                        <Lock className="w-3 h-3" /> Confirmado
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Tabla lista
                       </span>
                     )}
                   </div>
 
-                  <div className={`p-4 space-y-4 ${isLocked ? "bg-[#0d110d]" : "bg-[#0f0f0f]"}`}>
-                    {/* Podium slots */}
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { label: "1° Lugar", emoji: "🥇", team: firstTeam, color: "yellow" },
-                        { label: "2° Lugar", emoji: "🥈", team: secondTeam, color: "gray" },
-                      ].map(slot => (
-                        <div key={slot.label} className={`flex flex-col items-center p-3 rounded-xl border gap-1.5 text-center min-h-[110px] justify-center transition-all ${
-                          slot.team
-                            ? slot.color === "yellow" ? "bg-yellow-500/10 border-yellow-500/30"
-                            : "bg-[#1e1e1e] border-gray-500/30"
-                            : "bg-[#161616] border-dashed border-[#262626]"
-                        }`}>
-                          <span className="text-xl leading-none">{slot.emoji}</span>
-                          <p className={`text-[9px] font-black uppercase tracking-wider ${
-                            slot.team
-                              ? slot.color === "yellow" ? "text-yellow-400" : "text-gray-400"
-                              : "text-gray-700"
-                          }`}>
-                            {slot.label}
-                          </p>
-                          {slot.team ? (
-                            <>
-                              {slot.team.flagUrl && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={slot.team.flagUrl} alt="" className="w-9 h-6 object-cover rounded shadow-lg" />
-                              )}
-                              <p className={`font-bold text-[10px] leading-tight ${
-                                slot.color === "yellow" ? "text-yellow-200" : "text-gray-200"
-                              }`}>
-                                {slot.team.name}
-                              </p>
-                              {isLocked && <Lock className={`w-2.5 h-2.5 opacity-30 ${slot.color === "yellow" ? "text-yellow-400" : "text-gray-400"}`} />}
-                            </>
-                          ) : (
-                            <div className="w-9 h-6 rounded border-2 border-dashed border-[#262626] flex items-center justify-center">
-                              <span className="text-gray-800 text-[10px] font-bold">?</span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                  <div className={`${isComplete ? "bg-[#0d110d]" : "bg-[#0f0f0f]"}`}>
+                    {/* Column headers */}
+                    <div className="flex items-center px-4 py-2 border-b border-[#1a1a1a]">
+                      <span className="w-6 flex-shrink-0" />
+                      <span className="flex-1 text-[10px] font-bold text-gray-700 uppercase tracking-widest ml-2">Equipo</span>
+                      <span className="w-7 text-center text-[10px] font-bold text-gray-700 uppercase">J</span>
+                      <span className="w-7 text-center text-[10px] font-bold text-gray-700 uppercase">G</span>
+                      <span className="w-7 text-center text-[10px] font-bold text-gray-700 uppercase">E</span>
+                      <span className="w-7 text-center text-[10px] font-bold text-gray-700 uppercase">P</span>
+                      <span className="w-8 text-center text-[10px] font-bold text-yellow-600 uppercase">Pts</span>
                     </div>
 
-                    {/* Team selection — only when not locked */}
-                    {!isLocked && (
-                      <div className="space-y-2">
-                        <p className="text-gray-700 text-[10px] font-bold uppercase tracking-widest">
-                          {!firstId ? "Tocá un equipo para el 1° lugar" :
-                           !secondId ? "Elegí el 2° lugar" :
-                           "Tocá para cambiar"}
-                        </p>
-                        {group.teams.map(team => {
-                          const isFirst  = pending.first  === team.id;
-                          const isSecond = pending.second === team.id;
-                          return (
-                            <motion.button key={team.id} whileTap={{ scale: 0.97 }}
-                              onClick={() => handleToggleGroupTeam(group.id, team.id)}
-                              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all ${
-                                isFirst  ? "bg-yellow-500/15 border-yellow-500/40 text-yellow-200" :
-                                isSecond ? "bg-[#1e1e1e] border-gray-500/30 text-gray-200" :
-                                "bg-[#141414] border-[#222] text-gray-400 hover:border-[#333] hover:text-gray-200 active:scale-[0.98]"
-                              }`}
-                            >
-                              {team.flagUrl && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={team.flagUrl} alt="" className="w-8 h-5 object-cover rounded flex-shrink-0 shadow" />
-                              )}
-                              <span className="font-semibold text-sm flex-1 text-left">{team.name}</span>
-                              {isFirst  && <span className="text-sm font-black text-yellow-400 flex-shrink-0">🥇 1°</span>}
-                              {isSecond && <span className="text-sm font-black text-gray-300 flex-shrink-0">🥈 2°</span>}
-                              {!isFirst && !isSecond && (
-                                <span className="text-[10px] text-gray-700 font-semibold flex-shrink-0">
-                                  {!firstId ? "→ 1°" : "→ 2°"}
-                                </span>
-                              )}
-                            </motion.button>
-                          );
-                        })}
+                    {sorted.map((row, i) => (
+                      <div key={row.team.id}
+                        className={`flex items-center px-4 py-3 gap-2 border-b border-[#161616] last:border-0 ${i < 2 && isComplete ? "bg-green-500/5" : ""}`}>
+                        <span className={`w-6 h-6 rounded-md text-[10px] font-black flex items-center justify-center border flex-shrink-0 ${rankColors[i]}`}>
+                          {rankEmoji[i]}
+                        </span>
+                        {row.team.flagUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={row.team.flagUrl} alt="" className="w-7 h-[18px] object-cover rounded flex-shrink-0 shadow" />
+                        ) : (
+                          <span className="w-7 h-[18px] bg-[#222] rounded flex-shrink-0" />
+                        )}
+                        <span className={`flex-1 font-semibold text-xs truncate ${i < 2 ? "text-white" : "text-gray-500"}`}>
+                          {row.team.name}
+                        </span>
+                        <span className="w-7 text-center text-xs text-gray-600">{row.w + row.d + row.l}</span>
+                        <span className="w-7 text-center text-xs text-gray-500">{row.w}</span>
+                        <span className="w-7 text-center text-xs text-gray-500">{row.d}</span>
+                        <span className="w-7 text-center text-xs text-gray-500">{row.l}</span>
+                        <span className={`w-8 text-center text-sm font-black ${i < 2 && isComplete ? "text-green-400" : "text-gray-400"}`}>
+                          {row.pts}
+                        </span>
                       </div>
-                    )}
+                    ))}
 
-                    {hasBothPending && (
-                      <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>
-                        <Button variant="primary" size="sm" loading={savingGroup[`g_${group.id}`]}
-                          onClick={() => handleSaveGroupClassification(group.id)} className="w-full"
-                          data-save-predictions>
-                          <Save className="w-4 h-4" />
-                          Confirmar clasificados Grupo {group.name}
-                        </Button>
-                      </motion.div>
+                    {!isComplete && (
+                      <div className="px-4 py-3 flex items-center justify-between">
+                        <p className="text-gray-700 text-xs">Predecí todos los partidos para ver la tabla final</p>
+                        <button
+                          onClick={() => setActiveTab("matches")}
+                          className="text-xs text-red-500 font-semibold hover:text-red-400 transition-colors"
+                        >
+                          Ir a Partidos →
+                        </button>
+                      </div>
                     )}
                   </div>
                 </motion.div>
@@ -868,17 +877,18 @@ export default function PredictionsPage() {
                     {activeElimTab === "ROUND_OF_32" ? (
                       <>
                         <p className="text-gray-500 text-sm max-w-xs leading-relaxed">
-                          Primero tenés que confirmar los{" "}
-                          <span className="text-white font-semibold">clasificados 1° y 2° de los {groups.length} grupos</span>.
+                          Primero tenés que predecir todos los partidos de{" "}
+                          <span className="text-white font-semibold">los {groups.length} grupos</span>.
+                          La tabla se arma automáticamente.
                         </p>
                         <p className="text-gray-700 text-xs mt-2">
-                          Completados: {Object.keys(savedGroupPreds).length}/{groups.length} grupos
+                          Grupos completos: {Object.keys(savedGroupPreds).length}/{groups.length}
                         </p>
                         <button
-                          onClick={() => setActiveTab("groups")}
+                          onClick={() => setActiveTab("matches")}
                           className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-bold rounded-xl transition-colors"
                         >
-                          Ir a Grupos →
+                          Ir a Partidos →
                         </button>
                       </>
                     ) : (
@@ -948,6 +958,9 @@ export default function PredictionsPage() {
                             onPickBracketScore={(side, value) => handlePickBracketScore(currentPhase.key, i + 1, side, value)}
                             delay={i * 0.06}
                             onOpenSlot={(phase, slot) => setSelectionModal({ phase, slot })}
+                            changesRemaining={changesRemaining}
+                            onUseChange={handleUseChange}
+                            usingChange={usingChange}
                           />
                         ))}
                       </div>
@@ -956,10 +969,10 @@ export default function PredictionsPage() {
                     {/* Confirm button */}
                     {currentPhasePendingCount > 0 && (
                       <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-5">
-                        <Button variant="primary" size="sm" loading={savingBracket}
-                          onClick={handleSaveCurrentPhase} className="w-full"
+                        <Button variant="primary" size="lg" loading={savingBracket}
+                          onClick={handleSaveCurrentPhase} className="w-full text-base font-black py-4"
                           data-save-predictions>
-                          <Save className="w-4 h-4" />
+                          <Save className="w-5 h-5" />
                           Confirmar {currentPhasePendingCount} selección{currentPhasePendingCount > 1 ? "es" : ""} en {currentPhase.label}
                         </Button>
                       </motion.div>
@@ -1038,8 +1051,8 @@ export default function PredictionsPage() {
                   <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
                     <p className="text-amber-300 text-sm font-semibold mb-1">¿Qué incluye este canje?</p>
                     <ul className="text-amber-500/80 text-xs space-y-1">
-                      <li>✓ Desbloquea <strong className="text-amber-400">todas tus predicciones</strong></li>
-                      <li>✓ Podés modificar y volver a confirmar</li>
+                      <li>✓ Obtenés <strong className="text-amber-400">3 créditos</strong> para cambiar predicciones</li>
+                      <li>✓ Cada crédito desbloquea <strong className="text-amber-400">una predicción individual</strong></li>
                       <li>✓ Se descuentan <strong className="text-amber-400">{changeCost} puntos</strong> al instante</li>
                     </ul>
                   </div>
@@ -1062,7 +1075,7 @@ export default function PredictionsPage() {
                   </button>
                   <Button variant="primary" size="sm" loading={buyingChange}
                     disabled={availablePoints < changeCost} onClick={handleBuyChange} className="flex-1">
-                    {availablePoints < changeCost ? "Sin puntos" : `Canjear ${changeCost} pts`}
+                    {availablePoints < changeCost ? "Sin puntos" : `Obtener 3 créditos (${changeCost} pts)`}
                   </Button>
                 </div>
               </div>
@@ -1078,7 +1091,7 @@ export default function PredictionsPage() {
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/85 z-50 backdrop-blur-sm"
-              onClick={() => { sessionStorage.setItem("hardcore_spotlight_seen", "1"); setShowHardcoreSpotlight(false); }}
+              onClick={() => { localStorage.setItem("hardcore_spotlight_seen", "1"); setShowHardcoreSpotlight(false); }}
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 30 }}
@@ -1089,7 +1102,7 @@ export default function PredictionsPage() {
             >
               <div className="bg-[#111] border border-orange-500/40 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center relative pointer-events-auto">
                 <button
-                  onClick={() => { sessionStorage.setItem("hardcore_spotlight_seen", "1"); setShowHardcoreSpotlight(false); }}
+                  onClick={() => { localStorage.setItem("hardcore_spotlight_seen", "1"); setShowHardcoreSpotlight(false); }}
                   className="absolute top-3 right-3 text-gray-600 hover:text-gray-400 transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -1118,7 +1131,7 @@ export default function PredictionsPage() {
                 <div className="flex flex-col gap-2">
                   <button
                     onClick={async () => {
-                      sessionStorage.setItem("hardcore_spotlight_seen", "1");
+                      localStorage.setItem("hardcore_spotlight_seen", "1");
                       setShowHardcoreSpotlight(false);
                       await handleToggleHardcore();
                     }}
@@ -1127,7 +1140,7 @@ export default function PredictionsPage() {
                     <Flame className="w-4 h-4" /> Activar Modo Hardcore
                   </button>
                   <button
-                    onClick={() => { sessionStorage.setItem("hardcore_spotlight_seen", "1"); setShowHardcoreSpotlight(false); }}
+                    onClick={() => { localStorage.setItem("hardcore_spotlight_seen", "1"); setShowHardcoreSpotlight(false); }}
                     className="w-full py-2.5 text-gray-500 hover:text-gray-300 font-semibold text-sm transition-colors"
                   >
                     No gracias, seguir sin Hardcore
@@ -1225,7 +1238,7 @@ export default function PredictionsPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-bold text-sm">Logros automáticos</p>
                         <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">
-                          Si acertás muchos partidos o la llave entera, se suman logros con puntos extra enormes (hasta 250.000 pts).
+                          Si acertás muchos partidos o la llave entera, se suman logros con puntos extra (hasta 273.000 pts en total).
                         </p>
                       </div>
                     </div>
@@ -1245,9 +1258,9 @@ export default function PredictionsPage() {
                 <div className="px-4 pb-6 pt-2 flex-shrink-0">
                   <button
                     onClick={() => {
-                      sessionStorage.setItem("pred_onboarding_seen", "1");
+                      localStorage.setItem("pred_onboarding_seen", "1");
                       setShowOnboarding(false);
-                      if (!hardcoreMode && !sessionStorage.getItem("hardcore_spotlight_seen")) {
+                      if (!hardcoreMode && !localStorage.getItem("hardcore_spotlight_seen")) {
                         setTimeout(() => setShowHardcoreSpotlight(true), 400);
                       }
                     }}
@@ -1344,20 +1357,24 @@ export default function PredictionsPage() {
 // ─── Points & Achievements Modal ─────────────────────────────────────────────
 
 const LOGROS = [
-  { icon: "🚀", name: "Buen arranque",              condition: "Acertar 10 partidos de grupos",            pts: "2.000",   target: 10,  type: "match" as const },
-  { icon: "🔥", name: "Racha de aciertos",          condition: "Acertar 25 partidos de grupos",            pts: "6.000",   target: 25,  type: "match" as const },
-  { icon: "📊", name: "Especialista de grupos",     condition: "Acertar 40 partidos de grupos",            pts: "15.000",  target: 40,  type: "match" as const },
-  { icon: "🤖", name: "Máquina de grupos",          condition: "Acertar 55 partidos de grupos",            pts: "35.000",  target: 55,  type: "match" as const },
-  { icon: "🦅", name: "Ojo de halcón",              condition: "Acertar 12 clasificados de grupo",         pts: "5.000",   target: 12,  type: "classified" as const },
-  { icon: "👁️", name: "Ojo clínico",               condition: "Acertar 18 clasificados de grupo",         pts: "12.000",  target: 18,  type: "classified" as const },
-  { icon: "✅", name: "Todos clasificados",         condition: "Acertar los 24 clasificados",              pts: "30.000",  target: 24,  type: "classified" as const },
-  { icon: "📋", name: "Tabla perfecta",             condition: "Acertar todos los 1° y 2° exactos",        pts: "50.000",  target: 12,  type: "groups" as const },
-  { icon: "💪", name: "Bracket fuerte",             condition: "Acertar el 70% de eliminatorias",          pts: "20.000",  target: 22,  type: "bracket" as const },
-  { icon: "🎯", name: "Bracket perfecto",           condition: "Acertar toda la llave eliminatoria",       pts: "60.000",  target: 31,  type: "bracket" as const },
-  { icon: "🌍", name: "Fase de grupos excelente",   condition: "40+ partidos + 18+ clasificados correctos", pts: "35.000", target: 1,   type: "champion" as const },
-  { icon: "⭐", name: "Fase de grupos perfecta",    condition: "55 partidos + tabla exacta completa",       pts: "80.000", target: 1,   type: "champion" as const },
-  { icon: "🔮", name: "Prode casi perfecto",        condition: "Fase excelente + bracket fuerte",           pts: "120.000",target: 1,   type: "champion" as const },
-  { icon: "🏆", name: "Prode perfecto",             condition: "Desbloquear todos los logros",              pts: "250.000",target: 14,  type: "all" as const },
+  // Partidos de grupos (solo ganás el nivel más alto)
+  { icon: "🚀", name: "Buen arranque",        condition: "Acertar 28+ partidos de grupos",                    pts: "2.000",  target: 28,  type: "match" as const },
+  { icon: "📊", name: "Especialista",         condition: "Acertar 40+ partidos de grupos",                    pts: "9.000",  target: 40,  type: "match" as const },
+  { icon: "🤖", name: "Máquina de grupos",    condition: "Acertar 54+ partidos de grupos",                    pts: "22.000", target: 54,  type: "match" as const },
+  // Clasificados (solo ganás el nivel más alto)
+  { icon: "🦅", name: "Ojo de halcón",        condition: "Acertar 14+ equipos clasificados",                  pts: "3.000",  target: 14,  type: "classified" as const },
+  { icon: "👁️", name: "Ojo clínico",         condition: "Acertar 19+ equipos clasificados",                  pts: "10.000", target: 19,  type: "classified" as const },
+  { icon: "🎯", name: "Tabla casi perfecta",  condition: "Acertar 22+ equipos clasificados",                  pts: "25.000", target: 22,  type: "classified" as const },
+  // Eliminatorias (solo ganás el nivel más alto)
+  { icon: "💪", name: "Bracket fuerte",       condition: "Acertar el 65%+ de eliminatorias",                  pts: "6.000",  target: 31,  type: "bracket" as const },
+  { icon: "🔮", name: "Bracket experto",      condition: "Acertar el 80%+ de eliminatorias",                  pts: "18.000", target: 31,  type: "bracket" as const },
+  { icon: "⚡", name: "Bracket perfecto",     condition: "Acertar toda la llave eliminatoria",                pts: "48.000", target: 31,  type: "bracket" as const },
+  // Especial
+  { icon: "📋", name: "Tabla perfecta",       condition: "Acertar el 1° y 2° exacto en los 12 grupos",        pts: "28.000", target: 12,  type: "groups" as const },
+  // Combos
+  { icon: "🌍", name: "Prode sólido",         condition: "Especialista + Ojo clínico + Bracket fuerte (o sup.)", pts: "20.000", target: 1, type: "champion" as const },
+  { icon: "⭐", name: "Prode experto",        condition: "Máquina + Tabla casi perfecta + Bracket experto (o sup.)", pts: "50.000", target: 1, type: "champion" as const },
+  { icon: "🏆", name: "Prode perfecto",       condition: "Máquina + Tabla casi perfecta + Bracket perfecto + Tabla perfecta", pts: "80.000", target: 1, type: "champion" as const },
 ];
 
 const POINTS_TABLE = [
@@ -1400,7 +1417,6 @@ function PointsAndAchievementsModal({
       case "groups":      return Math.min(savedGroupCount, logro.target) / logro.target;
       case "bracket":     return Math.min(savedBracketCount, logro.target) / logro.target;
       case "champion":    return hasChampionPred ? 1 : 0;
-      case "all":         return 0;
       default:            return 0;
     }
   };
@@ -1412,7 +1428,6 @@ function PointsAndAchievementsModal({
       case "groups":     return Math.min(savedGroupCount, logro.target);
       case "bracket":    return Math.min(savedBracketCount, logro.target);
       case "champion":   return hasChampionPred ? 1 : 0;
-      case "all":        return 0;
       default:           return 0;
     }
   };
@@ -1502,7 +1517,7 @@ function PointsAndAchievementsModal({
                         </div>
                         <span className="text-yellow-400 font-black text-sm tabular-nums flex-shrink-0">{logro.pts}</span>
                       </div>
-                      {logro.type !== "all" && (
+                      {logro.type !== "champion" && (
                         <div>
                           <div className="flex justify-between text-[10px] mb-1">
                             <span className="text-gray-600">Progreso</span>
@@ -1536,6 +1551,7 @@ function PointsAndAchievementsModal({
 
 function MatchCard({
   match, saved, pending, hardcoreMode, pendingScore, savedScore, onPick, onPickScore,
+  changesRemaining, onUseChange, usingChange,
 }: {
   match: Match;
   saved?: Outcome;
@@ -1545,6 +1561,9 @@ function MatchCard({
   savedScore?: { home: number; away: number };
   onPick: (matchId: string, outcome: Outcome) => void;
   onPickScore: (matchId: string, side: "home" | "away", value: number) => void;
+  changesRemaining?: number;
+  onUseChange?: (type: "match" | "group" | "bracket", id: string) => void;
+  usingChange?: boolean;
 }) {
   const isLocked = !!saved;
   const matchStarted = match.status === "live" || match.status === "finished";
@@ -1616,6 +1635,17 @@ function MatchCard({
       )}
       {closedReason && !isLocked && !matchStarted && (
         <p className="px-4 pb-2 text-[10px] text-red-400/80 text-center">{closedReason}</p>
+      )}
+      {isLocked && (changesRemaining ?? 0) > 0 && onUseChange && (
+        <div className="px-4 pb-2 flex justify-end">
+          <button
+            onClick={() => onUseChange("match", match.id)}
+            disabled={usingChange}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-amber-500/40 text-amber-400 text-[10px] font-semibold hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+          >
+            <Gift className="w-3 h-3" /> Cambiar (1 crédito)
+          </button>
+        </div>
       )}
 
       {/* ── HARDCORE: score inputs ── */}
@@ -1723,6 +1753,7 @@ function BracketMatchCard({
   savedBracket, pendingBracket, hardcoreMode,
   pendingBracketScore, savedBracketScore, onPickBracketScore,
   onOpenSlot, delay = 0,
+  changesRemaining, onUseChange, usingChange,
 }: {
   matchNum: number; leftSlot: string; rightSlot: string;
   phase: string; allTeams: Team[];
@@ -1733,6 +1764,9 @@ function BracketMatchCard({
   onPickBracketScore: (side: "home" | "away", value: number) => void;
   onOpenSlot: (phase: string, slot: string) => void;
   delay?: number;
+  changesRemaining?: number;
+  onUseChange?: (type: "match" | "group" | "bracket", id: string) => void;
+  usingChange?: boolean;
 }) {
   const lKey = `${phase}:${leftSlot}`;
   const rKey = `${phase}:${rightSlot}`;
@@ -1761,6 +1795,9 @@ function BracketMatchCard({
         <BracketTeamSide
           team={leftTeam} isLocked={leftLocked} isPending={!!pendingBracket[lKey] && !leftLocked}
           onOpen={() => onOpenSlot(phase, leftSlot)}
+          changesRemaining={changesRemaining}
+          onUseChange={onUseChange ? () => onUseChange("bracket", lKey) : undefined}
+          usingChange={usingChange}
         />
         <div className="flex flex-col items-center justify-center flex-shrink-0 w-10 gap-1">
           <div className="w-px flex-1 bg-gradient-to-b from-transparent via-[#252525] to-transparent" />
@@ -1770,6 +1807,9 @@ function BracketMatchCard({
         <BracketTeamSide
           team={rightTeam} isLocked={rightLocked} isPending={!!pendingBracket[rKey] && !rightLocked}
           onOpen={() => onOpenSlot(phase, rightSlot)}
+          changesRemaining={changesRemaining}
+          onUseChange={onUseChange ? () => onUseChange("bracket", rKey) : undefined}
+          usingChange={usingChange}
         />
       </div>
 
@@ -1854,52 +1894,64 @@ function BracketMatchCard({
 
 // ─── Bracket Team Side ─────────────────────────────────────────────────────────
 
-function BracketTeamSide({ team, isLocked, isPending, onOpen }: {
+function BracketTeamSide({ team, isLocked, isPending, onOpen, changesRemaining, onUseChange, usingChange }: {
   team?: Team; isLocked: boolean; isPending: boolean; onOpen: () => void;
+  changesRemaining?: number; onUseChange?: () => void; usingChange?: boolean;
 }) {
   return (
-    <motion.button
-      whileTap={!isLocked ? { scale: 0.96 } : {}}
-      onClick={() => !isLocked && onOpen()}
-      className={`flex-1 flex flex-col items-center justify-center gap-2 py-5 px-3 transition-all ${
-        isLocked ? "cursor-default" : "cursor-pointer hover:bg-white/[0.03] active:bg-white/[0.05]"
-      }`}
-    >
-      {team ? (
-        <>
-          <div className={`relative rounded-lg transition-all ${
-            isPending ? "ring-2 ring-amber-500/60 ring-offset-2 ring-offset-[#0d0d0d]" :
-            isLocked  ? "ring-2 ring-green-500/40 ring-offset-2 ring-offset-[#0d0d0d]" : ""
-          }`}>
-            {team.flagUrl
-              // eslint-disable-next-line @next/next/no-img-element
-              ? <img src={team.flagUrl} alt="" className="w-14 h-10 object-cover rounded-lg shadow-xl" />
-              : <div className="w-14 h-10 bg-[#1a1a1a] rounded-lg flex items-center justify-center text-xs font-bold text-gray-500 border border-[#2a2a2a]">{team.code}</div>
-            }
-            {isLocked && (
-              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
-                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
-                <CheckCircle2 className="w-3 h-3 text-white" />
-              </motion.div>
-            )}
-          </div>
-          <div className="text-center px-1">
-            <p className={`text-[11px] font-bold leading-tight ${
-              isLocked ? "text-green-300" : isPending ? "text-amber-300" : "text-white"
-            }`}>{team.name}</p>
-            {isLocked  && <p className="text-[9px] text-green-700 mt-0.5 flex items-center justify-center gap-0.5"><Lock className="w-2 h-2" /> Guardado</p>}
-            {isPending && <p className="text-[9px] text-amber-700 mt-0.5">Sin confirmar</p>}
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="w-14 h-10 rounded-lg border-2 border-dashed border-[#222] flex items-center justify-center">
-            <ChevronDown className="w-4 h-4 text-[#282828]" />
-          </div>
-          <p className="text-[10px] text-gray-800 font-medium">Elegir</p>
-        </>
+    <div className={`flex-1 flex flex-col items-center justify-center gap-2 py-5 px-3 transition-all relative`}>
+      <motion.button
+        whileTap={!isLocked ? { scale: 0.96 } : {}}
+        onClick={() => !isLocked && onOpen()}
+        className={`flex flex-col items-center gap-2 w-full ${
+          isLocked ? "cursor-default" : "cursor-pointer hover:bg-white/[0.03] active:bg-white/[0.05] rounded-xl p-1"
+        }`}
+      >
+        {team ? (
+          <>
+            <div className={`relative rounded-lg transition-all ${
+              isPending ? "ring-2 ring-amber-500/60 ring-offset-2 ring-offset-[#0d0d0d]" :
+              isLocked  ? "ring-2 ring-green-500/40 ring-offset-2 ring-offset-[#0d0d0d]" : ""
+            }`}>
+              {team.flagUrl
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={team.flagUrl} alt="" className="w-14 h-10 object-cover rounded-lg shadow-xl" />
+                : <div className="w-14 h-10 bg-[#1a1a1a] rounded-lg flex items-center justify-center text-xs font-bold text-gray-500 border border-[#2a2a2a]">{team.code}</div>
+              }
+              {isLocked && (
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                  <CheckCircle2 className="w-3 h-3 text-white" />
+                </motion.div>
+              )}
+            </div>
+            <div className="text-center px-1">
+              <p className={`text-[11px] font-bold leading-tight ${
+                isLocked ? "text-green-300" : isPending ? "text-amber-300" : "text-white"
+              }`}>{team.name}</p>
+              {isLocked  && <p className="text-[9px] text-green-700 mt-0.5 flex items-center justify-center gap-0.5"><Lock className="w-2 h-2" /> Guardado</p>}
+              {isPending && <p className="text-[9px] text-amber-700 mt-0.5">Sin confirmar</p>}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="w-14 h-10 rounded-lg border-2 border-dashed border-[#222] flex items-center justify-center">
+              <ChevronDown className="w-4 h-4 text-[#282828]" />
+            </div>
+            <p className="text-[10px] text-gray-800 font-medium">Elegir</p>
+          </>
+        )}
+      </motion.button>
+      {isLocked && (changesRemaining ?? 0) > 0 && onUseChange && (
+        <button
+          onClick={onUseChange}
+          disabled={usingChange}
+          className="flex items-center gap-1 px-2 py-0.5 rounded border border-amber-500/30 text-amber-400 text-[9px] font-semibold hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+        >
+          <Gift className="w-2.5 h-2.5" /> Cambiar
+        </button>
       )}
-    </motion.button>
+    </div>
   );
 }
 
