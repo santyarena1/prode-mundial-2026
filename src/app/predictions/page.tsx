@@ -128,7 +128,7 @@ export default function PredictionsPage() {
 
   // Team selection modal for bracket picks
   const [selectionModal, setSelectionModal] = useState<{ phase: string; slot: string } | null>(null);
-  const [predictionsCta, setPredictionsCta] = useState<{ text: string; buttonLabel: string; buttonUrl: string; buttonLogoUrl?: string; bgColor?: string; buttonColor?: string } | null>(null);
+  const [predictionsCta, setPredictionsCta] = useState<{ text: string; buttonLabel: string; buttonUrl: string; buttonLogoUrl?: string; bgColor?: string; buttonColor?: string; textColor?: string } | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -588,32 +588,38 @@ export default function PredictionsPage() {
               <Zap className="w-3.5 h-3.5" />
               Puntos y logros
             </button>
-            {predictionsCta && (
-              <div
-                className="flex-1 min-w-0 flex items-center justify-between gap-3 px-4 py-2 rounded-xl border border-white/5"
-                style={{
-                  background: predictionsCta.bgColor ?? "#1a1a1a",
-                  boxShadow: `0 0 18px 2px ${(predictionsCta.bgColor ?? "#dc2626")}55`,
-                }}
-              >
-                <span className="text-white/80 text-xs font-medium truncate">{predictionsCta.text}</span>
-                {predictionsCta.buttonUrl && (predictionsCta.buttonLabel || predictionsCta.buttonLogoUrl) && (
-                  <a
-                    href={predictionsCta.buttonUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-white text-xs font-black uppercase tracking-wide rounded-lg transition-opacity hover:opacity-80"
-                    style={{ background: predictionsCta.buttonColor ?? "#dc2626" }}
-                  >
-                    {predictionsCta.buttonLogoUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={predictionsCta.buttonLogoUrl} alt="" className="h-4 w-auto object-contain" />
-                    )}
-                    {predictionsCta.buttonLabel}
-                  </a>
-                )}
-              </div>
-            )}
+            {predictionsCta && (() => {
+              const bg = predictionsCta.bgColor ?? "#111111";
+              const btnColor = predictionsCta.buttonColor ?? "#dc2626";
+              const txtColor = predictionsCta.textColor ?? "#9ca3af";
+              return (
+                <div
+                  className="flex-1 min-w-0 flex items-center justify-between gap-3 px-3 py-2 rounded-xl border text-xs font-bold uppercase tracking-wider"
+                  style={{
+                    background: bg,
+                    borderColor: `${btnColor}55`,
+                    boxShadow: `0 0 12px 1px ${btnColor}33`,
+                  }}
+                >
+                  <span className="truncate" style={{ color: txtColor }}>{predictionsCta.text}</span>
+                  {predictionsCta.buttonUrl && (predictionsCta.buttonLabel || predictionsCta.buttonLogoUrl) && (
+                    <a
+                      href={predictionsCta.buttonUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 text-white text-xs font-black uppercase tracking-wide rounded-lg transition-opacity hover:opacity-80"
+                      style={{ background: btnColor }}
+                    >
+                      {predictionsCta.buttonLogoUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={predictionsCta.buttonLogoUrl} alt="" className="h-3.5 w-auto object-contain" />
+                      )}
+                      {predictionsCta.buttonLabel}
+                    </a>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
 

@@ -13,6 +13,7 @@ export async function GET() {
       "sponsor_banner_predictions_button_logo_url",
       "sponsor_banner_predictions_bg_color",
       "sponsor_banner_predictions_button_color",
+      "sponsor_banner_predictions_text_color",
       "sponsor_banner_predictions_visible",
     ];
     const rows = await prisma.setting.findMany({ where: { key: { in: keys } } });
@@ -29,8 +30,9 @@ export async function GET() {
         buttonLabel: get("sponsor_banner_predictions_button_label"),
         buttonUrl: get("sponsor_banner_predictions_button_url"),
         buttonLogoUrl: get("sponsor_banner_predictions_button_logo_url"),
-        bgColor: get("sponsor_banner_predictions_bg_color") || "#1a1a1a",
+        bgColor: get("sponsor_banner_predictions_bg_color") || "#111111",
         buttonColor: get("sponsor_banner_predictions_button_color") || "#dc2626",
+        textColor: get("sponsor_banner_predictions_text_color") || "#9ca3af",
         visible: get("sponsor_banner_predictions_visible") === "true",
       },
     });
