@@ -287,6 +287,34 @@ function welcomeTemplate(firstName: string, lastName: string, email: string): st
 
 // ─── Send functions ────────────────────────────────────────────────────────────
 
+export async function sendRedemptionEmail(params: {
+  user: { id: string; firstName: string; email: string };
+  prizeName: string;
+  pointsSpent: number;
+}): Promise<void> {
+  if (!process.env.RESEND_API_KEY) return;
+  const { user, prizeName, pointsSpent } = params;
+  const from = process.env.RESEND_FROM || "Prode Mundial Gamer <no-reply@thegamershop-premios.com>";
+  const r = new Resend(process.env.RESEND_API_KEY.replace(/^﻿/, "").trim());
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Canje confirmado</title></head>
+<body style="margin:0;padding:32px 16px;background:#f4f4f5;font-family:sans-serif;">
+<div style="max-width:520px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;">
+  <div style="background:#0a0a0a;padding:24px 32px;text-align:center;">
+    <div style="font-size:20px;font-weight:900;color:#fff;">⚽ Prode Mundial Gamer 2026</div>
+  </div>
+  <div style="padding:32px;">
+    <p style="margin:0 0 8px;color:#6b7280;">Hola, <strong>${user.firstName}</strong></p>
+    <h1 style="margin:0 0 16px;font-size:20px;font-weight:800;color:#0a0a0a;">¡Tu canje fue confirmado!</h1>
+    <p style="color:#374151;">Canjeaste <strong>${pointsSpent.toLocaleString("es-AR")} puntos</strong> por:</p>
+    <div style="background:#f9fafb;border-radius:8px;padding:16px;margin:16px 0;font-size:18px;font-weight:700;color:#0a0a0a;">${prizeName}</div>
+    <p style="color:#6b7280;font-size:14px;">Nos contactaremos pronto para coordinar la entrega. ¡Gracias por participar!</p>
+  </div>
+</div>
+</body></html>`;
+  const { error } = await r.emails.send({ from, to: user.email, subject: `¡Canje confirmado! ${prizeName}`, html });
+  if (error) console.error("[email] Failed to send redemption email:", error);
+}
+
 export async function sendWelcomeEmail(user: {
   firstName: string;
   lastName: string;

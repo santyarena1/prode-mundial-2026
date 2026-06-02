@@ -181,18 +181,29 @@ export async function POST(request: NextRequest) {
     }
 
     sendWelcomeEmail({ firstName: user.firstName, lastName: user.lastName, email: user.email })
-      .then((sent) => {
+      .then(() => {
         prisma.emailLog.create({
           data: {
             subject: `Bienvenida — ${user.firstName} ${user.lastName}`,
             message: `Email de bienvenida automático enviado a ${user.email}`,
             recipientCount: 1,
-            sentCount: sent ? 1 : 0,
-            failedCount: sent ? 0 : 1,
+            sentCount: 1,
+            failedCount: 0,
           },
         }).catch(() => {});
       })
-      .catch((err) => console.error("[email] Failed to send welcome email:", err));
+      .catch((err) => {
+        console.error("[email] Failed to send welcome email:", err);
+        prisma.emailLog.create({
+          data: {
+            subject: `Bienvenida — ${user.firstName} ${user.lastName}`,
+            message: `Email de bienvenida automático enviado a ${user.email}`,
+            recipientCount: 1,
+            sentCount: 0,
+            failedCount: 1,
+          },
+        }).catch(() => {});
+      });
 
     const token = signUserToken(user.id);
     const response = NextResponse.json(
