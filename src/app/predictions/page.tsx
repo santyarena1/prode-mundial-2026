@@ -213,10 +213,12 @@ export default function PredictionsPage() {
   const isPhaseUnlocked = useCallback((phaseKey: string): boolean => {
     const idx = ELIMINATORIAS_PHASES.findIndex(p => p.key === phaseKey);
     if (idx === 0) {
-      // 16vos: todos los partidos de grupo disponibles deben estar predichos
-      const allGroupMatches = groups.flatMap(g => g.matches);
-      if (allGroupMatches.length === 0) return false;
-      return allGroupMatches.every(m => !!savedPreds[m.id]);
+      // 16vos: todos los partidos de fase de grupos deben estar predichos
+      if (groups.length === 0) return false;
+      return groups.every(group => {
+        const groupMatches = group.matches.filter(m => m.phase === "GROUP_STAGE");
+        return groupMatches.length > 0 && groupMatches.every(m => !!savedPreds[m.id]);
+      });
     }
     const prev = ELIMINATORIAS_PHASES[idx - 1];
     return Object.keys(savedBracket).filter(k => k.startsWith(`${prev.key}:`)).length >= prev.slots;
@@ -457,9 +459,10 @@ export default function PredictionsPage() {
 
   if (loading) return <LoadingScreen text="Cargando predicciones..." />;
 
-  const completedGroupsCount = groups.filter(group =>
-    group.matches.length > 0 && group.matches.every(m => !!savedPreds[m.id])
-  ).length;
+  const completedGroupsCount = groups.filter(group => {
+    const groupMatches = group.matches.filter(m => m.phase === "GROUP_STAGE");
+    return groupMatches.length > 0 && groupMatches.every(m => !!savedPreds[m.id]);
+  }).length;
 
   const hasAnyLocked =
     Object.keys(savedPreds).length > 0 ||
