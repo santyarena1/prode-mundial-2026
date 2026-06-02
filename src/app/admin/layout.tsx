@@ -11,24 +11,65 @@ import { Logo } from "@/components/layout/Logo";
 import { StickyBackBar } from "@/components/layout/StickyBackBar";
 import { shouldShowBackButton } from "@/lib/navigation";
 
-const navItems = [
-  { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/admin/participants", icon: Users, label: "Participantes" },
-  { href: "/admin/fixture", icon: Calendar, label: "Fixture" },
-  { href: "/admin/results", icon: CheckSquare, label: "Resultados" },
-  { href: "/admin/ranking", icon: Trophy, label: "Ranking" },
-  { href: "/admin/prizes", icon: Gift, label: "Premios" },
-  { href: "/admin/bonus", icon: Zap, label: "Bonus" },
-  { href: "/admin/raffles", icon: Shuffle, label: "Sorteos semanales" },
-  { href: "/admin/virtual-album", icon: BookOpen, label: "Álbum virtual" },
-  { href: "/admin/sponsors", icon: Building2, label: "Sponsors" },
-  { href: "/admin/sponsor-inquiries", icon: Handshake, label: "Consultas sponsors" },
-  { href: "/admin/squads", icon: Swords, label: "Grupos" },
-  { href: "/admin/communications", icon: Mail, label: "Comunicaciones" },
-  { href: "/admin/contacto", icon: MessageSquare, label: "Mensajes de contacto" },
-  { href: "/admin/sync", icon: RefreshCw, label: "Sincronización" },
-  { href: "/admin/settings", icon: Settings, label: "Configuración" },
+type NavItem = { href: string; icon: React.ElementType; label: string };
+type NavSection = { section: string; items: NavItem[] };
+
+const navSections: NavSection[] = [
+  {
+    section: "",
+    items: [
+      { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    ],
+  },
+  {
+    section: "Torneo",
+    items: [
+      { href: "/admin/participants", icon: Users, label: "Participantes" },
+      { href: "/admin/fixture", icon: Calendar, label: "Fixture" },
+      { href: "/admin/results", icon: CheckSquare, label: "Resultados" },
+      { href: "/admin/ranking", icon: Trophy, label: "Ranking" },
+    ],
+  },
+  {
+    section: "Premios & Puntos",
+    items: [
+      { href: "/admin/prizes", icon: Gift, label: "Premios" },
+      { href: "/admin/bonus", icon: Zap, label: "Bonus" },
+      { href: "/admin/raffles", icon: Shuffle, label: "Sorteos semanales" },
+    ],
+  },
+  {
+    section: "Contenido",
+    items: [
+      { href: "/admin/virtual-album", icon: BookOpen, label: "Álbum virtual" },
+      { href: "/admin/squads", icon: Swords, label: "Grupos" },
+    ],
+  },
+  {
+    section: "Comercial",
+    items: [
+      { href: "/admin/sponsors", icon: Building2, label: "Sponsors" },
+      { href: "/admin/sponsor-inquiries", icon: Handshake, label: "Consultas sponsors" },
+    ],
+  },
+  {
+    section: "Comunicación",
+    items: [
+      { href: "/admin/communications", icon: Mail, label: "Comunicaciones" },
+      { href: "/admin/contacto", icon: MessageSquare, label: "Mensajes de contacto" },
+    ],
+  },
+  {
+    section: "Sistema",
+    items: [
+      { href: "/admin/sync", icon: RefreshCw, label: "Sincronización" },
+      { href: "/admin/settings", icon: Settings, label: "Configuración" },
+    ],
+  },
 ];
+
+// Flat list for active label lookup
+const navItems = navSections.flatMap(s => s.items);
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -78,26 +119,37 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {navItems.map(({ href, icon: Icon, label }) => {
-            const active = pathname === href;
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  active
-                    ? "bg-red-600/15 text-red-400 border border-red-600/20"
-                    : "text-gray-500 hover:text-gray-200 hover:bg-[#1a1a1a]"
-                }`}
-              >
-                <Icon className="w-4 h-4 flex-shrink-0" />
-                <span>{label}</span>
-                {active && <ChevronRight className="w-3 h-3 ml-auto" />}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 p-3 overflow-y-auto space-y-4">
+          {navSections.map((section) => (
+            <div key={section.section}>
+              {section.section && (
+                <p className="px-3 mb-1 text-[10px] font-bold uppercase tracking-widest text-gray-700">
+                  {section.section}
+                </p>
+              )}
+              <div className="space-y-0.5">
+                {section.items.map(({ href, icon: Icon, label }) => {
+                  const active = pathname === href || (href !== "/admin/dashboard" && pathname.startsWith(href + "/"));
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={() => setSidebarOpen(false)}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                        active
+                          ? "bg-red-600/15 text-red-400 border border-red-600/20"
+                          : "text-gray-500 hover:text-gray-200 hover:bg-[#1a1a1a]"
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      <span>{label}</span>
+                      {active && <ChevronRight className="w-3 h-3 ml-auto" />}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* Logout */}

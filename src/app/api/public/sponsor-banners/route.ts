@@ -10,6 +10,7 @@ export async function GET() {
       "sponsor_banner_predictions_text",
       "sponsor_banner_predictions_button_label",
       "sponsor_banner_predictions_button_url",
+      "sponsor_banner_predictions_button_logo_url",
       "sponsor_banner_predictions_visible",
     ];
     const rows = await prisma.setting.findMany({ where: { key: { in: keys } } });
@@ -25,6 +26,7 @@ export async function GET() {
         text: get("sponsor_banner_predictions_text"),
         buttonLabel: get("sponsor_banner_predictions_button_label"),
         buttonUrl: get("sponsor_banner_predictions_button_url"),
+        buttonLogoUrl: get("sponsor_banner_predictions_button_logo_url"),
         visible: get("sponsor_banner_predictions_visible") === "true",
       },
     });

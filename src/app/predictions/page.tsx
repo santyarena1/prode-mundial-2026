@@ -128,7 +128,7 @@ export default function PredictionsPage() {
 
   // Team selection modal for bracket picks
   const [selectionModal, setSelectionModal] = useState<{ phase: string; slot: string } | null>(null);
-  const [predictionsCta, setPredictionsCta] = useState<{ text: string; buttonLabel: string; buttonUrl: string } | null>(null);
+  const [predictionsCta, setPredictionsCta] = useState<{ text: string; buttonLabel: string; buttonUrl: string; buttonLogoUrl?: string } | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -208,7 +208,7 @@ export default function PredictionsPage() {
 
       if (bannerRes.ok) {
         const bannerData = await bannerRes.json();
-        if (bannerData.predictions?.visible && bannerData.predictions.text) {
+        if (bannerData.predictions?.visible && (bannerData.predictions.text || bannerData.predictions.buttonLabel)) {
           setPredictionsCta(bannerData.predictions);
         }
       }
@@ -591,13 +591,17 @@ export default function PredictionsPage() {
             {predictionsCta && (
               <div className="flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl max-w-[420px] min-w-0">
                 <span className="text-gray-400 text-xs truncate">{predictionsCta.text}</span>
-                {predictionsCta.buttonLabel && predictionsCta.buttonUrl && (
+                {predictionsCta.buttonUrl && (predictionsCta.buttonLabel || predictionsCta.buttonLogoUrl) && (
                   <a
                     href={predictionsCta.buttonUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-shrink-0 px-2.5 py-1 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition-colors"
+                    className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition-colors"
                   >
+                    {predictionsCta.buttonLogoUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={predictionsCta.buttonLogoUrl} alt="" className="h-4 w-auto object-contain" />
+                    )}
                     {predictionsCta.buttonLabel}
                   </a>
                 )}

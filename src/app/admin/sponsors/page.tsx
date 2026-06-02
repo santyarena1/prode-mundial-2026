@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Plus, Trash2, Building2, Upload, ImageIcon, Pencil, X } from "lucide-react";
+import { Plus, Trash2, Building2, Upload, ImageIcon, Pencil, X, Save, ExternalLink } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -121,6 +121,52 @@ function EditModal({ sponsor, onClose, onSaved }: { sponsor: Sponsor; onClose: (
   );
 }
 
+interface BannerSettings {
+  dashboard: { imageUrl: string; linkUrl: string; visible: boolean };
+  predictions: { text: string; buttonLabel: string; buttonUrl: string; buttonLogoUrl: string; visible: boolean };
+}
+
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <label className="flex items-center gap-3 cursor-pointer select-none">
+      <div className="relative flex-shrink-0">
+        <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="sr-only" />
+        <div className={`w-10 h-6 rounded-full transition-colors ${checked ? "bg-red-600" : "bg-[#333]"}`}>
+          <div className={`w-4 h-4 bg-white rounded-full mt-1 transition-transform ${checked ? "translate-x-5" : "translate-x-1"}`} />
+        </div>
+      </div>
+      <span className="text-gray-300 text-sm">{label}</span>
+    </label>
+  );
+}
+
+function UploadButton({
+  label, accept, uploading, onFile, hint,
+}: {
+  label: string;
+  accept?: string;
+  uploading: boolean;
+  onFile: (f: File) => void;
+  hint?: string;
+}) {
+  return (
+    <div>
+      <label className="inline-flex items-center gap-2 cursor-pointer px-3 py-2 bg-[#1a1a1a] hover:bg-[#222] border border-[#333] hover:border-red-600/40 rounded-lg text-xs text-gray-300 font-semibold transition-colors">
+        <input
+          type="file"
+          accept={accept ?? "image/jpeg,image/png,image/webp,image/gif,image/svg+xml"}
+          className="sr-only"
+          disabled={uploading}
+          onChange={e => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }}
+        />
+        <Upload className="w-3.5 h-3.5" />
+        {uploading ? "Subiendo..." : label}
+      </label>
+      {hint && <p className="text-gray-600 text-xs mt-1">{hint}</p>}
+    </div>
+  );
+}
+
 export default function AdminSponsorsPage() {
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -133,6 +179,14 @@ export default function AdminSponsorsPage() {
   const [editingSponsor, setEditingSponsor] = useState<Sponsor | null>(null);
   const createInputRef = useRef<HTMLInputElement>(null);
 
+  const [banners, setBanners] = useState<BannerSettings>({
+    dashboard: { imageUrl: "", linkUrl: "", visible: false },
+    predictions: { text: "", buttonLabel: "", buttonUrl: "", buttonLogoUrl: "", visible: false },
+  });
+  const [savingBanners, setSavingBanners] = useState(false);
+  const [uploadingDashboard, setUploadingDashboard] = useState(false);
+  const [uploadingPredLogo, setUploadingPredLogo] = useState(false);
+
   const loadSponsors = () =>
     apiFetch("/api/admin/sponsors").then(async (r) => {
       const data = await r.json();
@@ -140,7 +194,28 @@ export default function AdminSponsorsPage() {
     });
 
   useEffect(() => {
-    loadSponsors().finally(() => setLoading(false));
+    Promise.all([
+      loadSponsors(),
+      apiFetch("/api/admin/sponsor-banners").then(async r => {
+        if (r.ok) {
+          const data = await r.json();
+          setBanners({
+            dashboard: {
+              imageUrl: data.dashboard?.imageUrl ?? "",
+              linkUrl: data.dashboard?.linkUrl ?? "",
+              visible: data.dashboard?.visible ?? false,
+            },
+            predictions: {
+              text: data.predictions?.text ?? "",
+              buttonLabel: data.predictions?.buttonLabel ?? "",
+              buttonUrl: data.predictions?.buttonUrl ?? "",
+              buttonLogoUrl: data.predictions?.buttonLogoUrl ?? "",
+              visible: data.predictions?.visible ?? false,
+            },
+          });
+        }
+      }),
+    ]).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -190,6 +265,46 @@ export default function AdminSponsorsPage() {
     if (!res.ok) { toast.error("Error al eliminar"); return; }
     setSponsors(prev => prev.filter(s => s.id !== id));
     toast.success("Sponsor eliminado");
+  };
+
+  const uploadBannerImage = async (file: File, folder: string): Promise<string | null> => {
+    const form = new FormData();
+    form.append("image", file);
+    form.append("folder", folder);
+    const res = await apiFetch("/api/admin/sponsor-banners", { method: "POST", body: form });
+    const data = await res.json();
+    if (!res.ok) { toast.error(data.error || "Error al subir imagen"); return null; }
+    return data.url as string;
+  };
+
+  const handleUploadDashboardImage = async (file: File) => {
+    setUploadingDashboard(true);
+    try {
+      const url = await uploadBannerImage(file, "dashboard");
+      if (url) setBanners(b => ({ ...b, dashboard: { ...b.dashboard, imageUrl: url } }));
+    } finally { setUploadingDashboard(false); }
+  };
+
+  const handleUploadPredLogo = async (file: File) => {
+    setUploadingPredLogo(true);
+    try {
+      const url = await uploadBannerImage(file, "predictions");
+      if (url) setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonLogoUrl: url } }));
+    } finally { setUploadingPredLogo(false); }
+  };
+
+  const saveBanners = async () => {
+    setSavingBanners(true);
+    try {
+      const res = await apiFetch("/api/admin/sponsor-banners", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(banners),
+      });
+      if (!res.ok) { toast.error("Error al guardar"); return; }
+      toast.success("Banners guardados");
+    } catch { toast.error("Error de conexión"); }
+    finally { setSavingBanners(false); }
   };
 
   if (loading) return <LoadingScreen />;
@@ -292,6 +407,169 @@ export default function AdminSponsorsPage() {
           onSaved={updated => setSponsors(prev => prev.map(s => s.id === updated.id ? updated : s))}
         />
       )}
+
+      {/* ── SPONSOR BANNERS ─────────────────────────────────────────────── */}
+      <div className="mt-10">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-black uppercase text-white">Banners de sponsor</h2>
+            <p className="text-gray-500 text-sm">Aparecen en el dashboard y en Mis Predicciones</p>
+          </div>
+          <Button variant="primary" size="sm" loading={savingBanners} onClick={saveBanners}>
+            <Save className="w-4 h-4" /> Guardar cambios
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* ── DASHBOARD BANNER ── */}
+          <Card className="p-5 flex flex-col gap-5">
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-gray-300 mb-0.5">Banner del Dashboard</h3>
+              <p className="text-gray-600 text-xs">Imagen horizontal debajo del saludo al usuario · 1200 × 80 px recomendado</p>
+            </div>
+
+            {/* Preview */}
+            <div className="w-full h-[80px] rounded-xl border border-dashed border-[#333] bg-[#0f0f0f] overflow-hidden flex items-center justify-center">
+              {banners.dashboard.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={banners.dashboard.imageUrl} alt="Preview banner" className="w-full h-full object-cover" />
+              ) : (
+                <div className="flex flex-col items-center gap-1 text-gray-700">
+                  <ImageIcon className="w-6 h-6" />
+                  <span className="text-xs">Sin imagen</span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <UploadButton
+                label="Subir imagen"
+                uploading={uploadingDashboard}
+                onFile={handleUploadDashboardImage}
+                hint="JPG, PNG, WebP, GIF o SVG · máx. 2 MB"
+              />
+              {banners.dashboard.imageUrl && (
+                <div className="flex items-center gap-2 bg-[#0f0f0f] border border-[#222] rounded-lg px-3 py-2">
+                  <span className="text-xs text-gray-500 font-mono break-all flex-1 line-clamp-1">{banners.dashboard.imageUrl}</span>
+                  <button
+                    type="button"
+                    onClick={() => { navigator.clipboard.writeText(banners.dashboard.imageUrl); toast.success("URL copiada"); }}
+                    className="text-gray-600 hover:text-white text-xs flex-shrink-0"
+                  >Copiar</button>
+                </div>
+              )}
+              <Input
+                label="URL de destino al hacer clic (opcional)"
+                placeholder="https://thegamershop.com"
+                value={banners.dashboard.linkUrl}
+                onChange={e => setBanners(b => ({ ...b, dashboard: { ...b.dashboard, linkUrl: e.target.value } }))}
+              />
+              <Toggle
+                checked={banners.dashboard.visible}
+                onChange={v => setBanners(b => ({ ...b, dashboard: { ...b.dashboard, visible: v } }))}
+                label="Visible en el dashboard"
+              />
+            </div>
+          </Card>
+
+          {/* ── PREDICTIONS CTA ── */}
+          <Card className="p-5 flex flex-col gap-5">
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-gray-300 mb-0.5">CTA en Mis Predicciones</h3>
+              <p className="text-gray-600 text-xs">Texto con botón — aparece junto a los botones de modo en la parte superior</p>
+            </div>
+
+            {/* Preview */}
+            <div className="w-full rounded-xl border border-dashed border-[#333] bg-[#0f0f0f] px-3 py-2.5 flex items-center gap-2 min-h-[44px]">
+              {(banners.predictions.text || banners.predictions.buttonLabel || banners.predictions.buttonLogoUrl) ? (
+                <>
+                  <span className="text-gray-400 text-xs flex-1 line-clamp-2">{banners.predictions.text || <em className="text-gray-600">sin texto</em>}</span>
+                  {(banners.predictions.buttonLabel || banners.predictions.buttonLogoUrl) && (
+                    <span className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 bg-red-600 text-white text-xs font-bold rounded-lg">
+                      {banners.predictions.buttonLogoUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={banners.predictions.buttonLogoUrl} alt="" className="h-4 w-auto object-contain" />
+                      )}
+                      {banners.predictions.buttonLabel || <em className="opacity-50">sin label</em>}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="text-gray-700 text-xs">Vista previa — completá los campos</span>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <Input
+                label="Texto"
+                placeholder="Visitá The Gamer Shop y encontrá los mejores periféricos"
+                value={banners.predictions.text}
+                onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, text: e.target.value } }))}
+              />
+              <Input
+                label="Label del botón"
+                placeholder="Ver tienda"
+                value={banners.predictions.buttonLabel}
+                onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonLabel: e.target.value } }))}
+              />
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Logo del botón (opcional)</p>
+                <div className="flex items-center gap-3">
+                  {banners.predictions.buttonLogoUrl ? (
+                    <div className="h-8 w-14 bg-[#1a1a1a] border border-[#333] rounded-lg flex items-center justify-center p-1.5 shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={banners.predictions.buttonLogoUrl} alt="logo" className="max-h-full max-w-full object-contain" />
+                    </div>
+                  ) : null}
+                  <UploadButton
+                    label="Subir logo"
+                    uploading={uploadingPredLogo}
+                    onFile={handleUploadPredLogo}
+                    hint="PNG/SVG con transparencia recomendado · máx. 2 MB"
+                  />
+                  {banners.predictions.buttonLogoUrl && (
+                    <button type="button" onClick={() => setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonLogoUrl: "" } }))}
+                      className="text-gray-600 hover:text-red-400 text-xs">Quitar</button>
+                  )}
+                </div>
+                {banners.predictions.buttonLogoUrl && (
+                  <div className="flex items-center gap-2 bg-[#0f0f0f] border border-[#222] rounded-lg px-3 py-2 mt-2">
+                    <span className="text-xs text-gray-500 font-mono break-all flex-1 line-clamp-1">{banners.predictions.buttonLogoUrl}</span>
+                    <button type="button"
+                      onClick={() => { navigator.clipboard.writeText(banners.predictions.buttonLogoUrl); toast.success("URL copiada"); }}
+                      className="text-gray-600 hover:text-white text-xs flex-shrink-0">Copiar</button>
+                  </div>
+                )}
+              </div>
+
+              <Input
+                label="URL del botón"
+                placeholder="https://thegamershop.com"
+                value={banners.predictions.buttonUrl}
+                onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonUrl: e.target.value } }))}
+              />
+              {banners.predictions.buttonUrl && (
+                <a href={banners.predictions.buttonUrl} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs">
+                  <ExternalLink className="w-3 h-3" /> Verificar enlace
+                </a>
+              )}
+              <Toggle
+                checked={banners.predictions.visible}
+                onChange={v => setBanners(b => ({ ...b, predictions: { ...b.predictions, visible: v } }))}
+                label="Visible en Mis Predicciones"
+              />
+            </div>
+          </Card>
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <Button variant="primary" size="md" loading={savingBanners} onClick={saveBanners}>
+            <Save className="w-4 h-4" /> Guardar banners
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
