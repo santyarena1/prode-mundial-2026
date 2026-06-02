@@ -21,26 +21,31 @@ async function upsertSetting(key: string, value: string) {
   await prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } });
 }
 
-// GET — return current banner settings
+const PRED_KEYS = [
+  "sponsor_banner_dashboard_image_url",
+  "sponsor_banner_dashboard_link_url",
+  "sponsor_banner_dashboard_visible",
+  "sponsor_banner_predictions_text",
+  "sponsor_banner_predictions_text_color",
+  "sponsor_banner_predictions_text_accent",
+  "sponsor_banner_predictions_text_accent_color",
+  "sponsor_banner_predictions_button_label",
+  "sponsor_banner_predictions_button_url",
+  "sponsor_banner_predictions_button_text_color",
+  "sponsor_banner_predictions_button_logo_url",
+  "sponsor_banner_predictions_button_logo2_url",
+  "sponsor_banner_predictions_logo_position",
+  "sponsor_banner_predictions_bg_color",
+  "sponsor_banner_predictions_button_color",
+  "sponsor_banner_predictions_visible",
+];
+
 export async function GET() {
   try {
     const auth = await getAdminFromCookies();
     if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const keys = [
-      "sponsor_banner_dashboard_image_url",
-      "sponsor_banner_dashboard_link_url",
-      "sponsor_banner_dashboard_visible",
-      "sponsor_banner_predictions_text",
-      "sponsor_banner_predictions_button_label",
-      "sponsor_banner_predictions_button_url",
-      "sponsor_banner_predictions_button_logo_url",
-      "sponsor_banner_predictions_bg_color",
-      "sponsor_banner_predictions_button_color",
-      "sponsor_banner_predictions_text_color",
-      "sponsor_banner_predictions_visible",
-    ];
-    const rows = await prisma.setting.findMany({ where: { key: { in: keys } } });
+    const rows = await prisma.setting.findMany({ where: { key: { in: PRED_KEYS } } });
     const get = (k: string) => rows.find(r => r.key === k)?.value ?? "";
 
     return NextResponse.json({
@@ -51,12 +56,17 @@ export async function GET() {
       },
       predictions: {
         text: get("sponsor_banner_predictions_text"),
+        textColor: get("sponsor_banner_predictions_text_color") || "#9ca3af",
+        textAccent: get("sponsor_banner_predictions_text_accent"),
+        textAccentColor: get("sponsor_banner_predictions_text_accent_color") || "#ffffff",
         buttonLabel: get("sponsor_banner_predictions_button_label"),
         buttonUrl: get("sponsor_banner_predictions_button_url"),
+        buttonTextColor: get("sponsor_banner_predictions_button_text_color") || "#ffffff",
         buttonLogoUrl: get("sponsor_banner_predictions_button_logo_url"),
+        buttonLogo2Url: get("sponsor_banner_predictions_button_logo2_url"),
+        logoPosition: get("sponsor_banner_predictions_logo_position") || "left",
         bgColor: get("sponsor_banner_predictions_bg_color") || "#111111",
         buttonColor: get("sponsor_banner_predictions_button_color") || "#dc2626",
-        textColor: get("sponsor_banner_predictions_text_color") || "#9ca3af",
         visible: get("sponsor_banner_predictions_visible") === "true",
       },
     });
@@ -66,7 +76,6 @@ export async function GET() {
   }
 }
 
-// POST — upload an image, returns { url }
 export async function POST(request: NextRequest) {
   try {
     const auth = await getAdminFromCookies();
@@ -93,26 +102,31 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT — save all banner settings
 export async function PUT(request: NextRequest) {
   try {
     const auth = await getAdminFromCookies();
     if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
+    const p = body.predictions ?? {};
 
     const pairs: [string, string][] = [
       ["sponsor_banner_dashboard_image_url", body.dashboard?.imageUrl ?? ""],
       ["sponsor_banner_dashboard_link_url", body.dashboard?.linkUrl ?? ""],
       ["sponsor_banner_dashboard_visible", String(body.dashboard?.visible ?? false)],
-      ["sponsor_banner_predictions_text", body.predictions?.text ?? ""],
-      ["sponsor_banner_predictions_button_label", body.predictions?.buttonLabel ?? ""],
-      ["sponsor_banner_predictions_button_url", body.predictions?.buttonUrl ?? ""],
-      ["sponsor_banner_predictions_button_logo_url", body.predictions?.buttonLogoUrl ?? ""],
-      ["sponsor_banner_predictions_bg_color", body.predictions?.bgColor ?? "#111111"],
-      ["sponsor_banner_predictions_button_color", body.predictions?.buttonColor ?? "#dc2626"],
-      ["sponsor_banner_predictions_text_color", body.predictions?.textColor ?? "#9ca3af"],
-      ["sponsor_banner_predictions_visible", String(body.predictions?.visible ?? false)],
+      ["sponsor_banner_predictions_text", p.text ?? ""],
+      ["sponsor_banner_predictions_text_color", p.textColor ?? "#9ca3af"],
+      ["sponsor_banner_predictions_text_accent", p.textAccent ?? ""],
+      ["sponsor_banner_predictions_text_accent_color", p.textAccentColor ?? "#ffffff"],
+      ["sponsor_banner_predictions_button_label", p.buttonLabel ?? ""],
+      ["sponsor_banner_predictions_button_url", p.buttonUrl ?? ""],
+      ["sponsor_banner_predictions_button_text_color", p.buttonTextColor ?? "#ffffff"],
+      ["sponsor_banner_predictions_button_logo_url", p.buttonLogoUrl ?? ""],
+      ["sponsor_banner_predictions_button_logo2_url", p.buttonLogo2Url ?? ""],
+      ["sponsor_banner_predictions_logo_position", p.logoPosition ?? "left"],
+      ["sponsor_banner_predictions_bg_color", p.bgColor ?? "#111111"],
+      ["sponsor_banner_predictions_button_color", p.buttonColor ?? "#dc2626"],
+      ["sponsor_banner_predictions_visible", String(p.visible ?? false)],
     ];
 
     await Promise.all(pairs.map(([k, v]) => upsertSetting(k, v)));

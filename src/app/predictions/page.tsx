@@ -128,7 +128,13 @@ export default function PredictionsPage() {
 
   // Team selection modal for bracket picks
   const [selectionModal, setSelectionModal] = useState<{ phase: string; slot: string } | null>(null);
-  const [predictionsCta, setPredictionsCta] = useState<{ text: string; buttonLabel: string; buttonUrl: string; buttonLogoUrl?: string; bgColor?: string; buttonColor?: string; textColor?: string } | null>(null);
+  const [predictionsCta, setPredictionsCta] = useState<{
+    text: string; textColor?: string;
+    textAccent?: string; textAccentColor?: string;
+    buttonLabel: string; buttonUrl: string; buttonTextColor?: string;
+    buttonLogoUrl?: string; buttonLogo2Url?: string; logoPosition?: string;
+    bgColor?: string; buttonColor?: string;
+  } | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -592,29 +598,38 @@ export default function PredictionsPage() {
               const bg = predictionsCta.bgColor ?? "#111111";
               const btnColor = predictionsCta.buttonColor ?? "#dc2626";
               const txtColor = predictionsCta.textColor ?? "#9ca3af";
+              const accentColor = predictionsCta.textAccentColor ?? "#ffffff";
+              const btnTxtColor = predictionsCta.buttonTextColor ?? "#ffffff";
+              const pos = predictionsCta.logoPosition ?? "left";
+              const logo1 = predictionsCta.buttonLogoUrl;
+              const logo2 = predictionsCta.buttonLogo2Url;
+              const Logo = ({ src }: { src: string }) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={src} alt="" className="h-3.5 w-auto object-contain flex-shrink-0" />
+              );
               return (
                 <div
                   className="flex-1 min-w-0 flex items-center justify-between gap-3 px-3 py-2 rounded-xl border text-xs font-bold uppercase tracking-wider"
-                  style={{
-                    background: bg,
-                    borderColor: `${btnColor}55`,
-                    boxShadow: `0 0 12px 1px ${btnColor}33`,
-                  }}
+                  style={{ background: bg, borderColor: `${btnColor}55`, boxShadow: `0 0 12px 1px ${btnColor}33` }}
                 >
-                  <span className="truncate" style={{ color: txtColor }}>{predictionsCta.text}</span>
-                  {predictionsCta.buttonUrl && (predictionsCta.buttonLabel || predictionsCta.buttonLogoUrl) && (
+                  <span className="truncate">
+                    {predictionsCta.text && <span style={{ color: txtColor }}>{predictionsCta.text}</span>}
+                    {predictionsCta.text && predictionsCta.textAccent && " "}
+                    {predictionsCta.textAccent && <span style={{ color: accentColor }}>{predictionsCta.textAccent}</span>}
+                  </span>
+                  {predictionsCta.buttonUrl && (logo1 || logo2 || predictionsCta.buttonLabel) && (
                     <a
                       href={predictionsCta.buttonUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 text-white text-xs font-black uppercase tracking-wide rounded-lg transition-opacity hover:opacity-80"
+                      className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 text-xs font-black uppercase tracking-wide rounded-lg transition-opacity hover:opacity-80"
                       style={{ background: btnColor }}
                     >
-                      {predictionsCta.buttonLogoUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={predictionsCta.buttonLogoUrl} alt="" className="h-3.5 w-auto object-contain" />
-                      )}
-                      {predictionsCta.buttonLabel}
+                      {(pos === "left" || pos === "sides") && logo1 && <Logo src={logo1} />}
+                      {pos === "left" && logo2 && <Logo src={logo2} />}
+                      {predictionsCta.buttonLabel && <span style={{ color: btnTxtColor }}>{predictionsCta.buttonLabel}</span>}
+                      {pos === "right" && logo1 && <Logo src={logo1} />}
+                      {(pos === "right" || pos === "sides") && logo2 && <Logo src={logo2} />}
                     </a>
                   )}
                 </div>

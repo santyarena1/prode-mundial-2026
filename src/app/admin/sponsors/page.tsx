@@ -123,7 +123,14 @@ function EditModal({ sponsor, onClose, onSaved }: { sponsor: Sponsor; onClose: (
 
 interface BannerSettings {
   dashboard: { imageUrl: string; linkUrl: string; visible: boolean };
-  predictions: { text: string; buttonLabel: string; buttonUrl: string; buttonLogoUrl: string; bgColor: string; buttonColor: string; textColor: string; visible: boolean };
+  predictions: {
+    text: string; textColor: string;
+    textAccent: string; textAccentColor: string;
+    buttonLabel: string; buttonUrl: string; buttonTextColor: string;
+    buttonLogoUrl: string; buttonLogo2Url: string; logoPosition: string;
+    bgColor: string; buttonColor: string;
+    visible: boolean;
+  };
 }
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -167,6 +174,29 @@ function UploadButton({
   );
 }
 
+function ColorPicker({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 block">{label}</label>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          className="w-9 h-9 rounded-lg cursor-pointer bg-transparent border border-[#333] p-0.5 flex-shrink-0"
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          className="flex-1 bg-[#1a1a1a] border border-[#333] text-white rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:border-red-500 min-w-0"
+          placeholder={value}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function AdminSponsorsPage() {
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -181,11 +211,19 @@ export default function AdminSponsorsPage() {
 
   const [banners, setBanners] = useState<BannerSettings>({
     dashboard: { imageUrl: "", linkUrl: "", visible: false },
-    predictions: { text: "", buttonLabel: "", buttonUrl: "", buttonLogoUrl: "", bgColor: "#111111", buttonColor: "#dc2626", textColor: "#9ca3af", visible: false },
+    predictions: {
+      text: "", textColor: "#9ca3af",
+      textAccent: "", textAccentColor: "#ffffff",
+      buttonLabel: "", buttonUrl: "", buttonTextColor: "#ffffff",
+      buttonLogoUrl: "", buttonLogo2Url: "", logoPosition: "left",
+      bgColor: "#111111", buttonColor: "#dc2626",
+      visible: false,
+    },
   });
   const [savingBanners, setSavingBanners] = useState(false);
   const [uploadingDashboard, setUploadingDashboard] = useState(false);
   const [uploadingPredLogo, setUploadingPredLogo] = useState(false);
+  const [uploadingPredLogo2, setUploadingPredLogo2] = useState(false);
 
   const loadSponsors = () =>
     apiFetch("/api/admin/sponsors").then(async (r) => {
@@ -210,9 +248,14 @@ export default function AdminSponsorsPage() {
               buttonLabel: data.predictions?.buttonLabel ?? "",
               buttonUrl: data.predictions?.buttonUrl ?? "",
               buttonLogoUrl: data.predictions?.buttonLogoUrl ?? "",
+              textColor: data.predictions?.textColor ?? "#9ca3af",
+              textAccent: data.predictions?.textAccent ?? "",
+              textAccentColor: data.predictions?.textAccentColor ?? "#ffffff",
+              buttonTextColor: data.predictions?.buttonTextColor ?? "#ffffff",
+              buttonLogo2Url: data.predictions?.buttonLogo2Url ?? "",
+              logoPosition: data.predictions?.logoPosition ?? "left",
               bgColor: data.predictions?.bgColor ?? "#111111",
               buttonColor: data.predictions?.buttonColor ?? "#dc2626",
-              textColor: data.predictions?.textColor ?? "#9ca3af",
               visible: data.predictions?.visible ?? false,
             },
           });
@@ -294,6 +337,14 @@ export default function AdminSponsorsPage() {
       const url = await uploadBannerImage(file, "predictions");
       if (url) setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonLogoUrl: url } }));
     } finally { setUploadingPredLogo(false); }
+  };
+
+  const handleUploadPredLogo2 = async (file: File) => {
+    setUploadingPredLogo2(true);
+    try {
+      const url = await uploadBannerImage(file, "predictions");
+      if (url) setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonLogo2Url: url } }));
+    } finally { setUploadingPredLogo2(false); }
   };
 
   const saveBanners = async () => {
@@ -482,88 +533,81 @@ export default function AdminSponsorsPage() {
               <p className="text-gray-600 text-xs">Texto con botón — aparece junto a los botones de modo en la parte superior</p>
             </div>
 
-            {/* Preview */}
-            <div
-              className="w-full rounded-xl border px-3 py-2 flex items-center justify-between gap-3 min-h-[40px] transition-all text-xs font-bold uppercase tracking-wider"
-              style={{
-                background: banners.predictions.bgColor || "#111111",
-                borderColor: `${banners.predictions.buttonColor || "#dc2626"}55`,
-                boxShadow: `0 0 12px 1px ${banners.predictions.buttonColor || "#dc2626"}33`,
-              }}
-            >
-              {(banners.predictions.text || banners.predictions.buttonLabel || banners.predictions.buttonLogoUrl) ? (
-                <>
-                  <span className="flex-1 truncate" style={{ color: banners.predictions.textColor || "#9ca3af" }}>
-                    {banners.predictions.text || <em className="opacity-40">sin texto</em>}
+            {/* Live preview */}
+            {(() => {
+              const p = banners.predictions;
+              const pos = p.logoPosition || "left";
+              const PreviewLogo = ({ src }: { src: string }) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={src} alt="" className="h-3.5 w-auto object-contain flex-shrink-0" />
+              );
+              return (
+                <div
+                  className="w-full rounded-xl border px-3 py-2 flex items-center justify-between gap-3 min-h-[40px] text-xs font-bold uppercase tracking-wider transition-all"
+                  style={{ background: p.bgColor || "#111111", borderColor: `${p.buttonColor || "#dc2626"}55`, boxShadow: `0 0 12px 1px ${p.buttonColor || "#dc2626"}33` }}
+                >
+                  <span className="flex-1 truncate">
+                    {p.text ? <span style={{ color: p.textColor || "#9ca3af" }}>{p.text}</span> : null}
+                    {p.text && p.textAccent ? " " : null}
+                    {p.textAccent ? <span style={{ color: p.textAccentColor || "#ffffff" }}>{p.textAccent}</span> : null}
+                    {!p.text && !p.textAccent && <span className="opacity-30">Vista previa</span>}
                   </span>
-                  {(banners.predictions.buttonLabel || banners.predictions.buttonLogoUrl) && (
+                  {(p.buttonLabel || p.buttonLogoUrl || p.buttonLogo2Url) && (
                     <span
-                      className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 text-white text-xs font-black uppercase tracking-wide rounded-lg"
-                      style={{ background: banners.predictions.buttonColor || "#dc2626" }}
+                      className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 text-xs font-black uppercase tracking-wide rounded-lg"
+                      style={{ background: p.buttonColor || "#dc2626" }}
                     >
-                      {banners.predictions.buttonLogoUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={banners.predictions.buttonLogoUrl} alt="" className="h-3.5 w-auto object-contain" />
-                      )}
-                      {banners.predictions.buttonLabel || <em className="opacity-50">sin label</em>}
+                      {(pos === "left" || pos === "sides") && p.buttonLogoUrl && <PreviewLogo src={p.buttonLogoUrl} />}
+                      {pos === "left" && p.buttonLogo2Url && <PreviewLogo src={p.buttonLogo2Url} />}
+                      {p.buttonLabel && <span style={{ color: p.buttonTextColor || "#ffffff" }}>{p.buttonLabel}</span>}
+                      {pos === "right" && p.buttonLogoUrl && <PreviewLogo src={p.buttonLogoUrl} />}
+                      {(pos === "right" || pos === "sides") && p.buttonLogo2Url && <PreviewLogo src={p.buttonLogo2Url} />}
                     </span>
                   )}
-                </>
-              ) : (
-                <span className="opacity-30">Vista previa — completá los campos</span>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <Input
-                label="Texto"
-                placeholder="Visitá The Gamer Shop y encontrá los mejores periféricos"
-                value={banners.predictions.text}
-                onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, text: e.target.value } }))}
-              />
-              <Input
-                label="Label del botón"
-                placeholder="Ver tienda"
-                value={banners.predictions.buttonLabel}
-                onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonLabel: e.target.value } }))}
-              />
-
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Logo del botón (opcional)</p>
-                <div className="flex items-center gap-3">
-                  {banners.predictions.buttonLogoUrl ? (
-                    <div className="h-8 w-14 bg-[#1a1a1a] border border-[#333] rounded-lg flex items-center justify-center p-1.5 shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={banners.predictions.buttonLogoUrl} alt="logo" className="max-h-full max-w-full object-contain" />
-                    </div>
-                  ) : null}
-                  <UploadButton
-                    label="Subir logo"
-                    uploading={uploadingPredLogo}
-                    onFile={handleUploadPredLogo}
-                    hint="PNG/SVG con transparencia recomendado · máx. 2 MB"
-                  />
-                  {banners.predictions.buttonLogoUrl && (
-                    <button type="button" onClick={() => setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonLogoUrl: "" } }))}
-                      className="text-gray-600 hover:text-red-400 text-xs">Quitar</button>
-                  )}
                 </div>
-                {banners.predictions.buttonLogoUrl && (
-                  <div className="flex items-center gap-2 bg-[#0f0f0f] border border-[#222] rounded-lg px-3 py-2 mt-2">
-                    <span className="text-xs text-gray-500 font-mono break-all flex-1 line-clamp-1">{banners.predictions.buttonLogoUrl}</span>
-                    <button type="button"
-                      onClick={() => { navigator.clipboard.writeText(banners.predictions.buttonLogoUrl); toast.success("URL copiada"); }}
-                      className="text-gray-600 hover:text-white text-xs flex-shrink-0">Copiar</button>
-                  </div>
-                )}
+              );
+            })()}
+
+            <div className="space-y-4">
+              {/* Texto principal + acento */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Input
+                    label="Texto principal"
+                    placeholder="Visitá"
+                    value={banners.predictions.text}
+                    onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, text: e.target.value } }))}
+                  />
+                  <ColorPicker label="Color texto principal" value={banners.predictions.textColor || "#9ca3af"}
+                    onChange={v => setBanners(b => ({ ...b, predictions: { ...b.predictions, textColor: v } }))} />
+                </div>
+                <div className="space-y-2">
+                  <Input
+                    label="Texto acento (2° color)"
+                    placeholder="The Gamer Shop"
+                    value={banners.predictions.textAccent}
+                    onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, textAccent: e.target.value } }))}
+                  />
+                  <ColorPicker label="Color acento" value={banners.predictions.textAccentColor || "#ffffff"}
+                    onChange={v => setBanners(b => ({ ...b, predictions: { ...b.predictions, textAccentColor: v } }))} />
+                </div>
               </div>
 
-              <Input
-                label="URL del botón"
-                placeholder="https://thegamershop.com"
-                value={banners.predictions.buttonUrl}
-                onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonUrl: e.target.value } }))}
-              />
+              {/* Botón */}
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Label del botón"
+                  placeholder="Ver tienda"
+                  value={banners.predictions.buttonLabel}
+                  onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonLabel: e.target.value } }))}
+                />
+                <Input
+                  label="URL del botón"
+                  placeholder="https://thegamershop.com"
+                  value={banners.predictions.buttonUrl}
+                  onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonUrl: e.target.value } }))}
+                />
+              </div>
               {banners.predictions.buttonUrl && (
                 <a href={banners.predictions.buttonUrl} target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs">
@@ -571,59 +615,69 @@ export default function AdminSponsorsPage() {
                 </a>
               )}
 
+              {/* Colores fondo + botón + texto botón */}
               <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 block">Color de fondo</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={banners.predictions.bgColor || "#1a1a1a"}
-                      onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, bgColor: e.target.value } }))}
-                      className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border border-[#333] p-0.5"
-                    />
-                    <input
-                      type="text"
-                      value={banners.predictions.bgColor || "#1a1a1a"}
-                      onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, bgColor: e.target.value } }))}
-                      className="flex-1 bg-[#1a1a1a] border border-[#333] text-white rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:border-red-500"
-                      placeholder="#1a1a1a"
-                    />
-                  </div>
+                <ColorPicker label="Fondo" value={banners.predictions.bgColor || "#111111"}
+                  onChange={v => setBanners(b => ({ ...b, predictions: { ...b.predictions, bgColor: v } }))} />
+                <ColorPicker label="Botón" value={banners.predictions.buttonColor || "#dc2626"}
+                  onChange={v => setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonColor: v } }))} />
+                <ColorPicker label="Texto botón" value={banners.predictions.buttonTextColor || "#ffffff"}
+                  onChange={v => setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonTextColor: v } }))} />
+              </div>
+
+              {/* Logos */}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Logos del botón</p>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  {(["Logo 1", "Logo 2"] as const).map((lbl, idx) => {
+                    const key = idx === 0 ? "buttonLogoUrl" : "buttonLogo2Url";
+                    const url = banners.predictions[key];
+                    const uploader = idx === 0 ? handleUploadPredLogo : handleUploadPredLogo2;
+                    const uploading = idx === 0 ? uploadingPredLogo : uploadingPredLogo2;
+                    return (
+                      <div key={lbl} className="space-y-1.5">
+                        <p className="text-[10px] uppercase tracking-wider text-gray-600">{lbl}</p>
+                        <div className="flex items-center gap-2">
+                          {url ? (
+                            <div className="h-8 w-12 bg-[#1a1a1a] border border-[#333] rounded-lg flex items-center justify-center p-1 shrink-0">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={url} alt="" className="max-h-full max-w-full object-contain" />
+                            </div>
+                          ) : null}
+                          <UploadButton label="Subir" uploading={uploading} onFile={uploader} hint="PNG/SVG recomendado" />
+                          {url && (
+                            <button type="button"
+                              onClick={() => setBanners(b => ({ ...b, predictions: { ...b.predictions, [key]: "" } }))}
+                              className="text-gray-600 hover:text-red-400 text-xs">Quitar</button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
+
+                {/* Posición de logos */}
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 block">Color del botón</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={banners.predictions.buttonColor || "#dc2626"}
-                      onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonColor: e.target.value } }))}
-                      className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border border-[#333] p-0.5"
-                    />
-                    <input
-                      type="text"
-                      value={banners.predictions.buttonColor || "#dc2626"}
-                      onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonColor: e.target.value } }))}
-                      className="flex-1 bg-[#1a1a1a] border border-[#333] text-white rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:border-red-500"
-                      placeholder="#dc2626"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 block">Color del texto</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={banners.predictions.textColor || "#9ca3af"}
-                      onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, textColor: e.target.value } }))}
-                      className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border border-[#333] p-0.5"
-                    />
-                    <input
-                      type="text"
-                      value={banners.predictions.textColor || "#9ca3af"}
-                      onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, textColor: e.target.value } }))}
-                      className="flex-1 bg-[#1a1a1a] border border-[#333] text-white rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:border-red-500"
-                      placeholder="#9ca3af"
-                    />
+                  <p className="text-[10px] uppercase tracking-wider text-gray-600 mb-1.5">Posición de los logos</p>
+                  <div className="flex gap-2">
+                    {([
+                      { value: "left", label: "🖼️🖼️ Texto" },
+                      { value: "right", label: "Texto 🖼️🖼️" },
+                      { value: "sides", label: "🖼️ Texto 🖼️" },
+                    ] as const).map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setBanners(b => ({ ...b, predictions: { ...b.predictions, logoPosition: opt.value } }))}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+                          banners.predictions.logoPosition === opt.value
+                            ? "bg-red-600/20 border-red-600/50 text-red-400"
+                            : "bg-[#1a1a1a] border-[#333] text-gray-500 hover:text-gray-300"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
