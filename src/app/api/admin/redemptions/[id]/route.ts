@@ -36,14 +36,7 @@ export async function PUT(
       if (redemptionWithUser) {
         await prisma.user.update({
           where: { id: redemptionWithUser.userId },
-          data: {
-            spentPoints: {
-              decrement: redemptionWithUser.pointsSpent,
-            },
-            totalPoints: {
-              increment: redemptionWithUser.pointsSpent,
-            },
-          },
+          data: { spentPoints: { decrement: redemptionWithUser.pointsSpent } },
         });
       }
     }
@@ -71,7 +64,7 @@ export async function DELETE(
       prisma.prizeRedemption.delete({ where: { id } }),
       prisma.user.update({
         where: { id: r.userId },
-        data: { spentPoints: { decrement: r.pointsSpent }, totalPoints: { increment: r.pointsSpent } },
+        data: { spentPoints: { decrement: r.pointsSpent } },
       }),
       prisma.prize.update({
         where: { id: r.prizeId },

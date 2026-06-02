@@ -3,7 +3,7 @@
 import React, { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { ArrowLeft, Trophy, Star, Zap, Gift, Medal, Target, Trash2, CheckCircle2, XCircle, Clock, Plus } from "lucide-react";
+import { ArrowLeft, Trophy, Star, Zap, Gift, Medal, Target, Trash2, CheckCircle2, XCircle, Clock, Plus, Minus } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -35,7 +35,7 @@ interface UserDetail {
     prize: { name: string };
   }>;
   predictions: Array<{
-    id: string; pointsEarned: number; predictedOutcome?: string | null; createdAt: string;
+    id: string; status: string; pointsEarned: number; predictedOutcome?: string | null; createdAt: string;
     match: { matchCode: string; phase: string; homeTeam?: { name: string } | null; awayTeam?: { name: string } | null };
   }>;
   userAchievements: Array<{
@@ -61,6 +61,9 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
   const [manualPoints, setManualPoints] = useState("");
   const [manualNote, setManualNote] = useState("");
   const [addingPoints, setAddingPoints] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deletingUser, setDeletingUser] = useState(false);
 
   useEffect(() => {
     fetch(`/api/admin/participants/${id}`)
@@ -117,7 +120,7 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
     setDeleting(p => ({ ...p, [itemId]: false }));
   };
 
-  const addManualPoints = async () => {
+  const applyManualPoints = async (operation: "add" | "subtract") => {
     const pts = parseInt(manualPoints, 10);
     if (!pts || pts < 1) { toast.error("Ingresá una cantidad válida de puntos"); return; }
     setAddingPoints(true);
@@ -125,16 +128,27 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
       const res = await fetch(`/api/admin/participants/${id}/manual-points`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ points: pts, note: manualNote.trim() || undefined }),
+        body: JSON.stringify({ points: pts, operation, note: manualNote.trim() || undefined }),
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error || "Error"); return; }
       setUser(u => u ? { ...u, totalPoints: data.totalPoints, bonusPoints: data.bonusPoints } : u);
       setManualPoints("");
       setManualNote("");
-      toast.success(`+${pts} puntos acreditados`);
+      toast.success(operation === "add" ? `+${pts} puntos acreditados` : `-${pts} puntos descontados`);
     } catch { toast.error("Error de conexión"); }
     finally { setAddingPoints(false); }
+  };
+
+  const deleteUser = async () => {
+    setDeletingUser(true);
+    try {
+      const res = await fetch(`/api/admin/participants/${id}`, { method: "DELETE" });
+      if (!res.ok) { toast.error("Error al eliminar el usuario"); return; }
+      toast.success("Usuario eliminado");
+      router.push("/admin/participants");
+    } catch { toast.error("Error de conexión"); }
+    finally { setDeletingUser(false); }
   };
 
   if (loading) return <LoadingScreen />;
@@ -143,16 +157,24 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
   const tabs: { key: Tab; label: string; count: number; icon: React.ReactNode }[] = [
     { key: "bonuses", label: "Bonus", count: user.bonuses.length, icon: <Zap className="w-4 h-4" /> },
     { key: "redemptions", label: "Premios", count: user.redemptions.length, icon: <Gift className="w-4 h-4" /> },
-    { key: "predictions", label: "Predicciones", count: user.predictions.length, icon: <Target className="w-4 h-4" /> },
+    { key: "predictions", label: "Predicciones", count: user.predictions.filter(p => p.status === "locked").length, icon: <Target className="w-4 h-4" /> },
     { key: "achievements", label: "Logros", count: user.userAchievements.length, icon: <Medal className="w-4 h-4" /> },
   ];
 
   return (
     <div>
       {/* Back */}
-      <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-500 hover:text-white text-sm mb-5 transition-colors">
-        <ArrowLeft className="w-4 h-4" /> Volver a participantes
-      </button>
+      <div className="flex items-center justify-between mb-5">
+        <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-500 hover:text-white text-sm transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Volver a participantes
+        </button>
+        <button
+          onClick={() => { setDeleteConfirm(""); setShowDeleteModal(true); }}
+          className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-400 border border-red-500/30 hover:border-red-400/50 px-3 py-1.5 rounded-lg transition-colors"
+        >
+          <Trash2 className="w-3.5 h-3.5" /> Eliminar usuario
+        </button>
+      </div>
 
       {/* Header */}
       <Card className="p-5 mb-6">
@@ -185,7 +207,7 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
           </div>
         </div>
         <div className="mt-4 pt-4 border-t border-[#1f1f1f]">
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-600 mb-3">Sumar puntos extra</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-600 mb-3">Ajuste manual de puntos</p>
           <div className="flex flex-wrap gap-2 items-end">
             <div className="w-28">
               <Input
@@ -204,8 +226,11 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
                 onChange={e => setManualNote(e.target.value)}
               />
             </div>
-            <Button variant="primary" size="sm" loading={addingPoints} onClick={addManualPoints}>
+            <Button variant="primary" size="sm" loading={addingPoints} onClick={() => applyManualPoints("add")}>
               <Plus className="w-4 h-4" /> Sumar
+            </Button>
+            <Button variant="secondary" size="sm" loading={addingPoints} onClick={() => applyManualPoints("subtract")}>
+              <Minus className="w-4 h-4" /> Restar
             </Button>
           </div>
         </div>
@@ -285,8 +310,10 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
       {/* Predictions tab */}
       {tab === "predictions" && (
         <div className="space-y-2">
-          {user.predictions.length === 0 && <Card className="p-6 text-center text-gray-600">Sin predicciones</Card>}
-          {user.predictions.map(p => (
+          {user.predictions.filter(p => p.status === "locked").length === 0 && (
+            <Card className="p-6 text-center text-gray-600">Sin predicciones guardadas</Card>
+          )}
+          {user.predictions.filter(p => p.status === "locked").map(p => (
             <Card key={p.id} className="p-4 flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-3 min-w-0">
                 <Target className="w-4 h-4 text-blue-400 flex-shrink-0" />
@@ -324,6 +351,49 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
               <span className="text-yellow-400 font-black text-sm flex-shrink-0">+{a.pointsEarned} pts</span>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Delete user modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111] border border-red-500/30 rounded-xl p-6 max-w-sm w-full space-y-4">
+            <div className="flex items-start gap-3">
+              <Trash2 className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-white font-bold">Eliminar usuario</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  Se eliminarán permanentemente todos los datos de{" "}
+                  <strong className="text-white">{user.firstName} {user.lastName}</strong>:
+                  predicciones, puntos, canjes, bonuses y logros.
+                  Esta acción <strong className="text-red-400">no se puede deshacer</strong>.
+                </p>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500">
+                Escribí <span className="text-white font-mono">{user.firstName} {user.lastName}</span> para confirmar
+              </label>
+              <input
+                value={deleteConfirm}
+                onChange={e => setDeleteConfirm(e.target.value)}
+                placeholder={`${user.firstName} ${user.lastName}`}
+                className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-red-500/50"
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={() => setShowDeleteModal(false)}>
+                Cancelar
+              </Button>
+              <button
+                disabled={deleteConfirm !== `${user.firstName} ${user.lastName}` || deletingUser}
+                onClick={deleteUser}
+                className="flex-1 px-4 py-2 rounded-lg text-sm font-bold bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {deletingUser ? "Eliminando..." : "Eliminar definitivamente"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

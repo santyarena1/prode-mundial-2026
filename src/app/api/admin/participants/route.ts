@@ -24,7 +24,7 @@ export async function GET() {
         passwordHash: true,
         createdAt: true,
         _count: {
-          select: { predictions: true },
+          select: { predictions: { where: { status: "locked" } } },
         },
         squadMemberships: {
           select: {

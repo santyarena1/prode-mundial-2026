@@ -3,9 +3,11 @@ import prisma from "@/lib/db";
 
 export async function GET() {
   try {
-    const [totalParticipants, totalPredictions, topUser] = await Promise.all([
+    const [totalParticipants, matchPreds, groupPreds, bracketPreds, topUser] = await Promise.all([
       prisma.user.count({ where: { isBlocked: false } }),
       prisma.prediction.count(),
+      prisma.groupPrediction.count(),
+      prisma.bracketPrediction.count(),
       prisma.user.findFirst({
         where: { isBlocked: false },
         orderBy: { totalPoints: "desc" },
@@ -15,7 +17,7 @@ export async function GET() {
 
     return NextResponse.json({
       totalParticipants,
-      totalPredictions,
+      totalPredictions: matchPreds + groupPreds + bracketPreds,
       topScore: topUser?.totalPoints ?? 0,
     });
   } catch (error) {

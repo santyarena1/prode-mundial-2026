@@ -27,7 +27,11 @@ export async function GET(
         },
         orderBy: { totalPoints: "desc" },
       },
-      prizes: { where: { active: true }, orderBy: { pointsCost: "asc" } },
+      prizes: {
+        where: { active: true },
+        orderBy: { pointsCost: "asc" },
+        include: { _count: { select: { redemptions: true } } },
+      },
       deleteRequest: {
         include: { votes: { select: { userId: true, approve: true } } },
       },

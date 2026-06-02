@@ -9,7 +9,7 @@ export async function POST() {
 
     const user = await prisma.user.findUnique({
       where: { id: auth.userId },
-      select: { id: true, earlyBirdGranted: true, createdAt: true },
+      select: { id: true, earlyBirdGranted: true },
     });
     if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -17,26 +17,23 @@ export async function POST() {
       return NextResponse.json({ error: "Ya reclamaste tu ticket" }, { status: 409 });
     }
 
-    const raffle = await prisma.weeklyRaffle.findFirst({
-      where: {
-        bonusActionId: { not: null },
-        status: { in: ["upcoming", "live"] },
-        earlyBirdCutoff: { gte: user.createdAt },
-      },
-      orderBy: { earlyBirdCutoff: "asc" },
+    // Find the raffle prize to attach the redemption to
+    const rafflePrize = await prisma.prize.findFirst({
+      where: { prizeType: "raffle", active: true },
+      orderBy: { createdAt: "asc" },
     });
 
-    if (!raffle?.bonusActionId) {
+    if (!rafflePrize) {
       return NextResponse.json({ error: "No hay sorteo disponible para reclamar" }, { status: 400 });
     }
 
     await prisma.$transaction([
-      prisma.userBonus.create({
+      prisma.prizeRedemption.create({
         data: {
           userId: user.id,
-          bonusActionId: raffle.bonusActionId,
+          prizeId: rafflePrize.id,
+          pointsSpent: 0,
           status: "approved",
-          pointsEarned: 0,
         },
       }),
       prisma.user.update({

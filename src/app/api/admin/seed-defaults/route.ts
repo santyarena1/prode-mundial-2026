@@ -72,12 +72,37 @@ export async function POST() {
       }
     }
 
+    // Migrate existing earlyBird users: create PrizeRedemption if they don't have one
+    const rafflePrize = await prisma.prize.findFirst({
+      where: { prizeType: "raffle", active: true },
+      orderBy: { createdAt: "asc" },
+    });
+    let earlyBirdMigrated = 0;
+    if (rafflePrize) {
+      const earlyBirdUsers = await prisma.user.findMany({
+        where: { earlyBirdGranted: true },
+        select: { id: true },
+      });
+      for (const u of earlyBirdUsers) {
+        const existing = await prisma.prizeRedemption.findFirst({
+          where: { userId: u.id, prizeId: rafflePrize.id, pointsSpent: 0 },
+        });
+        if (!existing) {
+          await prisma.prizeRedemption.create({
+            data: { userId: u.id, prizeId: rafflePrize.id, pointsSpent: 0, status: "approved" },
+          });
+          earlyBirdMigrated++;
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       prizes: prizesCreated,
       bonusActions: bonusCreated,
       deletedObsolete: deleted.count,
-      message: `Creados: ${prizesCreated} premios nuevos, ${bonusCreated} bonus nuevos. Eliminados: ${deleted.count} bonus obsoletos.`,
+      earlyBirdMigrated,
+      message: `Creados: ${prizesCreated} premios nuevos, ${bonusCreated} bonus nuevos. Eliminados: ${deleted.count} bonus obsoletos. Migrados: ${earlyBirdMigrated} tickets early bird.`,
     });
   } catch (error) {
     console.error("Seed defaults error:", error);

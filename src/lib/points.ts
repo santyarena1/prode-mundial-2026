@@ -21,20 +21,24 @@ export const DEFAULT_POINT_RULES = {
 };
 
 export const DEFAULT_ACHIEVEMENTS = {
-  MATCH_10:            { name: "Buen arranque",              description: "Acertar 10 partidos de fase de grupos",               points: 2000 },
-  MATCH_25:            { name: "Racha de aciertos",          description: "Acertar 25 partidos de fase de grupos",               points: 6000 },
-  MATCH_40:            { name: "Especialista de grupos",     description: "Acertar 40 partidos de fase de grupos",               points: 15000 },
-  MATCH_55:            { name: "Máquina de grupos",          description: "Acertar 55 partidos de fase de grupos",               points: 35000 },
-  CLASSIFIED_12:       { name: "Ojo de halcón",              description: "Acertar 12 clasificados de grupo",                    points: 5000 },
-  CLASSIFIED_18:       { name: "Ojo clínico",                description: "Acertar 18 clasificados de grupo",                    points: 12000 },
-  ALL_CLASSIFIED:      { name: "Todos clasificados",         description: "Acertar todos los 24 clasificados",                   points: 30000 },
-  PERFECT_TABLE:       { name: "Tabla perfecta",             description: "Acertar todos los 1° y 2° exactos de los grupos",     points: 50000 },
-  STRONG_BRACKET:      { name: "Bracket fuerte",             description: "Acertar el 70% de las predicciones de eliminatorias", points: 20000 },
-  PERFECT_BRACKET:     { name: "Bracket perfecto",           description: "Acertar toda la llave eliminatoria",                  points: 60000 },
-  GROUPS_EXCELLENT:    { name: "Fase de grupos excelente",   description: "Acertar 40+ partidos y 18+ clasificados",             points: 35000 },
-  GROUPS_PERFECT:      { name: "Fase de grupos perfecta",    description: "Acertar 55 partidos y toda la tabla exacta",          points: 80000 },
-  PRODE_ALMOST_PERFECT:{ name: "Prode casi perfecto",        description: "Lograr fase excelente + bracket fuerte",              points: 120000 },
-  PRODE_PERFECT:       { name: "Prode perfecto",             description: "Desbloquear todos los logros del prode",              points: 250000 },
+  // Categoría A: Partidos de grupos — solo se gana el tier más alto
+  A1_MATCH:         { name: "Buen arranque",         description: "Acertar 28 o más partidos de fase de grupos",                   points: 2000  },
+  A2_MATCH:         { name: "Especialista",           description: "Acertar 40 o más partidos de fase de grupos",                   points: 9000  },
+  A3_MATCH:         { name: "Máquina de grupos",      description: "Acertar 54 o más partidos de fase de grupos",                   points: 22000 },
+  // Categoría B: Clasificados — solo se gana el tier más alto
+  B1_CLASSIFIED:    { name: "Ojo de halcón",          description: "Acertar 14 o más equipos clasificados de grupos",               points: 3000  },
+  B2_CLASSIFIED:    { name: "Ojo clínico",             description: "Acertar 19 o más equipos clasificados de grupos",               points: 10000 },
+  B3_CLASSIFIED:    { name: "Tabla casi perfecta",    description: "Acertar 22 o más equipos clasificados de grupos",               points: 25000 },
+  // Categoría C: Eliminatorias — solo se gana el tier más alto
+  C1_BRACKET:       { name: "Bracket fuerte",         description: "Acertar el 65% o más de las predicciones de eliminatorias",     points: 6000  },
+  C2_BRACKET:       { name: "Bracket experto",        description: "Acertar el 80% o más de las predicciones de eliminatorias",     points: 18000 },
+  C3_BRACKET:       { name: "Bracket perfecto",       description: "Acertar toda la llave eliminatoria",                            points: 48000 },
+  // Categoría D: Especial
+  D_PERFECT_TABLE:  { name: "Tabla perfecta",         description: "Acertar el 1° y 2° exacto en los 12 grupos",                   points: 28000 },
+  // Combos — se suman encima de los tiers individuales
+  X1_SOLIDO:        { name: "Prode sólido",           description: "Ser Especialista + Ojo clínico + Bracket fuerte (o superior)",  points: 20000 },
+  X2_EXPERTO:       { name: "Prode experto",          description: "Ser Máquina + Tabla casi perfecta + Bracket experto (o sup.)",  points: 50000 },
+  X3_PERFECTO:      { name: "Prode perfecto",         description: "Máquina + Tabla casi perfecta + Bracket perfecto + Tabla perfecta", points: 80000 },
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -96,33 +100,38 @@ async function applyAchievements(userId: string, stats: AchievementStats): Promi
 
   const earned: string[] = [];
   const { groupCorrect, classifiedCorrect, groupsChecked, groupsPositionPerfect,
-          bracketCorrect, bracketFinished, finalChampionCorrect, finalRunnerUpCorrect } = stats;
+          bracketCorrect, bracketFinished } = stats;
 
-  // ── Group matches
-  if (groupCorrect >= 10) earned.push("MATCH_10");
-  if (groupCorrect >= 25) earned.push("MATCH_25");
-  if (groupCorrect >= 40) earned.push("MATCH_40");
-  if (groupCorrect >= 55) earned.push("MATCH_55");
+  // ── Categoría A: Partidos de grupos (exclusivo — solo el tier más alto)
+  if (groupCorrect >= 54)      earned.push("A3_MATCH");
+  else if (groupCorrect >= 40) earned.push("A2_MATCH");
+  else if (groupCorrect >= 28) earned.push("A1_MATCH");
 
-  // ── Classified teams
-  if (classifiedCorrect >= 12) earned.push("CLASSIFIED_12");
-  if (classifiedCorrect >= 18) earned.push("CLASSIFIED_18");
-  if (classifiedCorrect >= 24) earned.push("ALL_CLASSIFIED");
-  if (groupsChecked >= 12 && groupsPositionPerfect >= 12) earned.push("PERFECT_TABLE");
+  // ── Categoría B: Clasificados (exclusivo — solo el tier más alto)
+  if (classifiedCorrect >= 22)      earned.push("B3_CLASSIFIED");
+  else if (classifiedCorrect >= 19) earned.push("B2_CLASSIFIED");
+  else if (classifiedCorrect >= 14) earned.push("B1_CLASSIFIED");
 
-  // ── Bracket
-  if (bracketFinished > 0 && bracketCorrect / bracketFinished >= 0.7) earned.push("STRONG_BRACKET");
-  if (bracketFinished > 0 && bracketCorrect === bracketFinished) earned.push("PERFECT_BRACKET");
+  // ── Categoría C: Eliminatorias (exclusivo — solo el tier más alto)
+  if (bracketFinished > 0) {
+    const pct = bracketCorrect / bracketFinished;
+    if (bracketCorrect === bracketFinished)  earned.push("C3_BRACKET");
+    else if (pct >= 0.80)                    earned.push("C2_BRACKET");
+    else if (pct >= 0.65)                    earned.push("C1_BRACKET");
+  }
 
-  // ── Combo achievements
-  if (groupCorrect >= 40 && classifiedCorrect >= 18) earned.push("GROUPS_EXCELLENT");
-  if (groupCorrect >= 55 && groupsChecked >= 12 && groupsPositionPerfect >= 12) earned.push("GROUPS_PERFECT");
-  if (earned.includes("GROUPS_EXCELLENT") && earned.includes("STRONG_BRACKET")) earned.push("PRODE_ALMOST_PERFECT");
+  // ── Categoría D: Tabla perfecta (especial — acumula)
+  if (groupsChecked >= 12 && groupsPositionPerfect >= 12) earned.push("D_PERFECT_TABLE");
 
-  const baseKeys = ["MATCH_10","MATCH_25","MATCH_40","MATCH_55","CLASSIFIED_12","CLASSIFIED_18",
-    "ALL_CLASSIFIED","PERFECT_TABLE","STRONG_BRACKET","PERFECT_BRACKET",
-    "GROUPS_EXCELLENT","GROUPS_PERFECT","PRODE_ALMOST_PERFECT"];
-  if (baseKeys.every(k => earned.includes(k))) earned.push("PRODE_PERFECT");
+  // ── Combos (se suman encima de los tiers individuales)
+  const hasA2orBetter = earned.includes("A2_MATCH") || earned.includes("A3_MATCH");
+  const hasB2orBetter = earned.includes("B2_CLASSIFIED") || earned.includes("B3_CLASSIFIED");
+  const hasC1orBetter = earned.includes("C1_BRACKET") || earned.includes("C2_BRACKET") || earned.includes("C3_BRACKET");
+  const hasC2orBetter = earned.includes("C2_BRACKET") || earned.includes("C3_BRACKET");
+
+  if (hasA2orBetter && hasB2orBetter && hasC1orBetter) earned.push("X1_SOLIDO");
+  if (earned.includes("A3_MATCH") && earned.includes("B3_CLASSIFIED") && hasC2orBetter) earned.push("X2_EXPERTO");
+  if (earned.includes("A3_MATCH") && earned.includes("B3_CLASSIFIED") && earned.includes("C3_BRACKET") && earned.includes("D_PERFECT_TABLE")) earned.push("X3_PERFECTO");
 
   // Remove achievements no longer earned
   await prisma.userAchievement.deleteMany({
@@ -326,12 +335,14 @@ export async function calculateUserPoints(userId: string): Promise<number> {
   }
 
   // ── 4. Bonus points (bonus actions + purchase codes + referrals) ─────────
-  const [bonusAgg, codeAgg, userRec] = await Promise.all([
+  const [bonusAgg, codeAgg, userRec, redemptionAgg] = await Promise.all([
     prisma.userBonus.aggregate({ where: { userId, status: "approved" }, _sum: { pointsEarned: true } }),
     prisma.purchaseCode.aggregate({ where: { userId, status: "redeemed" }, _sum: { points: true } }),
     prisma.user.findUnique({ where: { id: userId }, select: { referralPoints: true } }),
+    prisma.prizeRedemption.aggregate({ where: { userId, status: { not: "rejected" } }, _sum: { pointsSpent: true } }),
   ]);
   const bonusPoints = (bonusAgg._sum.pointsEarned ?? 0) + (codeAgg._sum.points ?? 0) + (userRec?.referralPoints ?? 0);
+  const spentPoints = redemptionAgg._sum.pointsSpent ?? 0;
 
   // ── 5. Achievements ──────────────────────────────────────────────────────
   const achievementPoints = await applyAchievements(userId, achievementStats);
@@ -341,7 +352,7 @@ export async function calculateUserPoints(userId: string): Promise<number> {
 
   await prisma.user.update({
     where: { id: userId },
-    data: { predictionPoints, bonusPoints, achievementPoints, totalPoints },
+    data: { predictionPoints, bonusPoints, achievementPoints, totalPoints, spentPoints },
   });
 
   return totalPoints;

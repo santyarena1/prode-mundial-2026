@@ -36,10 +36,17 @@ export async function POST(_request: NextRequest) {
     for (const [key, rule] of Object.entries(DEFAULT_ACHIEVEMENTS)) {
       await prisma.achievementRule.upsert({
         where: { key },
-        update: { name: rule.name, description: rule.description, points: rule.points },
+        update: { name: rule.name, description: rule.description, points: rule.points, active: true },
         create: { key, name: rule.name, description: rule.description, points: rule.points },
       });
     }
+
+    // Deactivate any old keys no longer in DEFAULT_ACHIEVEMENTS
+    const activeKeys = Object.keys(DEFAULT_ACHIEVEMENTS);
+    await prisma.achievementRule.updateMany({
+      where: { key: { notIn: activeKeys } },
+      data: { active: false },
+    });
 
     const [achievements, pointRules] = await Promise.all([
       prisma.achievementRule.findMany({ orderBy: { points: "asc" } }),

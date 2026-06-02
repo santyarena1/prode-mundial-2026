@@ -16,6 +16,7 @@ interface EventSettings {
   whatsappVenueMessage?: string;
   instagramUrl?: string;
   referralPoints?: string;
+  referralNewUserPoints?: string;
 }
 
 interface StoreConfig {
@@ -70,6 +71,7 @@ export default function AdminSettingsPage() {
           whatsappVenueMessage: get("whatsapp_venue_message") || "",
           instagramUrl: get("instagram_url") || "",
           referralPoints: get("referral_points") || "200",
+          referralNewUserPoints: get("referral_new_user_points") || "300",
         });
         setStores([
           {
@@ -145,6 +147,11 @@ export default function AdminSettingsPage() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ key: "referral_points", value: String(parseInt(eventSettings.referralPoints || "200") || 200) }),
+        }),
+        fetch("/api/admin/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: "referral_new_user_points", value: String(parseInt(eventSettings.referralNewUserPoints || "300") || 300) }),
         }),
       ]);
       toast.success("Configuración guardada");
@@ -319,10 +326,17 @@ export default function AdminSettingsPage() {
             />
             <Input
               type="number"
-              label="Puntos por invitar un amigo (código referido)"
+              label="Puntos para quien comparte el código (referidor)"
               placeholder="200"
               value={eventSettings.referralPoints ?? "200"}
               onChange={(e) => setEventSettings((p) => ({ ...p, referralPoints: e.target.value }))}
+            />
+            <Input
+              type="number"
+              label="Puntos para quien se registra con un código (nuevo usuario)"
+              placeholder="300"
+              value={eventSettings.referralNewUserPoints ?? "300"}
+              onChange={(e) => setEventSettings((p) => ({ ...p, referralNewUserPoints: e.target.value }))}
             />
             <div>
               <label className="text-gray-400 text-xs uppercase tracking-wider mb-1 block">

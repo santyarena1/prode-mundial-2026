@@ -43,6 +43,37 @@ export async function GET(
   }
 }
 
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await getAdminFromCookies();
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { id } = await params;
+    const user = await prisma.user.findUnique({ where: { id }, select: { id: true } });
+    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    await prisma.$transaction([
+      prisma.prediction.deleteMany({ where: { userId: id } }),
+      prisma.groupPrediction.deleteMany({ where: { userId: id } }),
+      prisma.bracketPrediction.deleteMany({ where: { userId: id } }),
+      prisma.specialPrediction.deleteMany({ where: { userId: id } }),
+      prisma.userBonus.deleteMany({ where: { userId: id } }),
+      prisma.prizeRedemption.deleteMany({ where: { userId: id } }),
+      prisma.userAchievement.deleteMany({ where: { userId: id } }),
+      prisma.squadMember.deleteMany({ where: { userId: id } }),
+      prisma.user.delete({ where: { id } }),
+    ]);
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Participant DELETE error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

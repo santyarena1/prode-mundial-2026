@@ -144,12 +144,12 @@ export default function RegisterPage() {
             <p className="text-gray-500 text-sm mt-1">Unite al Prode Mundial Gamer 2026</p>
           </div>
 
-          <p className="text-center text-gray-500 text-sm mb-2">
-            ¿Ya tenés cuenta?{" "}
-            <Link href="/login" className="text-red-400 hover:text-red-300 font-medium">
-              Iniciá sesión
-            </Link>
-          </p>
+          <Link href="/login" className="block mb-4">
+            <div className="border border-[#333] hover:border-red-500/50 bg-[#0f0f0f] hover:bg-red-950/10 rounded-xl px-4 py-3 text-center transition-colors">
+              <span className="text-gray-400 text-sm">¿Ya tenés cuenta? </span>
+              <span className="text-red-400 font-bold text-sm">INICIÁ SESIÓN →</span>
+            </div>
+          </Link>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3">
@@ -271,7 +271,7 @@ export default function RegisterPage() {
               </div>
               <span className="text-sm text-gray-400 leading-relaxed">
                 Acepto las{" "}
-                <Link href="#" className="text-red-400 hover:text-red-300 underline">
+                <Link href="/terminos" target="_blank" className="text-red-400 hover:text-red-300 underline">
                   bases y condiciones
                 </Link>{" "}
                 del prode
@@ -280,6 +280,11 @@ export default function RegisterPage() {
             {errors.acceptedTerms && (
               <p className="text-red-400 text-xs -mt-2">{errors.acceptedTerms}</p>
             )}
+
+            <p className="text-gray-600 text-xs flex items-start gap-1.5">
+              <span className="text-green-500 flex-shrink-0">🔒</span>
+              Tu email y teléfono se usan solo para notificarte sobre el Prode. No hacemos spam ni compartimos tus datos.
+            </p>
 
             <Button
               type="submit"

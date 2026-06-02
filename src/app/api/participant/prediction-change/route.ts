@@ -23,33 +23,20 @@ export async function POST() {
       }, { status: 400 });
     }
 
-    // Deduct points and unlock all predictions in a transaction
-    await prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: auth.userId },
-        data: { spentPoints: { increment: cost } },
-      });
-
-      await tx.prediction.updateMany({
-        where: { userId: auth.userId },
-        data: { status: "editable", lockedAt: null },
-      });
-
-      await tx.groupPrediction.updateMany({
-        where: { userId: auth.userId },
-        data: { isLocked: false, lockedAt: null },
-      });
-
-      await tx.bracketPrediction.updateMany({
-        where: { userId: auth.userId },
-        data: { isLocked: false, lockedAt: null },
-      });
+    // Deduct points and grant 3 prediction change credits
+    await prisma.user.update({
+      where: { id: auth.userId },
+      data: {
+        spentPoints: { increment: cost },
+        predictionChangesRemaining: { increment: 3 },
+      },
     });
 
     return NextResponse.json({
       success: true,
-      message: `Predicciones desbloqueadas. Se descontaron ${cost} puntos.`,
+      message: `¡Obtuviste 3 créditos para cambiar predicciones!`,
       cost,
+      changesRemaining: user.predictionChangesRemaining + 3,
     });
   } catch (error) {
     console.error("Prediction change error:", error);
@@ -69,8 +56,9 @@ export async function GET() {
 
     const cost = parseInt(costSetting?.value || "800", 10);
     const available = user ? user.totalPoints - user.spentPoints : 0;
+    const changesRemaining = user?.predictionChangesRemaining ?? 0;
 
-    return NextResponse.json({ cost, available, canAfford: available >= cost });
+    return NextResponse.json({ cost, available, canAfford: available >= cost, changesRemaining });
   } catch (error) {
     console.error("Prediction change GET error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

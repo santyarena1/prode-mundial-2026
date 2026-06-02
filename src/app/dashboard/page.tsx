@@ -39,11 +39,6 @@ interface RankingUser {
   totalPoints: number;
 }
 
-interface FixtureMatch {
-  id: string;
-  phase: string;
-  status: string;
-}
 
 interface Redemption {
   id: string;
@@ -177,10 +172,9 @@ export default function DashboardPage() {
           }
         }
 
-        const [rankRes, predRes, fixRes, redRes, raffleRes] = await Promise.all([
+        const [rankRes, predRes, redRes, raffleRes] = await Promise.all([
           fetch("/api/public/ranking"),
           apiFetch("/api/participant/predictions"),
-          fetch("/api/public/fixture"),
           apiFetch("/api/participant/redemptions"),
           fetch("/api/public/raffles"),
         ]);
@@ -192,18 +186,14 @@ export default function DashboardPage() {
           );
           if (pos !== -1) setUserPosition(pos + 1);
         }
+
+        // 104 total matches in the 2026 World Cup (72 group + 32 knockout)
+        setTotalMatches(104);
         if (predRes.ok) {
-          const predData = await predRes.json();
-          setPredictedMatches(predData.predictions?.length || 0);
+          const preds = (await predRes.json()).predictions || [];
+          setPredictedMatches(preds.filter((p: { status: string }) => p.status === "locked").length);
         }
-        if (fixRes.ok) {
-          const fixData = await fixRes.json();
-          // Only count GROUP_STAGE matches (the only phase where predictions can be made)
-          const total = (fixData.fixture || [])
-            .filter((f: { phase: string; matches: FixtureMatch[] }) => f.phase === "GROUP_STAGE")
-            .reduce((sum: number, f: { phase: string; matches: FixtureMatch[] }) => sum + f.matches.length, 0);
-          setTotalMatches(total);
-        }
+
         if (redRes.ok) {
           const redData = await redRes.json();
           setRedemptions(redData.redemptions || []);
@@ -274,8 +264,8 @@ export default function DashboardPage() {
           {[
             { icon: <Trophy className="w-4 h-4" />, value: user.totalPoints.toLocaleString(), label: "Puntos totales", color: "text-yellow-400", bg: "bg-yellow-500/10 border-yellow-500/20", delay: 0.1 },
             { icon: <TrendingUp className="w-4 h-4" />, value: userPosition ? `#${userPosition}` : "—", label: "En el ranking", color: "text-red-400", bg: "bg-red-500/10 border-red-500/20", delay: 0.15 },
-            { icon: <Target className="w-4 h-4" />, value: `${predictedMatches}/${totalMatches || "?"}`, label: "Predicciones", color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20", delay: 0.2 },
-            { icon: <Star className="w-4 h-4" />, value: user.bonusPoints.toLocaleString(), label: "Pts bonus", color: "text-green-400", bg: "bg-green-500/10 border-green-500/20", delay: 0.25 },
+            { icon: <Target className="w-4 h-4" />, value: `${predictedMatches}/${totalMatches}`, label: "Predicciones", color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20", delay: 0.2 },
+            { icon: <Gift className="w-4 h-4" />, value: (user.totalPoints - user.spentPoints).toLocaleString(), label: "Pts disponibles", color: "text-green-400", bg: "bg-green-500/10 border-green-500/20", delay: 0.25 },
           ].map((s) => (
             <motion.div key={s.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: s.delay }}>
               <Card className={`p-4 border ${s.bg}`}>
@@ -294,7 +284,7 @@ export default function DashboardPage() {
                 Predicciones completadas
               </span>
               <span className="text-sm text-red-400 font-bold">
-                {predictedMatches} / {totalMatches || "?"} partidos
+                {predictedMatches} / {totalMatches}
               </span>
             </div>
             <div className="h-3 bg-[#222] rounded-full overflow-hidden">
@@ -386,12 +376,6 @@ export default function DashboardPage() {
                 );
               })}
 
-              {/* Early bird entry notice */}
-              {user.earlyBirdGranted && upcomingRaffles.length > 0 && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold">
-                  🎟️ Tenés +1 entrada extra en todos los sorteos (Early Bird)
-                </div>
-              )}
 
               {pastRaffles.length > 0 && (
                 <div>
@@ -424,18 +408,15 @@ export default function DashboardPage() {
         <motion.div className="mb-8" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xs font-bold uppercase tracking-widest text-gray-600">Mis premios canjeados</h2>
-            <Link href="/prizes" className="text-xs text-red-400 hover:text-red-300 font-semibold">
-              Canjeá más →
+            <Link href="/mis-premios" className="text-xs text-red-400 hover:text-red-300 font-semibold">
+              Ver historial →
             </Link>
           </div>
           <div className="space-y-2">
-            {/* Raffle entries — single row with total count */}
+            {/* Raffle entries — only real DB redemptions */}
             {(() => {
-              const raffleCount = redemptions.filter(r => r.prize.prizeType === "raffle" && r.status !== "rejected").length;
-              const total = 1 + (user.earlyBirdGranted ? 1 : 0) + raffleCount;
-              const parts: string[] = ["1 base"];
-              if (user.earlyBirdGranted) parts.push("1 Early Bird");
-              if (raffleCount > 0) parts.push(`${raffleCount} canjeada${raffleCount > 1 ? "s" : ""}`);
+              const total = redemptions.filter(r => r.prize.prizeType === "raffle" && r.status !== "rejected" && r.status !== "delivered").length;
+              if (total === 0) return null;
               return (
                 <Card className="p-4 flex items-center gap-4 border-amber-500/20 bg-amber-950/10">
                   <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
@@ -443,7 +424,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-semibold">Participación en sorteos semanales</p>
-                    <p className="text-gray-500 text-xs">{parts.join(" + ")}</p>
+                    <p className="text-gray-500 text-xs">{total === 1 ? "1 entrada" : `${total} entradas`}</p>
                   </div>
                   <Badge variant={total > 1 ? "warning" : "default"} className="text-sm font-black px-3 py-1">
                     {total} {total === 1 ? "ENTRADA" : "ENTRADAS"}
@@ -501,22 +482,27 @@ export default function DashboardPage() {
           <SponsorCTA compact />
         </div>
 
-        {/* Points breakdown */}
+        {/* Points summary */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
           <Card className="p-6">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">Desglose de puntos</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400">Resumen de puntos</h3>
+              <Link href="/mis-premios" className="text-xs text-red-400 hover:text-red-300 font-semibold">
+                Ver historial →
+              </Link>
+            </div>
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <div className="text-xl font-black text-blue-400">{user.predictionPoints}</div>
-                <div className="text-xs text-gray-600 uppercase tracking-wider">Predicciones</div>
+                <div className="text-xl font-black text-yellow-400">{user.totalPoints.toLocaleString()}</div>
+                <div className="text-xs text-gray-600 uppercase tracking-wider mt-0.5">Acumulados</div>
               </div>
               <div>
-                <div className="text-xl font-black text-green-400">{user.bonusPoints}</div>
-                <div className="text-xs text-gray-600 uppercase tracking-wider">Bonus</div>
+                <div className="text-xl font-black text-red-400">{user.spentPoints.toLocaleString()}</div>
+                <div className="text-xs text-gray-600 uppercase tracking-wider mt-0.5">Canjeados</div>
               </div>
               <div>
-                <div className="text-xl font-black text-red-400">{user.spentPoints}</div>
-                <div className="text-xs text-gray-600 uppercase tracking-wider">Canjeados</div>
+                <div className="text-xl font-black text-green-400">{(user.totalPoints - user.spentPoints).toLocaleString()}</div>
+                <div className="text-xs text-gray-600 uppercase tracking-wider mt-0.5">Disponibles</div>
               </div>
             </div>
           </Card>
@@ -582,11 +568,6 @@ export default function DashboardPage() {
                     {new Date(selectedRaffle.scheduledAt).toLocaleDateString("es-AR", { weekday: "long", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>
-                {user.earlyBirdGranted && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold">
-                    🎟️ Tenés +1 entrada por Early Bird en este sorteo
-                  </div>
-                )}
                 {selectedRaffle.winnerName && (
                   <div className="flex items-center gap-2 text-green-400 text-sm font-semibold">
                     <Trophy className="w-4 h-4" />

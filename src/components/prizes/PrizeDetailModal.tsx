@@ -23,6 +23,7 @@ interface Prize {
 
 interface UserData {
   totalPoints: number;
+  spentPoints: number;
   firstName: string;
 }
 
@@ -46,10 +47,11 @@ const PRIZE_TYPE_LABEL: Record<string, string> = {
 export function PrizeDetailModal({ prize, user, redeeming, onClose, onRedeem }: Props) {
   if (!prize) return null;
 
-  const canAfford = user && user.totalPoints >= prize.requiredPoints;
-  const missing = user ? prize.requiredPoints - user.totalPoints : null;
+  const availablePoints = user ? user.totalPoints - user.spentPoints : 0;
+  const canAfford = user && availablePoints >= prize.requiredPoints;
+  const missing = user ? prize.requiredPoints - availablePoints : null;
   const noStock = prize.stock !== 0 && prize.stock !== null;
-  const progress = user ? Math.min((user.totalPoints / prize.requiredPoints) * 100, 100) : 0;
+  const progress = user ? Math.min((availablePoints / prize.requiredPoints) * 100, 100) : 0;
 
   return (
     <AnimatePresence>
@@ -66,7 +68,7 @@ export function PrizeDetailModal({ prize, user, redeeming, onClose, onRedeem }: 
         className="fixed bottom-0 left-0 right-0 z-50 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="bg-[#0d0d0d] border border-[#222] rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg flex flex-col max-h-[92vh] sm:max-h-[85vh]">
+        <div className="bg-[#0d0d0d] border border-[#222] rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg flex flex-col max-h-[92dvh] sm:max-h-[85dvh]">
 
           {/* Handle mobile */}
           <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
@@ -87,7 +89,7 @@ export function PrizeDetailModal({ prize, user, redeeming, onClose, onRedeem }: 
             <div className="relative w-full aspect-[5/2] bg-[#1a1a1a] rounded-2xl overflow-hidden mb-5">
               {prize.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={prize.imageUrl} alt={prize.name} className="w-full h-full object-cover" />
+                <img src={prize.imageUrl} alt={prize.name} className="w-full h-full object-contain" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <Gift className="w-12 h-12 text-gray-700" />
@@ -143,7 +145,7 @@ export function PrizeDetailModal({ prize, user, redeeming, onClose, onRedeem }: 
                       <span className="text-gray-600 text-sm">Tus puntos</span>
                     </div>
                     <span className={`font-black text-sm ${canAfford ? "text-green-400" : "text-white"}`}>
-                      {user.totalPoints.toLocaleString("es-AR")}
+                      {availablePoints.toLocaleString("es-AR")}
                     </span>
                   </div>
 
@@ -176,7 +178,7 @@ export function PrizeDetailModal({ prize, user, redeeming, onClose, onRedeem }: 
           </div>
 
           {/* CTA fijo */}
-          <div className="px-5 pb-6 pt-3 flex-shrink-0 border-t border-[#1a1a1a]">
+          <div className="px-5 pt-3 flex-shrink-0 border-t border-[#1a1a1a]" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
             {noStock === false ? (
               <Button variant="secondary" size="lg" className="w-full" disabled>
                 Sin stock disponible

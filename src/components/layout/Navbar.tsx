@@ -18,6 +18,7 @@ interface UserData {
   firstName: string;
   lastName: string;
   totalPoints: number;
+  spentPoints: number;
   email: string;
 }
 
@@ -190,7 +191,7 @@ export function Navbar() {
                   <UserMenu user={user} />
                   <Badge variant="points">
                     <Trophy className="w-3 h-3 mr-1" />
-                    {user.totalPoints} pts
+                    {user.totalPoints - user.spentPoints} pts
                   </Badge>
                   <Link href="/notifications" className="relative p-1 text-gray-400 hover:text-white transition-colors" title="Notificaciones">
                     <Bell className={`w-5 h-5 transition-colors ${unreadCount > 0 ? "text-amber-400" : ""}`} />
@@ -212,11 +213,18 @@ export function Navbar() {
                   </button>
                 </>
               ) : (
-                <Link href="/register">
-                  <Button variant="primary" size="sm">
-                    Participar
-                  </Button>
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link href="/login">
+                    <Button variant="outline" size="sm">
+                      Iniciá sesión
+                    </Button>
+                  </Link>
+                  <Link href="/register">
+                    <Button variant="primary" size="sm">
+                      Participar
+                    </Button>
+                  </Link>
+                </div>
               )}
             </div>
 
@@ -268,7 +276,7 @@ export function Navbar() {
                   <div className="flex items-center justify-between">
                     <Badge variant="points">
                       <Trophy className="w-3 h-3 mr-1" />
-                      {user.totalPoints} pts
+                      {user.totalPoints - user.spentPoints} pts
                     </Badge>
                     <button onClick={handleLogout} className="text-gray-500 hover:text-red-400">
                       <LogOut className="w-4 h-4" />
@@ -276,11 +284,18 @@ export function Navbar() {
                   </div>
                 </div>
               ) : (
-                <Link href="/register">
-                  <Button variant="primary" size="md" className="w-full">
-                    Participar
-                  </Button>
-                </Link>
+                <div className="flex flex-col gap-2">
+                  <Link href="/register">
+                    <Button variant="primary" size="md" className="w-full">
+                      Participar
+                    </Button>
+                  </Link>
+                  <Link href="/login">
+                    <Button variant="outline" size="md" className="w-full">
+                      Iniciá sesión
+                    </Button>
+                  </Link>
+                </div>
               )}
             </div>
           </div>
@@ -326,7 +341,7 @@ export function Navbar() {
                   <UserMenu user={user} />
                   <Badge variant="points">
                     <Trophy className="w-3 h-3 mr-1" />
-                    {user.totalPoints} pts
+                    {user.totalPoints - user.spentPoints} pts
                   </Badge>
                   <Link href="/notifications" className="relative p-1 text-gray-400 hover:text-white transition-colors" title="Notificaciones">
                     <Bell className={`w-5 h-5 transition-colors ${unreadCount > 0 ? "text-amber-400" : ""}`} />
@@ -348,11 +363,18 @@ export function Navbar() {
                   </button>
                 </>
               ) : (
-                <Link href="/register">
-                  <Button variant="primary" size="sm">
-                    Participar
-                  </Button>
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link href="/login">
+                    <Button variant="outline" size="sm">
+                      Iniciá sesión
+                    </Button>
+                  </Link>
+                  <Link href="/register">
+                    <Button variant="primary" size="sm">
+                      Participar
+                    </Button>
+                  </Link>
+                </div>
               )}
             </div>
 
@@ -409,7 +431,7 @@ export function Navbar() {
                 <div className="flex items-center justify-between">
                   <Badge variant="points">
                     <Trophy className="w-3 h-3 mr-1" />
-                    {user.totalPoints} pts
+                    {user.totalPoints - user.spentPoints} pts
                   </Badge>
                   <button onClick={handleLogout} className="text-gray-500 hover:text-red-400">
                     <LogOut className="w-4 h-4" />

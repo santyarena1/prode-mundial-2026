@@ -10,36 +10,39 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://prode-mundial-2026-ten-blue.vercel.app"),
-  title: "Prode Mundial Gamer 2026 | The Gamer Shop",
-  description: "Predecí los resultados del Mundial 2026, acumulá puntos y ganá premios increíbles con The Gamer Shop.",
+  metadataBase: new URL("https://thegamershop-premios.com"),
+  title: "Prode Mundial 2026 | The Gamer Shop",
+  description: "Jugá el Prode del Mundial 2026 con The Gamer Shop. Predecí los resultados de los 104 partidos, acumulá puntos y canjeá premios gaming exclusivos. ¡Registrate gratis y competí contra miles de jugadores!",
   icons: {
     icon: [
-      { url: "/logo-color.png", sizes: "any" },
+      { url: "/logo-color.png", type: "image/png", sizes: "512x512" },
+      { url: "/logo-color.png", type: "image/png", sizes: "192x192" },
+      { url: "/logo-color.png", type: "image/png", sizes: "32x32" },
     ],
-    apple: "/logo-color.png",
+    apple: { url: "/logo-color.png", sizes: "180x180", type: "image/png" },
+    shortcut: "/logo-color.png",
   },
   openGraph: {
-    title: "Prode Mundial Gamer 2026 | The Gamer Shop",
-    description: "Predecí, competí y ganá premios. El prode gamer del Mundial 2026.",
-    url: "https://prode-mundial-2026-ten-blue.vercel.app",
-    siteName: "Prode Mundial Gamer 2026",
+    title: "Prode Mundial 2026 | The Gamer Shop",
+    description: "Predecí los resultados del Mundial 2026, acumulá puntos y canjeá premios gaming exclusivos. ¡Registrate gratis!",
+    url: "https://thegamershop-premios.com",
+    siteName: "Prode Mundial 2026 | The Gamer Shop",
     type: "website",
     locale: "es_AR",
     images: [
       {
-        url: "https://prode-mundial-2026-ten-blue.vercel.app/og-image.png",
+        url: "https://thegamershop-premios.com/og-image.png",
         width: 1280,
         height: 960,
-        alt: "Prode Mundial Gamer 2026 - The Gamer Shop",
+        alt: "Prode Mundial 2026 - The Gamer Shop",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Prode Mundial Gamer 2026 | The Gamer Shop",
-    description: "Predecí, competí y ganá premios.",
-    images: ["https://prode-mundial-2026-ten-blue.vercel.app/og-image.png"],
+    title: "Prode Mundial 2026 | The Gamer Shop",
+    description: "Predecí los resultados del Mundial 2026 y ganá premios gaming exclusivos con The Gamer Shop.",
+    images: ["https://thegamershop-premios.com/og-image.png"],
   },
 };
 

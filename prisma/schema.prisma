@@ -24,8 +24,9 @@ model User {
   referralPoints    Int      @default(0)
   referralCode      String?  @unique
   referredById      String?
-  earlyBirdGranted  Boolean  @default(false)
-  hardcoreMode           Boolean  @default(false)
+  earlyBirdGranted           Boolean  @default(false)
+  predictionChangesRemaining Int      @default(0)
+  hardcoreMode               Boolean  @default(false)
   isBlocked              Boolean  @default(false)
   emailUnsubscribed      Boolean  @default(false)
   acceptedTerms     Boolean  @default(false)
@@ -672,6 +673,22 @@ model SquadDeleteVote {
   @@unique([requestId, userId])
 }
 
+// ── Email log ─────────────────────────────────────────────────────────────────
+
+model EmailLog {
+  id           String   @id @default(cuid())
+  subject      String
+  message      String
+  ctaUrl       String?
+  ctaLabel     String?
+  recipientCount Int
+  sentCount    Int
+  failedCount  Int
+  sentAt       DateTime @default(now())
+
+  @@index([sentAt])
+}
+
 // ── Notifications ─────────────────────────────────────────────────────────────
 
 model Notification {
@@ -688,4 +705,18 @@ model Notification {
 
   @@index([userId])
   @@index([userId, read])
+}
+
+// ── Contact messages ──────────────────────────────────────────────────────────
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }

@@ -109,15 +109,49 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Award referral points to the person who invited
+    // Award referral points to both parties
     if (referrer) {
-      const referralSetting = await prisma.setting.findUnique({ where: { key: "referral_points" } });
-      const REFERRAL_POINTS = referralSetting ? (parseInt(referralSetting.value) || 200) : 200;
-      await prisma.user.update({
-        where: { id: referrer.id },
-        data: { referralPoints: { increment: REFERRAL_POINTS } },
-      });
+      const [referralSetting, newUserSetting] = await Promise.all([
+        prisma.setting.findUnique({ where: { key: "referral_points" } }),
+        prisma.setting.findUnique({ where: { key: "referral_new_user_points" } }),
+      ]);
+      const REFERRAL_POINTS = parseInt(referralSetting?.value || "200") || 200;
+      const NEW_USER_POINTS = parseInt(newUserSetting?.value || "300") || 300;
+
+      // Find or create the referral bonus action
+      let referralAction = await prisma.bonusAction.findFirst({ where: { name: "Código de referido" } });
+      if (!referralAction) {
+        referralAction = await prisma.bonusAction.create({
+          data: {
+            name: "Código de referido",
+            description: "Puntos por registrarse con el código de un amigo",
+            points: 0,
+            requiresApproval: false,
+            active: false,
+            allowMultipleClaims: false,
+          },
+        });
+      }
+
+      await Promise.all([
+        // Referrer gets points via referralPoints field
+        prisma.user.update({
+          where: { id: referrer.id },
+          data: { referralPoints: { increment: REFERRAL_POINTS } },
+        }),
+        // New user gets points via a bonus entry
+        prisma.userBonus.create({
+          data: {
+            userId: user.id,
+            bonusActionId: referralAction.id,
+            status: "approved",
+            pointsEarned: NEW_USER_POINTS,
+          },
+        }),
+      ]);
+
       calculateUserPoints(referrer.id).catch(() => {});
+      calculateUserPoints(user.id).catch(() => {});
     }
 
     // Early bird: auto-grant raffle entry if registering before cutoff
@@ -147,6 +181,17 @@ export async function POST(request: NextRequest) {
     }
 
     sendWelcomeEmail({ firstName: user.firstName, lastName: user.lastName, email: user.email })
+      .then((sent) => {
+        prisma.emailLog.create({
+          data: {
+            subject: `Bienvenida — ${user.firstName} ${user.lastName}`,
+            message: `Email de bienvenida automático enviado a ${user.email}`,
+            recipientCount: 1,
+            sentCount: sent ? 1 : 0,
+            failedCount: sent ? 0 : 1,
+          },
+        }).catch(() => {});
+      })
       .catch((err) => console.error("[email] Failed to send welcome email:", err));
 
     const token = signUserToken(user.id);

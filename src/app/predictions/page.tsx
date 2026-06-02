@@ -213,12 +213,16 @@ export default function PredictionsPage() {
   const isPhaseUnlocked = useCallback((phaseKey: string): boolean => {
     const idx = ELIMINATORIAS_PHASES.findIndex(p => p.key === phaseKey);
     if (idx === 0) {
-      // 16vos requires ALL groups to have confirmed 1st + 2nd place
-      return groups.length > 0 && Object.keys(savedGroupPreds).length >= groups.length;
+      // 16vos: todos los partidos de fase de grupos deben estar predichos
+      if (groups.length === 0) return false;
+      return groups.every(group => {
+        const groupMatches = group.matches.filter(m => m.phase === "GROUP_STAGE");
+        return groupMatches.length > 0 && groupMatches.every(m => !!savedPreds[m.id]);
+      });
     }
     const prev = ELIMINATORIAS_PHASES[idx - 1];
     return Object.keys(savedBracket).filter(k => k.startsWith(`${prev.key}:`)).length >= prev.slots;
-  }, [savedBracket, savedGroupPreds, groups]);
+  }, [savedBracket, savedPreds, groups]);
 
   const getEligibleTeams = useCallback((phaseKey: string): Team[] => {
     const idx = ELIMINATORIAS_PHASES.findIndex(p => p.key === phaseKey);
@@ -454,6 +458,11 @@ export default function PredictionsPage() {
   }, [hasUnsaved]);
 
   if (loading) return <LoadingScreen text="Cargando predicciones..." />;
+
+  const completedGroupsCount = groups.filter(group => {
+    const groupMatches = group.matches.filter(m => m.phase === "GROUP_STAGE");
+    return groupMatches.length > 0 && groupMatches.every(m => !!savedPreds[m.id]);
+  }).length;
 
   const hasAnyLocked =
     Object.keys(savedPreds).length > 0 ||
@@ -882,7 +891,7 @@ export default function PredictionsPage() {
                           La tabla se arma automáticamente.
                         </p>
                         <p className="text-gray-700 text-xs mt-2">
-                          Grupos completos: {Object.keys(savedGroupPreds).length}/{groups.length}
+                          Grupos completos: {completedGroupsCount}/{groups.length}
                         </p>
                         <button
                           onClick={() => setActiveTab("matches")}
@@ -993,7 +1002,7 @@ export default function PredictionsPage() {
           <PointsAndAchievementsModal
             onClose={() => setShowPointsModal(false)}
             savedMatchCount={Object.keys(savedPreds).length}
-            savedGroupCount={Object.keys(savedGroupPreds).length}
+            savedGroupCount={completedGroupsCount}
             savedBracketCount={Object.keys(savedBracket).length}
             hasChampionPred={Object.keys(savedBracket).some(k => k.startsWith("CHAMPION:"))}
           />

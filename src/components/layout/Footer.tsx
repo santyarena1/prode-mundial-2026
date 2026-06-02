@@ -19,7 +19,7 @@ export function Footer() {
             <Link href="/ranking" className="text-gray-500 hover:text-gray-300 text-xs uppercase tracking-wider transition-colors">
               Ranking
             </Link>
-            <Link href="#" className="text-gray-500 hover:text-gray-300 text-xs uppercase tracking-wider transition-colors">
+            <Link href="/contacto" className="text-gray-500 hover:text-gray-300 text-xs uppercase tracking-wider transition-colors">
               Contacto
             </Link>
           </div>

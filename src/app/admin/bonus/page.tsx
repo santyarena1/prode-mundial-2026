@@ -26,6 +26,7 @@ interface BonusAction {
   description: string;
   points: number;
   requiresEvidence: boolean;
+  requiresApproval: boolean;
   actionUrl?: string | null;
   requiredHandles?: string | null;
   imageUrl?: string | null;
@@ -43,7 +44,7 @@ interface UserBonus {
   bonusAction: { name: string; points: number };
 }
 
-const emptyEdit = { name: "", description: "", points: "", actionUrl: "", requiredHandles: [] as string[], imageUrl: "", active: true };
+const emptyEdit = { name: "", description: "", points: "", actionUrl: "", requiredHandles: [] as string[], imageUrl: "", active: true, requiresApproval: true };
 
 export default function AdminBonusPage() {
   const [actions, setActions] = useState<BonusAction[]>([]);
@@ -51,7 +52,7 @@ export default function AdminBonusPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"actions" | "claims" | "codes">("codes");
   const [newAction, setNewAction] = useState({
-    name: "", description: "", points: "", actionUrl: "", requiresEvidence: false, requiredHandles: [] as string[],
+    name: "", description: "", points: "", actionUrl: "", requiresEvidence: false, requiresApproval: true, requiredHandles: [] as string[],
   });
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
@@ -93,6 +94,7 @@ export default function AdminBonusPage() {
           description: newAction.description,
           points: parseInt(newAction.points),
           requiresEvidence: newAction.requiresEvidence,
+          requiresApproval: newAction.requiresApproval,
           actionUrl: newAction.actionUrl.trim() || undefined,
           requiredHandles: newAction.requiredHandles.length > 0 ? JSON.stringify(newAction.requiredHandles) : undefined,
           active: true,
@@ -101,7 +103,7 @@ export default function AdminBonusPage() {
       if (!res.ok) { toast.error("Error al crear acción bonus"); return; }
       const data = await res.json();
       setActions((prev) => [...prev, data.bonusAction]);
-      setNewAction({ name: "", description: "", points: "", actionUrl: "", requiresEvidence: false, requiredHandles: [] });
+      setNewAction({ name: "", description: "", points: "", actionUrl: "", requiresEvidence: false, requiresApproval: true, requiredHandles: [] });
       toast.success("Acción bonus creada");
     } catch {
       toast.error("Error de conexión");
@@ -122,7 +124,7 @@ export default function AdminBonusPage() {
     setEditingId(a.id);
     let handles: string[] = [];
     try { handles = a.requiredHandles ? JSON.parse(a.requiredHandles) : []; } catch { handles = []; }
-    setEditForm({ name: a.name, description: a.description, points: String(a.points), actionUrl: a.actionUrl || "", requiredHandles: handles, imageUrl: a.imageUrl || "", active: a.active });
+    setEditForm({ name: a.name, description: a.description, points: String(a.points), actionUrl: a.actionUrl || "", requiredHandles: handles, imageUrl: a.imageUrl || "", active: a.active, requiresApproval: a.requiresApproval });
   };
 
   const saveEdit = async () => {
@@ -140,6 +142,7 @@ export default function AdminBonusPage() {
           requiredHandles: editForm.requiredHandles.length > 0 ? JSON.stringify(editForm.requiredHandles) : null,
           imageUrl: editForm.imageUrl.trim() || null,
           active: editForm.active,
+          requiresApproval: editForm.requiresApproval,
         }),
       });
       if (!res.ok) { toast.error("Error al guardar"); return; }
@@ -344,9 +347,15 @@ export default function AdminBonusPage() {
             <div className="mb-3">
               <HandlesCheckboxes value={newAction.requiredHandles} onChange={(v) => setNewAction((p) => ({ ...p, requiredHandles: v }))} />
             </div>
-            <label className="flex items-center gap-2 text-sm text-gray-400 mb-3 cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-gray-400 mb-2 cursor-pointer">
               <input type="checkbox" checked={newAction.requiresEvidence} onChange={(e) => setNewAction((p) => ({ ...p, requiresEvidence: e.target.checked }))} className="rounded" />
               Requiere URL de evidencia adicional
+            </label>
+            <label className="flex items-center gap-2 text-sm mb-3 cursor-pointer">
+              <input type="checkbox" checked={newAction.requiresApproval} onChange={(e) => setNewAction((p) => ({ ...p, requiresApproval: e.target.checked }))} className="rounded accent-red-500" />
+              <span className={newAction.requiresApproval ? "text-yellow-400 font-semibold" : "text-gray-400"}>
+                Requiere aprobación de TGS {newAction.requiresApproval ? "(puntos se acreditan cuando admin aprueba)" : "(puntos se acreditan al instante)"}
+              </span>
             </label>
             <Button variant="primary" size="sm" loading={creating} onClick={createAction}>
               <Plus className="w-4 h-4" /> Crear acción
@@ -379,6 +388,12 @@ export default function AdminBonusPage() {
                         <input type="checkbox" checked={editForm.active} onChange={(e) => setEditForm((p) => ({ ...p, active: e.target.checked }))} />
                         Activo (visible para usuarios)
                       </label>
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" checked={editForm.requiresApproval} onChange={(e) => setEditForm((p) => ({ ...p, requiresApproval: e.target.checked }))} className="accent-red-500" />
+                        <span className={editForm.requiresApproval ? "text-yellow-400 font-semibold" : "text-gray-400"}>
+                          Requiere aprobación de TGS {editForm.requiresApproval ? "(puntos al aprobar)" : "(puntos al instante)"}
+                        </span>
+                      </label>
                       <div className="flex gap-2">
                         <Button variant="primary" size="sm" loading={updating[a.id]} onClick={saveEdit}>
                           <Save className="w-4 h-4" /> Guardar
@@ -395,6 +410,7 @@ export default function AdminBonusPage() {
                           <h3 className="text-white font-bold text-sm">{a.name}</h3>
                           <Badge variant="success" className="text-xs">+{a.points} pts</Badge>
                           {a.requiresEvidence && <Badge variant="info">Requiere evidencia</Badge>}
+                          <Badge variant={a.requiresApproval ? "warning" : "success"}>{a.requiresApproval ? "Aprobación TGS" : "Auto-aprobado"}</Badge>
                           <Badge variant={a.active ? "success" : "default"}>{a.active ? "Activo" : "Inactivo"}</Badge>
                         </div>
                         <p className="text-gray-500 text-xs">{a.description}</p>

@@ -133,20 +133,24 @@ export default function ComoJugarPage() {
             <p className="text-gray-500 text-xs mb-4">
               Los logros se calculan automáticamente y se suman a tu puntaje. No hace falta reclamarlos.
             </p>
-            <Achievement name="Buen arranque"              condition="Acertar 10 partidos de fase de grupos"               pts="2.000" />
-            <Achievement name="Racha de aciertos"          condition="Acertar 25 partidos de fase de grupos"               pts="6.000" />
-            <Achievement name="Especialista de grupos"     condition="Acertar 40 partidos de fase de grupos"               pts="15.000" />
-            <Achievement name="Máquina de grupos"          condition="Acertar 55 partidos de fase de grupos"               pts="35.000" />
-            <Achievement name="Ojo de halcón"              condition="Acertar 12 clasificados de grupo"                    pts="5.000" />
-            <Achievement name="Ojo clínico"                condition="Acertar 18 clasificados de grupo"                    pts="12.000" />
-            <Achievement name="Todos clasificados"         condition="Acertar los 24 clasificados"                         pts="30.000" />
-            <Achievement name="Tabla perfecta"             condition="Acertar todos los 1° y 2° exactos en los 12 grupos"  pts="50.000" />
-            <Achievement name="Bracket fuerte"             condition="Acertar el 70% de las predicciones de eliminatorias" pts="20.000" />
-            <Achievement name="Bracket perfecto"           condition="Acertar toda la llave eliminatoria"                  pts="60.000" />
-            <Achievement name="Fase de grupos excelente"   condition="40+ partidos + 18+ clasificados correctos"           pts="35.000" />
-            <Achievement name="Fase de grupos perfecta"    condition="55 partidos + tabla exacta completa"                 pts="80.000" />
-            <Achievement name="Prode casi perfecto"        condition="Fase excelente + bracket fuerte"                     pts="120.000" />
-            <Achievement name="Prode perfecto"             condition="Desbloquear todos los logros"                        pts="250.000" />
+            <p className="text-yellow-500/70 text-xs mb-3 font-medium">Partidos de grupos — solo ganás el nivel más alto que alcanzás</p>
+            <Achievement name="Buen arranque"         condition="Acertar 28+ partidos de grupos"               pts="2.000" />
+            <Achievement name="Especialista"          condition="Acertar 40+ partidos de grupos"               pts="9.000" />
+            <Achievement name="Máquina de grupos"     condition="Acertar 54+ partidos de grupos"               pts="22.000" />
+            <p className="text-yellow-500/70 text-xs mt-4 mb-3 font-medium">Clasificados — solo ganás el nivel más alto que alcanzás</p>
+            <Achievement name="Ojo de halcón"         condition="Acertar 14+ equipos clasificados"             pts="3.000" />
+            <Achievement name="Ojo clínico"           condition="Acertar 19+ equipos clasificados"             pts="10.000" />
+            <Achievement name="Tabla casi perfecta"   condition="Acertar 22+ equipos clasificados"             pts="25.000" />
+            <p className="text-yellow-500/70 text-xs mt-4 mb-3 font-medium">Eliminatorias — solo ganás el nivel más alto que alcanzás</p>
+            <Achievement name="Bracket fuerte"        condition="Acertar el 65%+ de predicciones de eliminatorias" pts="6.000" />
+            <Achievement name="Bracket experto"       condition="Acertar el 80%+ de predicciones de eliminatorias" pts="18.000" />
+            <Achievement name="Bracket perfecto"      condition="Acertar toda la llave eliminatoria"           pts="48.000" />
+            <p className="text-yellow-500/70 text-xs mt-4 mb-3 font-medium">Especial</p>
+            <Achievement name="Tabla perfecta"        condition="Acertar el 1° y 2° exacto en los 12 grupos"   pts="28.000" />
+            <p className="text-yellow-500/70 text-xs mt-4 mb-3 font-medium">Combos — se suman encima de los anteriores</p>
+            <Achievement name="Prode sólido"          condition="Especialista + Ojo clínico + Bracket fuerte (o sup.)" pts="20.000" />
+            <Achievement name="Prode experto"         condition="Máquina + Tabla casi perfecta + Bracket experto (o sup.)" pts="50.000" />
+            <Achievement name="Prode perfecto"        condition="Máquina + Tabla casi perfecta + Bracket perfecto + Tabla perfecta" pts="80.000" />
           </Card>
         </Section>
 

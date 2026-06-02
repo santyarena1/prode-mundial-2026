@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import { getUserFromCookies } from "@/lib/cookies";
+import { sendRedemptionEmail } from "@/lib/email";
 
 const redeemSchema = z.object({
   prizeId: z.string().min(1),
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
       if (!prize) throw new Error("404:Prize not found");
       if (!prize.active) throw new Error("400:Prize is not active");
       if (!user) throw new Error("404:User not found");
-      if (user.totalPoints < prize.requiredPoints) throw new Error("400:Insufficient points");
+      if (user.totalPoints - user.spentPoints < prize.requiredPoints) throw new Error("400:Insufficient points");
 
       if (prize.stock > 0) {
         // Limited stock: block duplicate pending and decrement atomically
@@ -66,10 +67,7 @@ export async function POST(request: NextRequest) {
 
       await tx.user.update({
         where: { id: auth.userId },
-        data: {
-          spentPoints: { increment: prize.requiredPoints },
-          totalPoints: { decrement: prize.requiredPoints },
-        },
+        data: { spentPoints: { increment: prize.requiredPoints } },
       });
 
       return tx.prizeRedemption.create({
@@ -81,6 +79,20 @@ export async function POST(request: NextRequest) {
         },
       });
     });
+
+    // Fire-and-forget confirmation email
+    prisma.prizeRedemption.findUnique({
+      where: { id: redemption.id },
+      include: { prize: { select: { name: true } }, user: { select: { firstName: true, email: true } } },
+    }).then((r) => {
+      if (r) {
+        sendRedemptionEmail({
+          user: { id: auth.userId, firstName: r.user.firstName, email: r.user.email },
+          prizeName: r.prize.name,
+          pointsSpent: r.pointsSpent,
+        }).catch(() => {});
+      }
+    }).catch(() => {});
 
     return NextResponse.json({ redemption }, { status: 201 });
   } catch (error) {

@@ -185,8 +185,16 @@ export async function syncResults(): Promise<{ success: boolean; message: string
   }
   try {
     const provider = getProvider();
+    // Only fetch results for matches that have already started (up to 12 hours ago).
+    // 12h covers any match with delays, extra time, or timezone edge cases.
+    // This avoids burning API quota on future matches while leaving plenty of margin.
+    const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
     const pending = await prisma.match.findMany({
-      where: { status: { not: "finished" }, externalId: { not: null } },
+      where: {
+        status: { not: "finished" },
+        externalId: { not: null },
+        startDate: { lte: new Date(), gte: twelveHoursAgo },
+      },
     });
     let count = 0;
     const errors: string[] = [];

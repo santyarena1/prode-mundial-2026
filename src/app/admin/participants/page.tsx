@@ -204,8 +204,18 @@ export default function AdminParticipantsPage() {
         toast.error(data.error || "Error al resetear");
         return;
       }
-      toast.success(data.message);
-      closeResetModal();
+      // Build count summary for feedback
+      const counts = Object.values(data.unlocked as Record<string, number>).reduce((a, b) => a + b, 0);
+      toast.success(`${counts > 0 ? `${counts} predicciones desbloqueadas` : "Desbloqueado"} — el usuario debe actualizar su página de predicciones`);
+      // Re-fetch summary to confirm 0 locked remain
+      const summaryRes = await apiFetch(`/api/admin/participants/${resetModal.id}/reset-predictions`);
+      if (summaryRes.ok) {
+        const summaryData = await summaryRes.json();
+        setResetSummary(summaryData.summary);
+        setSelectedResetTypes([]);
+      } else {
+        closeResetModal();
+      }
     } catch {
       toast.error("Error de conexión");
     } finally {

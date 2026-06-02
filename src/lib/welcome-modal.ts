@@ -1,7 +1,6 @@
 export function shouldShowWelcomeModal(
   seenKey: string,
   featureUsed: boolean,
-  maxShows = 5
 ): boolean {
   if (typeof window === "undefined") return false;
   const doneKey = `${seenKey}_done`;
@@ -15,12 +14,7 @@ export function shouldShowWelcomeModal(
     localStorage.setItem(doneKey, "1");
     return false;
   }
-  const countKey = `${seenKey}_count`;
-  const count = parseInt(localStorage.getItem(countKey) || "0", 10);
-  if (count >= maxShows) {
-    localStorage.setItem(doneKey, "1");
-    return false;
-  }
-  localStorage.setItem(countKey, String(count + 1));
+  // Mark as done immediately so it only ever shows once
+  localStorage.setItem(doneKey, "1");
   return true;
 }

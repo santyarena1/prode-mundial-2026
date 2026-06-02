@@ -93,6 +93,7 @@ export default function PrizesPage() {
       // Refresh user points
       const meRes = await apiFetch("/api/auth/me");
       if (meRes.ok) setUser((await meRes.json()).user);
+      window.dispatchEvent(new CustomEvent("pointsUpdated"));
     } catch {
       toast.error("Error de conexión");
     } finally {
@@ -119,7 +120,7 @@ export default function PrizesPage() {
           {user && (
             <div className="inline-flex items-center gap-2 mt-3 bg-yellow-900/20 border border-yellow-600/30 text-yellow-400 px-4 py-2 rounded-full text-sm font-bold">
               <Star className="w-4 h-4 fill-yellow-400" />
-              Tenés {user.totalPoints} puntos disponibles
+              Tenés {user.totalPoints - user.spentPoints} puntos disponibles
             </div>
           )}
         </div>
@@ -145,8 +146,9 @@ export default function PrizesPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {prizes.filter((p) => p.active).map((prize, i) => {
-            const canAfford = user && user.totalPoints >= prize.requiredPoints;
-            const missing = user ? prize.requiredPoints - user.totalPoints : 0;
+            const availablePoints = user ? user.totalPoints - user.spentPoints : 0;
+            const canAfford = user && availablePoints >= prize.requiredPoints;
+            const missing = user ? prize.requiredPoints - availablePoints : 0;
 
             return (
               <motion.div
@@ -165,7 +167,7 @@ export default function PrizesPage() {
                     <div className="relative w-full aspect-[5/2] bg-[#1a1a1a] border-b border-[#222] overflow-hidden">
                       {prize.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={prize.imageUrl} alt={prize.name} className="w-full h-full object-cover" />
+                        <img src={prize.imageUrl} alt={prize.name} className="w-full h-full object-contain" />
                       ) : (
                         <div className="h-full flex items-center justify-center"><span className="text-5xl">🎁</span></div>
                       )}

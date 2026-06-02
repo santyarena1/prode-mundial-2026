@@ -22,6 +22,7 @@ export async function GET() {
         totalPoints: true,
         predictionPoints: true,
         bonusPoints: true,
+        achievementPoints: true,
         spentPoints: true,
         isBlocked: true,
         earlyBirdGranted: true,

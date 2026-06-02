@@ -68,7 +68,7 @@ export function SponsorInquiryModal({ onClose }: Props) {
         className="fixed bottom-0 left-0 right-0 z-50 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4"
         onClick={e => e.stopPropagation()}
       >
-        <div className="bg-[#0d0d0d] border border-[#222] rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg flex flex-col max-h-[92vh] sm:max-h-[85vh]">
+        <div className="bg-[#0d0d0d] border border-[#222] rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg flex flex-col max-h-[92dvh] sm:max-h-[85dvh]">
 
           {/* Handle mobile */}
           <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
@@ -174,7 +174,7 @@ export function SponsorInquiryModal({ onClose }: Props) {
                 </p>
               </div>
 
-              <div className="px-5 pb-6 pt-3 flex-shrink-0 border-t border-[#1a1a1a]">
+              <div className="px-5 pt-3 flex-shrink-0 border-t border-[#1a1a1a]" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
                 <Button
                   variant="primary"
                   size="lg"

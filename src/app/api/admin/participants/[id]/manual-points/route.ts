@@ -7,6 +7,7 @@ import { calculateUserPoints } from "@/lib/points";
 const schema = z.object({
   points: z.number().int().min(1).max(100000),
   note: z.string().max(200).optional(),
+  operation: z.enum(["add", "subtract"]).default("add"),
 });
 
 export async function POST(
@@ -42,14 +43,16 @@ export async function POST(
       });
     }
 
+    const { points, note, operation } = parsed.data;
+    const pointsEarned = operation === "subtract" ? -points : points;
+
     await prisma.userBonus.create({
       data: {
         userId: id,
         bonusActionId: manualAction.id,
         status: "approved",
-        pointsEarned: parsed.data.points,
-        // store admin note in socialHandles field if provided
-        socialHandles: parsed.data.note || null,
+        pointsEarned,
+        socialHandles: note || null,
       },
     });
 
@@ -60,7 +63,7 @@ export async function POST(
       select: { totalPoints: true, bonusPoints: true },
     });
 
-    return NextResponse.json({ ok: true, totalPoints: updated?.totalPoints, bonusPoints: updated?.bonusPoints });
+    return NextResponse.json({ ok: true, operation, points, totalPoints: updated?.totalPoints, bonusPoints: updated?.bonusPoints });
   } catch (error) {
     console.error("Manual points error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

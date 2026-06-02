@@ -54,7 +54,7 @@ export function WelcomeModal({ onClose }: { onClose: () => void }) {
         exit={{ opacity: 0, y: "100%" }} transition={{ duration: 0.35, ease: "easeOut" }}
         className="fixed bottom-0 left-0 right-0 z-50 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4"
       >
-        <div className="bg-[#0d0d0d] border border-[#222] rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md flex flex-col max-h-[92vh] sm:max-h-[88vh]">
+        <div className="bg-[#0d0d0d] border border-[#222] rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md flex flex-col max-h-[92dvh] sm:max-h-[88dvh]">
 
           {/* Handle */}
           <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
@@ -147,7 +147,7 @@ export function WelcomeModal({ onClose }: { onClose: () => void }) {
           </div>
 
           {/* CTA */}
-          <div className="px-5 pb-6 pt-3 flex-shrink-0">
+          <div className="px-5 pt-3 flex-shrink-0" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
             <button
               onClick={handleRegister}
               className="w-full py-4 bg-red-600 hover:bg-red-500 active:scale-95 text-white font-black text-sm uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-red-500/20"

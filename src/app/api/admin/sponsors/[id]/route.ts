@@ -6,12 +6,12 @@ import { deleteSponsorLogoFile, saveSponsorLogo } from "@/lib/sponsor-upload";
 
 const updateSponsorSchema = z.object({
   name: z.string().optional(),
-  logoUrl: z.string().optional(),
-  description: z.string().optional(),
-  websiteUrl: z.string().optional(),
-  instagramUrl: z.string().optional(),
-  tiktokUrl: z.string().optional(),
-  youtubeUrl: z.string().optional(),
+  logoUrl: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  websiteUrl: z.string().nullable().optional(),
+  instagramUrl: z.string().nullable().optional(),
+  tiktokUrl: z.string().nullable().optional(),
+  youtubeUrl: z.string().nullable().optional(),
   active: z.boolean().optional(),
   showInHome: z.boolean().optional(),
 });
