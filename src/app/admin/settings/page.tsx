@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Settings, Save, RefreshCw, Trophy, Gift, Store } from "lucide-react";
+import { Settings, Save, RefreshCw, Trophy, Gift, Store, Image } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -51,6 +51,16 @@ export default function AdminSettingsPage() {
     { name: "", address: "", mapsUrl: "", instagram: "", instagramUrl: "", phone: "", phoneUrl: "" },
   ]);
   const [savingStores, setSavingStores] = useState(false);
+  const [sponsorBanners, setSponsorBanners] = useState({
+    dashboardImageUrl: "",
+    dashboardLinkUrl: "",
+    dashboardVisible: false,
+    predictionsText: "",
+    predictionsButtonLabel: "",
+    predictionsButtonUrl: "",
+    predictionsVisible: false,
+  });
+  const [savingBanners, setSavingBanners] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -72,6 +82,15 @@ export default function AdminSettingsPage() {
           instagramUrl: get("instagram_url") || "",
           referralPoints: get("referral_points") || "200",
           referralNewUserPoints: get("referral_new_user_points") || "300",
+        });
+        setSponsorBanners({
+          dashboardImageUrl: get("sponsor_banner_dashboard_image_url"),
+          dashboardLinkUrl: get("sponsor_banner_dashboard_link_url"),
+          dashboardVisible: get("sponsor_banner_dashboard_visible") === "true",
+          predictionsText: get("sponsor_banner_predictions_text"),
+          predictionsButtonLabel: get("sponsor_banner_predictions_button_label"),
+          predictionsButtonUrl: get("sponsor_banner_predictions_button_url"),
+          predictionsVisible: get("sponsor_banner_predictions_visible") === "true",
         });
         setStores([
           {
@@ -266,6 +285,35 @@ export default function AdminSettingsPage() {
       toast.error("Error de conexión");
     } finally {
       setSavingStores(false);
+    }
+  };
+
+  const saveSponsorBanners = async () => {
+    setSavingBanners(true);
+    try {
+      const pairs: [string, string][] = [
+        ["sponsor_banner_dashboard_image_url", sponsorBanners.dashboardImageUrl],
+        ["sponsor_banner_dashboard_link_url", sponsorBanners.dashboardLinkUrl],
+        ["sponsor_banner_dashboard_visible", String(sponsorBanners.dashboardVisible)],
+        ["sponsor_banner_predictions_text", sponsorBanners.predictionsText],
+        ["sponsor_banner_predictions_button_label", sponsorBanners.predictionsButtonLabel],
+        ["sponsor_banner_predictions_button_url", sponsorBanners.predictionsButtonUrl],
+        ["sponsor_banner_predictions_visible", String(sponsorBanners.predictionsVisible)],
+      ];
+      await Promise.all(
+        pairs.map(([key, value]) =>
+          fetch("/api/admin/settings", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key, value }),
+          })
+        )
+      );
+      toast.success("Banners guardados");
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setSavingBanners(false);
     }
   };
 
@@ -596,6 +644,105 @@ export default function AdminSettingsPage() {
         <div className="mt-4">
           <Button variant="primary" size="md" loading={savingStores} onClick={saveStores} className="w-full sm:w-auto">
             <Save className="w-4 h-4" /> Guardar locales
+          </Button>
+        </div>
+      </div>
+      {/* Sponsor banners */}
+      <div className="mt-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Image className="w-4 h-4 text-purple-400" />
+          <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400">
+            Banners de sponsor
+          </h3>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Dashboard banner */}
+          <Card className="p-5">
+            <h4 className="text-sm font-bold text-white mb-4">Banner del Dashboard <span className="text-gray-600 font-normal text-xs">(1200×80px)</span></h4>
+            <div className="space-y-3">
+              <Input
+                label="URL de la imagen"
+                placeholder="https://cdn.ejemplo.com/banner.jpg"
+                value={sponsorBanners.dashboardImageUrl}
+                onChange={(e) => setSponsorBanners(p => ({ ...p, dashboardImageUrl: e.target.value }))}
+              />
+              <Input
+                label="URL de destino (clic)"
+                placeholder="https://thegamershop.com"
+                value={sponsorBanners.dashboardLinkUrl}
+                onChange={(e) => setSponsorBanners(p => ({ ...p, dashboardLinkUrl: e.target.value }))}
+              />
+              <label className="flex items-center gap-3 cursor-pointer">
+                <div className="relative">
+                  <input type="checkbox" checked={sponsorBanners.dashboardVisible}
+                    onChange={(e) => setSponsorBanners(p => ({ ...p, dashboardVisible: e.target.checked }))}
+                    className="sr-only"
+                  />
+                  <div className={`w-10 h-6 rounded-full transition-colors ${sponsorBanners.dashboardVisible ? "bg-red-600" : "bg-[#333]"}`}>
+                    <div className={`w-4 h-4 bg-white rounded-full mt-1 transition-transform ${sponsorBanners.dashboardVisible ? "translate-x-5" : "translate-x-1"}`} />
+                  </div>
+                </div>
+                <span className="text-gray-300 text-sm">Visible en el dashboard</span>
+              </label>
+              {sponsorBanners.dashboardImageUrl && (
+                <div className="rounded-lg overflow-hidden border border-[#333] h-[60px]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={sponsorBanners.dashboardImageUrl} alt="Preview" className="w-full h-full object-cover" />
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Predictions CTA */}
+          <Card className="p-5">
+            <h4 className="text-sm font-bold text-white mb-4">CTA en Mis Predicciones <span className="text-gray-600 font-normal text-xs">(texto + botón)</span></h4>
+            <div className="space-y-3">
+              <Input
+                label="Texto"
+                placeholder="Visitá The Gamer Shop y encontrá los mejores periféricos"
+                value={sponsorBanners.predictionsText}
+                onChange={(e) => setSponsorBanners(p => ({ ...p, predictionsText: e.target.value }))}
+              />
+              <Input
+                label="Label del botón"
+                placeholder="Ver tienda"
+                value={sponsorBanners.predictionsButtonLabel}
+                onChange={(e) => setSponsorBanners(p => ({ ...p, predictionsButtonLabel: e.target.value }))}
+              />
+              <Input
+                label="URL del botón"
+                placeholder="https://thegamershop.com"
+                value={sponsorBanners.predictionsButtonUrl}
+                onChange={(e) => setSponsorBanners(p => ({ ...p, predictionsButtonUrl: e.target.value }))}
+              />
+              <label className="flex items-center gap-3 cursor-pointer">
+                <div className="relative">
+                  <input type="checkbox" checked={sponsorBanners.predictionsVisible}
+                    onChange={(e) => setSponsorBanners(p => ({ ...p, predictionsVisible: e.target.checked }))}
+                    className="sr-only"
+                  />
+                  <div className={`w-10 h-6 rounded-full transition-colors ${sponsorBanners.predictionsVisible ? "bg-red-600" : "bg-[#333]"}`}>
+                    <div className={`w-4 h-4 bg-white rounded-full mt-1 transition-transform ${sponsorBanners.predictionsVisible ? "translate-x-5" : "translate-x-1"}`} />
+                  </div>
+                </div>
+                <span className="text-gray-300 text-sm">Visible en Mis Predicciones</span>
+              </label>
+              {(sponsorBanners.predictionsText || sponsorBanners.predictionsButtonLabel) && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
+                  <span className="text-gray-400 text-xs truncate">{sponsorBanners.predictionsText}</span>
+                  {sponsorBanners.predictionsButtonLabel && (
+                    <span className="flex-shrink-0 px-2.5 py-1 bg-red-600 text-white text-xs font-bold rounded-lg">
+                      {sponsorBanners.predictionsButtonLabel}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+        <div className="mt-4">
+          <Button variant="primary" size="md" loading={savingBanners} onClick={saveSponsorBanners} className="w-full sm:w-auto">
+            <Save className="w-4 h-4" /> Guardar banners
           </Button>
         </div>
       </div>

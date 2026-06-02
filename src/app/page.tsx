@@ -323,7 +323,7 @@ export default function HomePage() {
             <p className="text-gray-500 mt-2">Productos gaming exclusivos te esperan</p>
           </motion.div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {featuredPrizes.map((prize, i) => (
               <motion.div
                 key={prize.id}
@@ -367,7 +367,7 @@ export default function HomePage() {
                 </Link>
               </motion.div>
             ))}
-            {featuredPrizes.length === 0 && [0, 1, 2].map(i => (
+            {featuredPrizes.length === 0 && [0, 1, 2, 3].map(i => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, scale: 0.95 }}

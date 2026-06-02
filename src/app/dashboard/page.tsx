@@ -48,6 +48,12 @@ interface Redemption {
   prize: { name: string; imageUrl?: string | null; prizeType: string };
 }
 
+interface SponsorBanner {
+  imageUrl: string;
+  linkUrl: string;
+  visible: boolean;
+}
+
 interface WeeklyRaffle {
   id: string;
   title: string;
@@ -146,6 +152,7 @@ export default function DashboardPage() {
   const [showEarlyBird, setShowEarlyBird] = useState(false);
   const [earlyBirdMode, setEarlyBirdMode] = useState<"claim" | "confirmed">("confirmed");
   const [selectedRaffle, setSelectedRaffle] = useState<WeeklyRaffle | null>(null);
+  const [dashboardBanner, setDashboardBanner] = useState<SponsorBanner | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -172,11 +179,12 @@ export default function DashboardPage() {
           }
         }
 
-        const [rankRes, predRes, redRes, raffleRes] = await Promise.all([
+        const [rankRes, predRes, redRes, raffleRes, bannerRes] = await Promise.all([
           fetch("/api/public/ranking"),
           apiFetch("/api/participant/predictions"),
           apiFetch("/api/participant/redemptions"),
           fetch("/api/public/raffles"),
+          fetch("/api/public/sponsor-banners"),
         ]);
 
         if (rankRes.ok) {
@@ -201,6 +209,10 @@ export default function DashboardPage() {
         if (raffleRes.ok) {
           const raffleData = await raffleRes.json();
           setRaffles(raffleData.raffles || []);
+        }
+        if (bannerRes.ok) {
+          const bannerData = await bannerRes.json();
+          if (bannerData.dashboard?.visible) setDashboardBanner(bannerData.dashboard);
         }
       } catch {
         router.replace("/login");
@@ -258,6 +270,23 @@ export default function DashboardPage() {
             </div>
           )}
         </motion.div>
+
+        {/* Sponsor banner */}
+        {dashboardBanner && (
+          <motion.div className="mb-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.05 }}>
+            {dashboardBanner.linkUrl ? (
+              <a href={dashboardBanner.linkUrl} target="_blank" rel="noopener noreferrer" className="block w-full rounded-xl overflow-hidden border border-[#222] h-[80px]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={dashboardBanner.imageUrl} alt="Sponsor" className="w-full h-full object-cover" />
+              </a>
+            ) : (
+              <div className="w-full rounded-xl overflow-hidden border border-[#222] h-[80px]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={dashboardBanner.imageUrl} alt="Sponsor" className="w-full h-full object-cover" />
+              </div>
+            )}
+          </motion.div>
+        )}
 
         {/* Stats row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">

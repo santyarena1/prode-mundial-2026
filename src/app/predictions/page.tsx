@@ -128,6 +128,7 @@ export default function PredictionsPage() {
 
   // Team selection modal for bracket picks
   const [selectionModal, setSelectionModal] = useState<{ phase: string; slot: string } | null>(null);
+  const [predictionsCta, setPredictionsCta] = useState<{ text: string; buttonLabel: string; buttonUrl: string } | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -136,12 +137,13 @@ export default function PredictionsPage() {
       const meData = await meRes.json();
       if (meData.user?.hardcoreMode) setHardcoreMode(true);
 
-      const [groupsRes, predRes, groupPredRes, bracketRes, changeRes] = await Promise.all([
+      const [groupsRes, predRes, groupPredRes, bracketRes, changeRes, bannerRes] = await Promise.all([
         fetch("/api/public/groups"),
         apiFetch("/api/participant/predictions"),
         apiFetch("/api/participant/group-predictions"),
         apiFetch("/api/participant/bracket-predictions"),
         apiFetch("/api/participant/prediction-change"),
+        fetch("/api/public/sponsor-banners"),
       ]);
 
       const sp: Record<string, Outcome> = {};
@@ -202,6 +204,13 @@ export default function PredictionsPage() {
         setChangeCost(data.cost);
         setAvailablePoints(data.available);
         setChangesRemaining(data.changesRemaining ?? 0);
+      }
+
+      if (bannerRes.ok) {
+        const bannerData = await bannerRes.json();
+        if (bannerData.predictions?.visible && bannerData.predictions.text) {
+          setPredictionsCta(bannerData.predictions);
+        }
       }
 
       const hasSeenOnboarding = typeof window !== "undefined" && localStorage.getItem("pred_onboarding_seen");
@@ -579,6 +588,21 @@ export default function PredictionsPage() {
               <Zap className="w-3.5 h-3.5" />
               Puntos y logros
             </button>
+            {predictionsCta && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl max-w-[420px] min-w-0">
+                <span className="text-gray-400 text-xs truncate">{predictionsCta.text}</span>
+                {predictionsCta.buttonLabel && predictionsCta.buttonUrl && (
+                  <a
+                    href={predictionsCta.buttonUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-shrink-0 px-2.5 py-1 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition-colors"
+                  >
+                    {predictionsCta.buttonLabel}
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

@@ -8,15 +8,15 @@ export async function GET() {
       where: { active: true, featured: true },
       include: { sponsor: true },
       orderBy: [{ sortOrder: "asc" }, { requiredPoints: "asc" }],
-      take: 3,
+      take: 4,
     });
 
-    if (prizes.length < 3) {
+    if (prizes.length < 4) {
       const extra = await prisma.prize.findMany({
         where: { active: true, featured: false, id: { notIn: prizes.map(p => p.id) } },
         include: { sponsor: true },
         orderBy: [{ sortOrder: "asc" }, { requiredPoints: "asc" }],
-        take: 3 - prizes.length,
+        take: 4 - prizes.length,
       });
       prizes = [...prizes, ...extra];
     }
