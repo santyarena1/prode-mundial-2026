@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, Calendar, CheckSquare, Trophy, Gift, Zap,
-  Building2, RefreshCw, Settings, LogOut, Menu, X, ChevronRight, BookOpen, Handshake, Shuffle, Swords, Mail, MessageSquare,
+  Building2, RefreshCw, Settings, LogOut, Menu, X, ChevronRight, ChevronDown, BookOpen, Handshake, Shuffle, Swords, Mail, MessageSquare,
 } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
 import { StickyBackBar } from "@/components/layout/StickyBackBar";
@@ -77,6 +77,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adminChecked, setAdminChecked] = useState(false);
 
+  // Start all collapsible sections open; auto-expand the one with the active route
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  const toggleSection = (section: string) => {
+    setCollapsed(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  // When route changes, ensure the active section is expanded
+  useEffect(() => {
+    for (const s of navSections) {
+      if (!s.section) continue;
+      if (s.items.some(item => pathname === item.href || pathname.startsWith(item.href + "/"))) {
+        setCollapsed(prev => ({ ...prev, [s.section]: false }));
+      }
+    }
+  }, [pathname]);
+
   useEffect(() => {
     if (pathname === "/admin/login") {
       setAdminChecked(true);
@@ -119,37 +136,66 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 p-3 overflow-y-auto space-y-4">
-          {navSections.map((section) => (
-            <div key={section.section}>
-              {section.section && (
-                <p className="px-3 mb-1 text-[10px] font-bold uppercase tracking-widest text-gray-700">
-                  {section.section}
-                </p>
-              )}
-              <div className="space-y-0.5">
-                {section.items.map(({ href, icon: Icon, label }) => {
-                  const active = pathname === href || (href !== "/admin/dashboard" && pathname.startsWith(href + "/"));
-                  return (
-                    <Link
-                      key={href}
-                      href={href}
-                      onClick={() => setSidebarOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        active
-                          ? "bg-red-600/15 text-red-400 border border-red-600/20"
-                          : "text-gray-500 hover:text-gray-200 hover:bg-[#1a1a1a]"
-                      }`}
-                    >
-                      <Icon className="w-4 h-4 flex-shrink-0" />
-                      <span>{label}</span>
-                      {active && <ChevronRight className="w-3 h-3 ml-auto" />}
-                    </Link>
-                  );
-                })}
+        <nav className="flex-1 p-3 overflow-y-auto space-y-1">
+          {navSections.map((section) => {
+            const isCollapsible = !!section.section;
+            const isOpen = !isCollapsible || !collapsed[section.section];
+            const hasActive = section.items.some(
+              item => pathname === item.href || (item.href !== "/admin/dashboard" && pathname.startsWith(item.href + "/"))
+            );
+
+            return (
+              <div key={section.section || "__root"}>
+                {isCollapsible && (
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(section.section)}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors group ${
+                      hasActive && !isOpen
+                        ? "text-red-400 bg-red-600/5"
+                        : "text-gray-600 hover:text-gray-300 hover:bg-[#1a1a1a]"
+                    }`}
+                  >
+                    <span className="text-[10px] font-bold uppercase tracking-widest flex-1 text-left">
+                      {section.section}
+                    </span>
+                    {hasActive && !isOpen && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
+                    )}
+                    <ChevronDown
+                      className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 ${isOpen ? "rotate-0" : "-rotate-90"}`}
+                    />
+                  </button>
+                )}
+
+                {isOpen && (
+                  <div className="space-y-0.5 mt-0.5">
+                    {section.items.map(({ href, icon: Icon, label }) => {
+                      const active = pathname === href || (href !== "/admin/dashboard" && pathname.startsWith(href + "/"));
+                      return (
+                        <Link
+                          key={href}
+                          href={href}
+                          onClick={() => setSidebarOpen(false)}
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                            isCollapsible ? "pl-4" : ""
+                          } ${
+                            active
+                              ? "bg-red-600/15 text-red-400 border border-red-600/20"
+                              : "text-gray-500 hover:text-gray-200 hover:bg-[#1a1a1a]"
+                          }`}
+                        >
+                          <Icon className="w-4 h-4 flex-shrink-0" />
+                          <span>{label}</span>
+                          {active && <ChevronRight className="w-3 h-3 ml-auto" />}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
 
         {/* Logout */}
