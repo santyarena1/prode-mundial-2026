@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, CheckCircle2, Clock, XCircle, Link as LinkIcon, X, Shuffle, AlertTriangle, Shield, Copy, Users, ExternalLink, Ticket, Download } from "lucide-react";
+import { Zap, CheckCircle2, Clock, XCircle, Link as LinkIcon, X, Shuffle, AlertTriangle, Shield, Copy, Users, ExternalLink, Ticket, Download, MessageCircle } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Card } from "@/components/ui/Card";
@@ -277,7 +277,7 @@ export default function BonusesPage() {
                 Compartí tu código. Cada amigo que lo use al registrarse te suma{" "}
                 <span className="text-green-400 font-bold">+{referral.pointsPerReferral} pts automáticamente</span>.
               </p>
-              <div className="flex items-center gap-3 mb-5">
+              <div className="flex items-center gap-3 mb-4">
                 <div className="bg-[#1a1a1a] border border-[#333] rounded-xl px-5 py-3 font-mono text-white font-black tracking-widest text-xl flex-1 text-center sm:flex-none sm:text-left">
                   {referral.referralCode ?? "—"}
                 </div>
@@ -289,6 +289,20 @@ export default function BonusesPage() {
                   {copied ? "¡Copiado!" : "Copiar"}
                 </button>
               </div>
+              {referral.referralCode && (
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(
+                    `¡Unite al Prode Mundial Gamer 2026! 🏆⚽\n\nRegistrate gratis y competí por premios reales.\n\n👉 https://thegamershop-premios.com/register\n\nUsa mi código al registrarte y los dos ganamos puntos extra:\n🎟️ Código: *${referral.referralCode}*`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-colors mb-5"
+                  style={{ background: "#25D366", color: "#fff" }}
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Compartir por WhatsApp
+                </a>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-[#1a1a1a] border border-[#222] rounded-xl p-4 text-center">
                   <div className="text-3xl font-black text-green-400">{referral.referralCount}</div>
