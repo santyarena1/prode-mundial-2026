@@ -123,7 +123,7 @@ function EditModal({ sponsor, onClose, onSaved }: { sponsor: Sponsor; onClose: (
 
 interface BannerSettings {
   dashboard: { imageUrl: string; linkUrl: string; visible: boolean };
-  predictions: { text: string; buttonLabel: string; buttonUrl: string; buttonLogoUrl: string; visible: boolean };
+  predictions: { text: string; buttonLabel: string; buttonUrl: string; buttonLogoUrl: string; bgColor: string; buttonColor: string; visible: boolean };
 }
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -181,7 +181,7 @@ export default function AdminSponsorsPage() {
 
   const [banners, setBanners] = useState<BannerSettings>({
     dashboard: { imageUrl: "", linkUrl: "", visible: false },
-    predictions: { text: "", buttonLabel: "", buttonUrl: "", buttonLogoUrl: "", visible: false },
+    predictions: { text: "", buttonLabel: "", buttonUrl: "", buttonLogoUrl: "", bgColor: "#1a1a1a", buttonColor: "#dc2626", visible: false },
   });
   const [savingBanners, setSavingBanners] = useState(false);
   const [uploadingDashboard, setUploadingDashboard] = useState(false);
@@ -210,6 +210,8 @@ export default function AdminSponsorsPage() {
               buttonLabel: data.predictions?.buttonLabel ?? "",
               buttonUrl: data.predictions?.buttonUrl ?? "",
               buttonLogoUrl: data.predictions?.buttonLogoUrl ?? "",
+              bgColor: data.predictions?.bgColor ?? "#1a1a1a",
+              buttonColor: data.predictions?.buttonColor ?? "#dc2626",
               visible: data.predictions?.visible ?? false,
             },
           });
@@ -480,12 +482,23 @@ export default function AdminSponsorsPage() {
             </div>
 
             {/* Preview */}
-            <div className="w-full rounded-xl border border-dashed border-[#333] bg-[#0f0f0f] px-3 py-2.5 flex items-center gap-2 min-h-[44px]">
+            <div
+              className="w-full rounded-xl border border-white/5 px-4 py-2.5 flex items-center justify-between gap-3 min-h-[44px] transition-all"
+              style={{
+                background: banners.predictions.bgColor || "#1a1a1a",
+                boxShadow: `0 0 18px 2px ${banners.predictions.bgColor || "#dc2626"}55`,
+              }}
+            >
               {(banners.predictions.text || banners.predictions.buttonLabel || banners.predictions.buttonLogoUrl) ? (
                 <>
-                  <span className="text-gray-400 text-xs flex-1 line-clamp-2">{banners.predictions.text || <em className="text-gray-600">sin texto</em>}</span>
+                  <span className="text-white/80 text-xs font-medium flex-1 line-clamp-1">
+                    {banners.predictions.text || <em className="opacity-40">sin texto</em>}
+                  </span>
                   {(banners.predictions.buttonLabel || banners.predictions.buttonLogoUrl) && (
-                    <span className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 bg-red-600 text-white text-xs font-bold rounded-lg">
+                    <span
+                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-white text-xs font-black uppercase tracking-wide rounded-lg"
+                      style={{ background: banners.predictions.buttonColor || "#dc2626" }}
+                    >
                       {banners.predictions.buttonLogoUrl && (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={banners.predictions.buttonLogoUrl} alt="" className="h-4 w-auto object-contain" />
@@ -495,7 +508,7 @@ export default function AdminSponsorsPage() {
                   )}
                 </>
               ) : (
-                <span className="text-gray-700 text-xs">Vista previa — completá los campos</span>
+                <span className="text-white/30 text-xs">Vista previa — completá los campos</span>
               )}
             </div>
 
@@ -555,6 +568,46 @@ export default function AdminSponsorsPage() {
                   <ExternalLink className="w-3 h-3" /> Verificar enlace
                 </a>
               )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 block">Color de fondo</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={banners.predictions.bgColor || "#1a1a1a"}
+                      onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, bgColor: e.target.value } }))}
+                      className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border border-[#333] p-0.5"
+                    />
+                    <input
+                      type="text"
+                      value={banners.predictions.bgColor || "#1a1a1a"}
+                      onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, bgColor: e.target.value } }))}
+                      className="flex-1 bg-[#1a1a1a] border border-[#333] text-white rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:border-red-500"
+                      placeholder="#1a1a1a"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 block">Color del botón</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={banners.predictions.buttonColor || "#dc2626"}
+                      onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonColor: e.target.value } }))}
+                      className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border border-[#333] p-0.5"
+                    />
+                    <input
+                      type="text"
+                      value={banners.predictions.buttonColor || "#dc2626"}
+                      onChange={e => setBanners(b => ({ ...b, predictions: { ...b.predictions, buttonColor: e.target.value } }))}
+                      className="flex-1 bg-[#1a1a1a] border border-[#333] text-white rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:border-red-500"
+                      placeholder="#dc2626"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <Toggle
                 checked={banners.predictions.visible}
                 onChange={v => setBanners(b => ({ ...b, predictions: { ...b.predictions, visible: v } }))}

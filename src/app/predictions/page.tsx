@@ -128,7 +128,7 @@ export default function PredictionsPage() {
 
   // Team selection modal for bracket picks
   const [selectionModal, setSelectionModal] = useState<{ phase: string; slot: string } | null>(null);
-  const [predictionsCta, setPredictionsCta] = useState<{ text: string; buttonLabel: string; buttonUrl: string; buttonLogoUrl?: string } | null>(null);
+  const [predictionsCta, setPredictionsCta] = useState<{ text: string; buttonLabel: string; buttonUrl: string; buttonLogoUrl?: string; bgColor?: string; buttonColor?: string } | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -568,11 +568,11 @@ export default function PredictionsPage() {
             </div>
             <GuidedTour steps={PREDICTIONS_TOUR} storageKey="predictions_tour" />
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
             <button
               onClick={handleToggleHardcore}
               disabled={togglingHardcore}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all ${
+              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all ${
                 hardcoreMode
                   ? "bg-orange-500/20 border-orange-500/50 text-orange-400 hover:bg-orange-500/30"
                   : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-500 hover:border-[#3a3a3a] hover:text-gray-300"
@@ -583,20 +583,27 @@ export default function PredictionsPage() {
             </button>
             <button
               onClick={() => setShowPointsModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 rounded-xl text-yellow-400 text-xs font-bold uppercase tracking-wider transition-colors"
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 rounded-xl text-yellow-400 text-xs font-bold uppercase tracking-wider transition-colors"
             >
               <Zap className="w-3.5 h-3.5" />
               Puntos y logros
             </button>
             {predictionsCta && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl max-w-[420px] min-w-0">
-                <span className="text-gray-400 text-xs truncate">{predictionsCta.text}</span>
+              <div
+                className="flex-1 min-w-0 flex items-center justify-between gap-3 px-4 py-2 rounded-xl border border-white/5"
+                style={{
+                  background: predictionsCta.bgColor ?? "#1a1a1a",
+                  boxShadow: `0 0 18px 2px ${(predictionsCta.bgColor ?? "#dc2626")}55`,
+                }}
+              >
+                <span className="text-white/80 text-xs font-medium truncate">{predictionsCta.text}</span>
                 {predictionsCta.buttonUrl && (predictionsCta.buttonLabel || predictionsCta.buttonLogoUrl) && (
                   <a
                     href={predictionsCta.buttonUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition-colors"
+                    className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-white text-xs font-black uppercase tracking-wide rounded-lg transition-opacity hover:opacity-80"
+                    style={{ background: predictionsCta.buttonColor ?? "#dc2626" }}
                   >
                     {predictionsCta.buttonLogoUrl && (
                       // eslint-disable-next-line @next/next/no-img-element
