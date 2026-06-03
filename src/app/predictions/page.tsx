@@ -402,14 +402,27 @@ export default function PredictionsPage() {
   }, []);
 
   const handleSaveCurrentPhase = useCallback(async () => {
+    // New picks (team selections)
     const phasePending = Object.entries(pendingBracket).filter(([k]) => k.startsWith(`${activeElimTab}:`));
-    if (phasePending.length === 0) return;
+    // Score-only upgrades: already saved team, no saved score, pending score entered
+    const phaseScoreUpgrades = hardcoreMode
+      ? Object.keys(savedBracket)
+          .filter(k => {
+            if (!k.startsWith(`${activeElimTab}:`)) return false;
+            if (savedBracketScores[k]) return false;
+            const s = pendingBracketScores[k];
+            return s?.home !== undefined && s?.away !== undefined;
+          })
+      : [];
+
+    if (phasePending.length === 0 && phaseScoreUpgrades.length === 0) return;
     setSavingBracket(true);
     let ok = 0;
+
+    // Save new picks
     for (const [key, teamId] of phasePending) {
       if (savedBracket[key]) continue;
       const [phase, slot] = key.split(":");
-      // slot IS the match number for non-CHAMPION phases (e.g. "73", "74")
       const matchNum = parseInt(slot);
       const score = hardcoreMode ? pendingBracketScores[`${phase}:${matchNum}`] : undefined;
       const scorePayload = (score?.home !== undefined && score?.away !== undefined)
@@ -432,9 +445,28 @@ export default function PredictionsPage() {
         } else { const d = await res.json(); toast.error(d.error || "Error"); }
       } catch { toast.error("Error de conexión"); }
     }
+
+    // Save score-only upgrades on already-locked bracket predictions
+    for (const key of phaseScoreUpgrades) {
+      const [phase, slot] = key.split(":");
+      const score = pendingBracketScores[key];
+      const teamId = savedBracket[key];
+      try {
+        const res = await apiFetch("/api/participant/bracket-predictions", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phase, matchSlot: slot, predictedTeamId: teamId, predictedHomeScore: score.home, predictedAwayScore: score.away }),
+        });
+        if (res.ok) {
+          setSavedBracketScores(prev => ({ ...prev, [key]: { home: score.home!, away: score.away! } }));
+          setPendingBracketScores(prev => { const n = { ...prev }; delete n[key]; return n; });
+          ok++;
+        } else { const d = await res.json(); toast.error(d.error || "Error"); }
+      } catch { toast.error("Error de conexión"); }
+    }
+
     if (ok > 0) toast.success(`${ok} selección${ok > 1 ? "es" : ""} confirmada${ok > 1 ? "s" : ""} ✓`);
     setSavingBracket(false);
-  }, [pendingBracket, savedBracket, activeElimTab, hardcoreMode, pendingBracketScores]);
+  }, [pendingBracket, savedBracket, savedBracketScores, activeElimTab, hardcoreMode, pendingBracketScores]);
 
   const handleToggleHardcore = useCallback(async () => {
     setTogglingHardcore(true);
@@ -555,7 +587,16 @@ export default function PredictionsPage() {
     Object.keys(savedBracket).length > 0;
 
   const currentPhase = ELIMINATORIAS_PHASES.find(p => p.key === activeElimTab)!;
-  const currentPhasePendingCount = Object.keys(pendingBracket).filter(k => k.startsWith(`${activeElimTab}:`)).length;
+  const currentPhasePendingCount =
+    Object.keys(pendingBracket).filter(k => k.startsWith(`${activeElimTab}:`)).length +
+    (hardcoreMode
+      ? Object.keys(savedBracket).filter(k => {
+          if (!k.startsWith(`${activeElimTab}:`)) return false;
+          if (savedBracketScores[k]) return false;
+          const s = pendingBracketScores[k];
+          return s?.home !== undefined && s?.away !== undefined;
+        }).length
+      : 0);
   const savedInPhase = Object.keys(savedBracket).filter(k => k.startsWith(`${activeElimTab}:`)).length;
   const currentPhaseUnlocked = isPhaseUnlocked(activeElimTab);
 

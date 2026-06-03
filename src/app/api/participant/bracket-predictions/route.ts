@@ -47,10 +47,20 @@ export async function POST(request: NextRequest) {
       where: { userId_phase_matchSlot: { userId: auth.userId, phase, matchSlot } },
     });
     if (existing?.isLocked) {
-      return NextResponse.json({
-        error: "Tu predicción ya está bloqueada. Canjeá un cambio de predicción para modificarla.",
-        locked: true,
-      }, { status: 403 });
+      // Allow adding scores to a locked bracket prediction with no scores (hardcore upgrade)
+      const isScoreUpgrade =
+        predictedHomeScore !== undefined &&
+        predictedAwayScore !== undefined &&
+        existing.predictedHomeScore === null &&
+        existing.predictedAwayScore === null;
+
+      if (!isScoreUpgrade) {
+        return NextResponse.json({
+          error: "Tu predicción ya está bloqueada. Canjeá un cambio de predicción para modificarla.",
+          locked: true,
+        }, { status: 403 });
+      }
+      // Score upgrade on locked bracket prediction — fall through to upsert
     }
 
     const now = new Date();
