@@ -102,6 +102,7 @@ export default function PredictionsPage() {
 
   const [savingGroup, setSavingGroup] = useState<Record<string, boolean>>({});
   const [savingBracket, setSavingBracket] = useState(false);
+  const [savingMatchScore, setSavingMatchScore] = useState<Record<string, boolean>>({});
 
   const [activeTab, setActiveTab] = useState<"matches" | "groups" | "eliminatorias">("matches");
   const [activeElimTab, setActiveElimTab] = useState(ELIMINATORIAS_PHASES[0].key);
@@ -332,11 +333,10 @@ export default function PredictionsPage() {
     let derived: { firstTeamId: string | null; secondTeamId: string | null; thirdTeamId: string | null } | null = null;
 
     for (const match of matches) {
+      if (savedPreds[match.id]) continue;
       if (!isMatchPredictionWindowOpen(match.startDate)) continue;
 
       if (hardcoreMode) {
-        // Skip if score already saved
-        if (savedScores[match.id]) continue;
         const score = pendingScores[match.id];
         if (score?.home === undefined || score?.away === undefined) continue;
         try {
@@ -355,7 +355,6 @@ export default function PredictionsPage() {
           } else { const d = await res.json(); toast.error(d.error || "Error"); }
         } catch { toast.error("Error de conexión"); }
       } else {
-        if (savedPreds[match.id]) continue;
         const outcome = pendingPreds[match.id];
         if (!outcome) continue;
         try {
@@ -389,6 +388,37 @@ export default function PredictionsPage() {
     setSavingGroup(prev => ({ ...prev, [groupId]: false }));
   }, [pendingPreds, pendingScores, savedPreds, hardcoreMode]);
 
+  const handleSaveMatchScore = useCallback(async (matchId: string, groupId: string | undefined, homeScore: number, awayScore: number) => {
+    setSavingMatchScore(prev => ({ ...prev, [matchId]: true }));
+    try {
+      const res = await apiFetch("/api/participant/predictions", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matchId, predictedHomeScore: homeScore, predictedAwayScore: awayScore }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const outcome: Outcome = homeScore > awayScore ? "home" : awayScore > homeScore ? "away" : "draw";
+        setSavedPreds(prev => ({ ...prev, [matchId]: outcome }));
+        setSavedScores(prev => ({ ...prev, [matchId]: { home: homeScore, away: awayScore } }));
+        setPendingScores(prev => { const n = { ...prev }; delete n[matchId]; return n; });
+        toast.success("Marcador confirmado ✓");
+        if (data.derivedGroup && groupId) {
+          setSavedGroupPreds(prev => ({
+            ...prev,
+            [groupId]: {
+              first:  data.derivedGroup.firstTeamId  ?? undefined,
+              second: data.derivedGroup.secondTeamId ?? undefined,
+              third:  data.derivedGroup.thirdTeamId  ?? undefined,
+            },
+          }));
+        }
+      } else {
+        const d = await res.json();
+        toast.error(d.error || "Error al guardar marcador");
+      }
+    } catch { toast.error("Error de conexión"); }
+    setSavingMatchScore(prev => ({ ...prev, [matchId]: false }));
+  }, []);
 
   const handlePickBracket = useCallback((phase: string, slot: string, teamId: string) => {
     const key = `${phase}:${slot}`;
@@ -780,13 +810,11 @@ export default function PredictionsPage() {
             {groups.length === 0 && <div className="p-8 text-center text-gray-500">No hay partidos disponibles aún.</div>}
             {groups.map(group => {
               const pendingCount = group.matches.filter(m => {
+                if (savedPreds[m.id]) return false;
                 if (hardcoreMode) {
-                  // Already has score saved → nothing pending
-                  if (savedScores[m.id]) return false;
                   const s = pendingScores[m.id];
                   return s?.home !== undefined && s?.away !== undefined;
                 }
-                if (savedPreds[m.id]) return false;
                 return !!pendingPreds[m.id];
               }).length;
               const savedCount = group.matches.filter(m => savedPreds[m.id]).length;
@@ -834,6 +862,8 @@ export default function PredictionsPage() {
                                 savedScore={savedScores[match.id]}
                                 onPick={handlePickMatch}
                                 onPickScore={handlePickScore}
+                                onSaveScore={(home, away) => handleSaveMatchScore(match.id, group.id, home, away)}
+                                savingScore={savingMatchScore[match.id]}
                                 changesRemaining={changesRemaining}
                                 onUseChange={handleUseChange}
                                 usingChange={usingChange}
@@ -1717,6 +1747,7 @@ function PointsAndAchievementsModal({
 
 function MatchCard({
   match, saved, pending, hardcoreMode, pendingScore, savedScore, onPick, onPickScore,
+  onSaveScore, savingScore,
   changesRemaining, onUseChange, usingChange,
 }: {
   match: Match;
@@ -1727,6 +1758,8 @@ function MatchCard({
   savedScore?: { home: number; away: number };
   onPick: (matchId: string, outcome: Outcome) => void;
   onPickScore: (matchId: string, side: "home" | "away", value: number) => void;
+  onSaveScore?: (home: number, away: number) => void;
+  savingScore?: boolean;
   changesRemaining?: number;
   onUseChange?: (type: "match" | "group" | "bracket", id: string) => void;
   usingChange?: boolean;
@@ -1841,34 +1874,59 @@ function MatchCard({
             </div>
           ) : isLocked && !savedScore && windowOpen && !matchStarted ? (
             /* Hardcore upgrade: outcome saved in normal mode, scores not yet added */
-            <>
-              <p className="text-[10px] text-orange-400/80 text-center mb-2 font-semibold">
-                Agregá el marcador — el ganador ({saved === "home" ? homeCode : saved === "away" ? awayCode : "Empate"}) ya está fijo
-              </p>
-              <div className="flex items-center justify-center gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500 text-[10px] font-bold uppercase">{homeCode}</span>
-                  <input
-                    type="number" min={0} max={30}
-                    value={pendingScore?.home ?? ""}
-                    onChange={e => onPickScore(match.id, "home", Math.max(0, Math.min(30, parseInt(e.target.value) || 0)))}
-                    placeholder="0"
-                    className="w-12 h-10 rounded-lg bg-[#1a1a1a] border border-orange-500/40 text-white text-center font-black text-lg focus:outline-none focus:border-orange-500/70 transition-colors"
-                  />
-                </div>
-                <span className="text-gray-700 font-black text-sm">—</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number" min={0} max={30}
-                    value={pendingScore?.away ?? ""}
-                    onChange={e => onPickScore(match.id, "away", Math.max(0, Math.min(30, parseInt(e.target.value) || 0)))}
-                    placeholder="0"
-                    className="w-12 h-10 rounded-lg bg-[#1a1a1a] border border-orange-500/40 text-white text-center font-black text-lg focus:outline-none focus:border-orange-500/70 transition-colors"
-                  />
-                  <span className="text-gray-500 text-[10px] font-bold uppercase">{awayCode}</span>
-                </div>
-              </div>
-            </>
+            (() => {
+              const lockedWinnerLabel = saved === "home" ? homeCode : saved === "away" ? awayCode : "Empate";
+              const impliedWinner: Outcome | null = hasPendingScore
+                ? (pendingScore!.home! > pendingScore!.away! ? "home"
+                  : pendingScore!.away! > pendingScore!.home! ? "away"
+                  : "draw")
+                : null;
+              const wrongWinner = hasPendingScore && impliedWinner !== saved;
+              return (
+                <>
+                  <p className="text-[10px] text-orange-400/80 text-center mb-2 font-semibold">
+                    Agregá el marcador — el ganador ({lockedWinnerLabel}) ya está fijo
+                  </p>
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-500 text-[10px] font-bold uppercase">{homeCode}</span>
+                      <input
+                        type="number" min={0} max={30}
+                        value={pendingScore?.home ?? ""}
+                        onChange={e => onPickScore(match.id, "home", Math.max(0, Math.min(30, parseInt(e.target.value) || 0)))}
+                        placeholder="0"
+                        className={`w-12 h-10 rounded-lg bg-[#1a1a1a] border text-white text-center font-black text-lg focus:outline-none transition-colors ${wrongWinner ? "border-red-500/60 focus:border-red-500" : "border-orange-500/40 focus:border-orange-500/70"}`}
+                      />
+                    </div>
+                    <span className="text-gray-700 font-black text-sm">—</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number" min={0} max={30}
+                        value={pendingScore?.away ?? ""}
+                        onChange={e => onPickScore(match.id, "away", Math.max(0, Math.min(30, parseInt(e.target.value) || 0)))}
+                        placeholder="0"
+                        className={`w-12 h-10 rounded-lg bg-[#1a1a1a] border text-white text-center font-black text-lg focus:outline-none transition-colors ${wrongWinner ? "border-red-500/60 focus:border-red-500" : "border-orange-500/40 focus:border-orange-500/70"}`}
+                      />
+                      <span className="text-gray-500 text-[10px] font-bold uppercase">{awayCode}</span>
+                    </div>
+                  </div>
+                  {wrongWinner && (
+                    <p className="text-red-400 text-[10px] text-center mt-1.5 font-semibold">
+                      El marcador cambia el ganador — necesitás que gane {lockedWinnerLabel}
+                    </p>
+                  )}
+                  {hasPendingScore && !wrongWinner && onSaveScore && (
+                    <button
+                      onClick={() => onSaveScore(pendingScore!.home!, pendingScore!.away!)}
+                      disabled={!!savingScore}
+                      className="mt-2 w-full py-2 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-black font-black text-xs transition-colors"
+                    >
+                      {savingScore ? "Guardando..." : "Confirmar marcador"}
+                    </button>
+                  )}
+                </>
+              );
+            })()
           ) : isReadOnly ? (
             <div className="flex items-center justify-center gap-2 py-1">
               <span className="text-gray-700 text-xs">Sin predicción de marcador</span>
