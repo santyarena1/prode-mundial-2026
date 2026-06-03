@@ -24,7 +24,12 @@ export async function GET() {
         passwordHash: true,
         createdAt: true,
         _count: {
-          select: { predictions: { where: { status: "locked" } } },
+          select: {
+            predictions: { where: { status: "locked" } },
+            groupPredictions: true,
+            bracketPredictions: true,
+            specialPredictions: true,
+          },
         },
         squadMemberships: {
           select: {
@@ -35,9 +40,16 @@ export async function GET() {
       },
     });
 
-    const users = rawUsers.map(({ passwordHash, ...user }) => ({
+    const users = rawUsers.map(({ passwordHash, _count, ...user }) => ({
       ...user,
       hasPassword: !!passwordHash,
+      _count: {
+        predictions:
+          (_count.predictions ?? 0) +
+          (_count.groupPredictions ?? 0) +
+          (_count.bracketPredictions ?? 0) +
+          (_count.specialPredictions ?? 0),
+      },
     }));
 
     return NextResponse.json({ users });
