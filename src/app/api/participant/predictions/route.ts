@@ -130,10 +130,30 @@ export async function POST(request: NextRequest) {
       where: { userId_matchId: { userId: auth.userId, matchId } },
     });
     if (existing && existing.status === "locked") {
-      return NextResponse.json({
-        error: "Tu predicción ya está bloqueada. Canjeá un cambio de predicción para modificarla.",
-        locked: true,
-      }, { status: 403 });
+      // Allow adding scores to a prediction locked without scores (hardcore upgrade)
+      const isScoreUpgrade =
+        predictedHomeScore !== undefined &&
+        predictedAwayScore !== undefined &&
+        existing.predictedHomeScore === null &&
+        existing.predictedAwayScore === null;
+
+      if (isScoreUpgrade) {
+        const newOutcome =
+          predictedHomeScore > predictedAwayScore ? "home" :
+          predictedAwayScore > predictedHomeScore ? "away" : "draw";
+        if (newOutcome !== existing.predictedOutcome) {
+          return NextResponse.json({
+            error: `El marcador debe respetar el ganador ya predicho (${existing.predictedOutcome === "home" ? "local" : existing.predictedOutcome === "away" ? "visita" : "empate"}).`,
+            wrongWinner: true,
+          }, { status: 400 });
+        }
+        // Score upgrade allowed — fall through to upsert
+      } else {
+        return NextResponse.json({
+          error: "Tu predicción ya está bloqueada. Canjeá un cambio de predicción para modificarla.",
+          locked: true,
+        }, { status: 403 });
+      }
     }
 
     const prediction = await prisma.prediction.upsert({

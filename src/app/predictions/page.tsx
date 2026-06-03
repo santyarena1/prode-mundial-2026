@@ -332,10 +332,11 @@ export default function PredictionsPage() {
     let derived: { firstTeamId: string | null; secondTeamId: string | null; thirdTeamId: string | null } | null = null;
 
     for (const match of matches) {
-      if (savedPreds[match.id]) continue;
       if (!isMatchPredictionWindowOpen(match.startDate)) continue;
 
       if (hardcoreMode) {
+        // Skip if score already saved
+        if (savedScores[match.id]) continue;
         const score = pendingScores[match.id];
         if (score?.home === undefined || score?.away === undefined) continue;
         try {
@@ -354,6 +355,7 @@ export default function PredictionsPage() {
           } else { const d = await res.json(); toast.error(d.error || "Error"); }
         } catch { toast.error("Error de conexión"); }
       } else {
+        if (savedPreds[match.id]) continue;
         const outcome = pendingPreds[match.id];
         if (!outcome) continue;
         try {
@@ -451,12 +453,13 @@ export default function PredictionsPage() {
   }, [hardcoreMode]);
 
   const handlePickScore = useCallback((matchId: string, side: "home" | "away", value: number) => {
-    if (savedPreds[matchId]) return;
+    // Block only if score is already saved; allow entry when outcome is saved but score is missing (hardcore re-save)
+    if (savedPreds[matchId] && savedScores[matchId]) return;
     setPendingScores(prev => ({
       ...prev,
       [matchId]: { ...prev[matchId], [side]: value },
     }));
-  }, [savedPreds]);
+  }, [savedPreds, savedScores]);
 
   const handleBuyChange = useCallback(async () => {
     setBuyingChange(true);
@@ -736,11 +739,13 @@ export default function PredictionsPage() {
             {groups.length === 0 && <div className="p-8 text-center text-gray-500">No hay partidos disponibles aún.</div>}
             {groups.map(group => {
               const pendingCount = group.matches.filter(m => {
-                if (savedPreds[m.id]) return false;
                 if (hardcoreMode) {
+                  // Already has score saved → nothing pending
+                  if (savedScores[m.id]) return false;
                   const s = pendingScores[m.id];
                   return s?.home !== undefined && s?.away !== undefined;
                 }
+                if (savedPreds[m.id]) return false;
                 return !!pendingPreds[m.id];
               }).length;
               const savedCount = group.matches.filter(m => savedPreds[m.id]).length;
@@ -1712,8 +1717,13 @@ function MatchCard({
     home: `Gana ${homeCode}`, draw: "Empate", away: `Gana ${awayCode}`,
   };
 
+  const needsHardcoreScore = isLocked && hardcoreMode && !savedScore && windowOpen && !matchStarted;
+
   return (
     <div className={`rounded-xl border overflow-hidden transition-all ${
+      isLocked && savedScore ? "border-green-500/20 bg-[#0d110d]" :
+      needsHardcoreScore && hasPendingScore ? "border-orange-500/30 bg-orange-500/5" :
+      needsHardcoreScore ? "border-orange-500/15 bg-[#0f0d0a]" :
       isLocked ? "border-green-500/20 bg-[#0d110d]" :
       (pending || hasPendingScore) ? "border-amber-500/20 bg-amber-500/5" :
       "border-[#1d1d1d] bg-[#141414]"
@@ -1788,6 +1798,36 @@ function MatchCard({
               </div>
               <Lock className="w-3 h-3 text-green-700 ml-1" />
             </div>
+          ) : isLocked && !savedScore && windowOpen && !matchStarted ? (
+            /* Hardcore upgrade: outcome saved in normal mode, scores not yet added */
+            <>
+              <p className="text-[10px] text-orange-400/80 text-center mb-2 font-semibold">
+                Agregá el marcador — el ganador ({saved === "home" ? homeCode : saved === "away" ? awayCode : "Empate"}) ya está fijo
+              </p>
+              <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 text-[10px] font-bold uppercase">{homeCode}</span>
+                  <input
+                    type="number" min={0} max={30}
+                    value={pendingScore?.home ?? ""}
+                    onChange={e => onPickScore(match.id, "home", Math.max(0, Math.min(30, parseInt(e.target.value) || 0)))}
+                    placeholder="0"
+                    className="w-12 h-10 rounded-lg bg-[#1a1a1a] border border-orange-500/40 text-white text-center font-black text-lg focus:outline-none focus:border-orange-500/70 transition-colors"
+                  />
+                </div>
+                <span className="text-gray-700 font-black text-sm">—</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" min={0} max={30}
+                    value={pendingScore?.away ?? ""}
+                    onChange={e => onPickScore(match.id, "away", Math.max(0, Math.min(30, parseInt(e.target.value) || 0)))}
+                    placeholder="0"
+                    className="w-12 h-10 rounded-lg bg-[#1a1a1a] border border-orange-500/40 text-white text-center font-black text-lg focus:outline-none focus:border-orange-500/70 transition-colors"
+                  />
+                  <span className="text-gray-500 text-[10px] font-bold uppercase">{awayCode}</span>
+                </div>
+              </div>
+            </>
           ) : isReadOnly ? (
             <div className="flex items-center justify-center gap-2 py-1">
               <span className="text-gray-700 text-xs">Sin predicción de marcador</span>
@@ -1925,7 +1965,8 @@ function BracketMatchCard2({
       transition={{ delay, duration: 0.25, ease: "easeOut" }}
       className={`relative overflow-hidden rounded-2xl border transition-all ${
         isLocked ? "border-green-500/20 bg-gradient-to-br from-[#0d110d] to-[#0a0a0a]" :
-        isPending ? "border-amber-500/15 bg-[#0d0d0d]" : "border-[#1e1e1e] bg-[#0d0d0d]"
+        isPending ? "border-amber-500/15 bg-[#0d0d0d]" :
+        teamsKnown ? "border-blue-500/20 bg-[#0a0c10]" : "border-[#1e1e1e] bg-[#0d0d0d]"
       }`}>
 
       {/* Match number badge */}
