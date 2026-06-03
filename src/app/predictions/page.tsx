@@ -1129,6 +1129,7 @@ export default function PredictionsPage() {
             savedGroupCount={completedGroupsCount}
             savedBracketCount={Object.keys(savedBracket).length}
             hasChampionPred={Object.keys(savedBracket).some(k => k.startsWith("CHAMPION:"))}
+            isHardcore={hardcoreMode}
           />
         )}
       </AnimatePresence>
@@ -1518,13 +1519,14 @@ const POINTS_TABLE = [
 ];
 
 function PointsAndAchievementsModal({
-  onClose, savedMatchCount, savedGroupCount, savedBracketCount, hasChampionPred,
+  onClose, savedMatchCount, savedGroupCount, savedBracketCount, hasChampionPred, isHardcore,
 }: {
   onClose: () => void;
   savedMatchCount: number;
   savedGroupCount: number;
   savedBracketCount: number;
   hasChampionPred: boolean;
+  isHardcore: boolean;
 }) {
   const [tab, setTab] = useState<"points" | "logros">("points");
 
@@ -1604,9 +1606,19 @@ function PointsAndAchievementsModal({
 
             {tab === "logros" && (
               <div className="space-y-3">
+                {!isHardcore && (
+                  <div className="flex items-start gap-2.5 bg-orange-500/10 border border-orange-500/25 rounded-xl px-3.5 py-3">
+                    <span className="text-orange-400 text-base leading-none mt-0.5">🔥</span>
+                    <div>
+                      <p className="text-orange-300 text-xs font-bold">Solo disponibles en Modo Hardcore</p>
+                      <p className="text-orange-500/80 text-[11px] mt-0.5 leading-snug">
+                        Activá el Modo Hardcore para poder ganar logros. Sin él, los puntos de logros no se acreditan.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <p className="text-gray-600 text-[11px] leading-relaxed pb-1">
-                  Los logros se calculan automáticamente al finalizar el torneo.
-                  Las barras muestran predicciones cargadas hasta ahora.
+                  Los logros se calculan automáticamente al cerrar cada fase del torneo.
                 </p>
                 {LOGROS.map(logro => {
                   const progress = getProgress(logro);

@@ -292,14 +292,21 @@ export async function calculateUserPoints(userId: string): Promise<number> {
   const [bonusAgg, codeAgg, userRec, redemptionAgg] = await Promise.all([
     prisma.userBonus.aggregate({ where: { userId, status: "approved" }, _sum: { pointsEarned: true } }),
     prisma.purchaseCode.aggregate({ where: { userId, status: "redeemed" }, _sum: { points: true } }),
-    prisma.user.findUnique({ where: { id: userId }, select: { referralPoints: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { referralPoints: true, hardcoreMode: true } }),
     prisma.prizeRedemption.aggregate({ where: { userId, status: { not: "rejected" } }, _sum: { pointsSpent: true } }),
   ]);
   const bonusPoints = (bonusAgg._sum.pointsEarned ?? 0) + (codeAgg._sum.points ?? 0) + (userRec?.referralPoints ?? 0);
   const spentPoints = redemptionAgg._sum.pointsSpent ?? 0;
 
-  // ── 5. Achievements ──────────────────────────────────────────────────────
-  const achievementPoints = await applyAchievements(userId, achievementStats);
+  // ── 5. Achievements — solo aplican en modo Hardcore ──────────────────────
+  const achievementPoints = userRec?.hardcoreMode
+    ? await applyAchievements(userId, achievementStats)
+    : 0;
+
+  // Si no está en hardcore, borrar logros que haya ganado antes
+  if (!userRec?.hardcoreMode) {
+    await prisma.userAchievement.deleteMany({ where: { userId } });
+  }
 
   // ── 6. Update user ───────────────────────────────────────────────────────
   const totalPoints = predictionPoints + bonusPoints + achievementPoints;
