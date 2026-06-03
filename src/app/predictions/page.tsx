@@ -1371,7 +1371,7 @@ export default function PredictionsPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-bold text-sm">Logros automáticos</p>
                         <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">
-                          Si acertás muchos partidos o la llave entera, se suman logros con puntos extra (hasta 273.000 pts en total).
+                          Si acertás grupos y bracket, se suman logros con puntos extra (hasta 85.000 pts adicionales).
                         </p>
                       </div>
                     </div>
@@ -1490,45 +1490,30 @@ export default function PredictionsPage() {
 // ─── Points & Achievements Modal ─────────────────────────────────────────────
 
 const LOGROS = [
-  // Partidos de grupos (solo ganás el nivel más alto)
-  { icon: "🚀", name: "Buen arranque",        condition: "Acertar 28+ partidos de grupos",                    pts: "2.000",  target: 28,  type: "match" as const },
-  { icon: "📊", name: "Especialista",         condition: "Acertar 40+ partidos de grupos",                    pts: "9.000",  target: 40,  type: "match" as const },
-  { icon: "🤖", name: "Máquina de grupos",    condition: "Acertar 54+ partidos de grupos",                    pts: "22.000", target: 54,  type: "match" as const },
-  // Clasificados (solo ganás el nivel más alto)
-  { icon: "🦅", name: "Ojo de halcón",        condition: "Acertar 14+ equipos clasificados",                  pts: "3.000",  target: 14,  type: "classified" as const },
-  { icon: "👁️", name: "Ojo clínico",         condition: "Acertar 19+ equipos clasificados",                  pts: "10.000", target: 19,  type: "classified" as const },
-  { icon: "🎯", name: "Tabla casi perfecta",  condition: "Acertar 22+ equipos clasificados",                  pts: "25.000", target: 22,  type: "classified" as const },
-  // Eliminatorias (solo ganás el nivel más alto)
-  { icon: "💪", name: "Bracket fuerte",       condition: "Acertar el 65%+ de eliminatorias",                  pts: "6.000",  target: 31,  type: "bracket" as const },
-  { icon: "🔮", name: "Bracket experto",      condition: "Acertar el 80%+ de eliminatorias",                  pts: "18.000", target: 31,  type: "bracket" as const },
-  { icon: "⚡", name: "Bracket perfecto",     condition: "Acertar toda la llave eliminatoria",                pts: "48.000", target: 31,  type: "bracket" as const },
-  // Especial
-  { icon: "📋", name: "Tabla perfecta",       condition: "Acertar el 1° y 2° exacto en los 12 grupos",        pts: "28.000", target: 12,  type: "groups" as const },
-  // Combos
-  { icon: "🌍", name: "Prode sólido",         condition: "Especialista + Ojo clínico + Bracket fuerte (o sup.)", pts: "20.000", target: 1, type: "champion" as const },
-  { icon: "⭐", name: "Prode experto",        condition: "Máquina + Tabla casi perfecta + Bracket experto (o sup.)", pts: "50.000", target: 1, type: "champion" as const },
-  { icon: "🏆", name: "Prode perfecto",       condition: "Máquina + Tabla casi perfecta + Bracket perfecto + Tabla perfecta", pts: "80.000", target: 1, type: "champion" as const },
+  { icon: "🦅", name: "Ojo de águila",   condition: "Acertar el 1° y 2° exacto en al menos 4 grupos (se calcula al cerrar la fase de grupos)", pts: "15.000", target: 4,  type: "groups" as const },
+  { icon: "🎯", name: "Bracket de lujo", condition: "Acertar 6 o más de los 8 clasificados a cuartos de final (se calcula al terminar octavos)", pts: "20.000", target: 1,  type: "champion" as const },
+  { icon: "🏆", name: "Lo vi venir",     condition: "Acertar al campeón en la predicción del ganador (se calcula al terminar el torneo)",        pts: "50.000", target: 1,  type: "champion" as const },
 ];
 
 const POINTS_TABLE = [
   { section: "Partidos de grupos", items: [
-    { label: "Acertar ganador o perdedor",        pts: "150",    note: "48 partidos en grupos" },
-    { label: "Acertar empate exacto",             pts: "250",    note: "(150 + 100 bonus empate)" },
-    { label: "🔥 Bonus marcador exacto (Hardcore)", pts: "+150", note: "se suma al resultado acertado" },
+    { label: "Acertar ganador o perdedor",          pts: "500",    note: "48 partidos en grupos" },
+    { label: "Acertar empate exacto",               pts: "800",    note: "(500 + 300 bonus empate)" },
+    { label: "🔥 Bonus marcador exacto (Hardcore)", pts: "+500",   note: "se suma al resultado acertado" },
   ]},
   { section: "Clasificados de grupo", items: [
-    { label: "Acertar equipo clasificado",        pts: "400",    note: "por cada clasificado" },
-    { label: "Acertar la posición exacta",        pts: "+600",   note: "extra si acertás 1° o 2° exacto" },
-    { label: "Ejemplo: Argentina 1° exacto",      pts: "1.000",  note: "400 + 600 = 1.000 pts" },
+    { label: "Acertar equipo clasificado",          pts: "1.200",  note: "por cada clasificado" },
+    { label: "Acertar la posición exacta",          pts: "+1.800", note: "extra si acertás 1° o 2° exacto" },
+    { label: "Ejemplo: Argentina 1° exacto",        pts: "3.000",  note: "1.200 + 1.800 = 3.000 pts" },
   ]},
   { section: "Eliminatorias", items: [
-    { label: "Equipo que pasa en Ronda de 32",    pts: "700",    note: "× 16 equipos" },
-    { label: "Equipo que pasa en Octavos",        pts: "1.200",  note: "× 8 equipos" },
-    { label: "Equipo que pasa en Cuartos",        pts: "2.000",  note: "× 4 equipos" },
-    { label: "Equipo que pasa en Semifinal",      pts: "3.500",  note: "× 2 equipos" },
-    { label: "Acertar al subcampeón (finalista)", pts: "5.000",  note: "" },
-    { label: "Acertar al campeón",                pts: "10.000", note: "" },
-    { label: "Campeón + subcampeón exactos",      pts: "+15.000",note: "bonus adicional" },
+    { label: "Equipo que pasa en Ronda de 32",      pts: "2.000",  note: "× 32 equipos" },
+    { label: "Equipo que pasa en Octavos",          pts: "3.500",  note: "× 16 equipos" },
+    { label: "Equipo que pasa en Cuartos",          pts: "6.000",  note: "× 8 equipos" },
+    { label: "Equipo que pasa en Semifinal",        pts: "10.000", note: "× 4 equipos" },
+    { label: "Acertar al subcampeón (finalista)",   pts: "15.000", note: "" },
+    { label: "Acertar al campeón",                  pts: "30.000", note: "" },
+    { label: "Campeón + subcampeón exactos",        pts: "+40.000",note: "bonus adicional" },
   ]},
 ];
 
@@ -1544,25 +1529,15 @@ function PointsAndAchievementsModal({
   const [tab, setTab] = useState<"points" | "logros">("points");
 
   const getProgress = (logro: typeof LOGROS[0]) => {
-    switch (logro.type) {
-      case "match":       return Math.min(savedMatchCount, logro.target) / logro.target;
-      case "classified":  return Math.min(savedGroupCount * 2, logro.target) / logro.target;
-      case "groups":      return Math.min(savedGroupCount, logro.target) / logro.target;
-      case "bracket":     return Math.min(savedBracketCount, logro.target) / logro.target;
-      case "champion":    return hasChampionPred ? 1 : 0;
-      default:            return 0;
-    }
+    if (logro.type === "groups") return Math.min(savedGroupCount, logro.target) / logro.target;
+    if (logro.type === "champion") return hasChampionPred ? 1 : 0;
+    return 0;
   };
 
   const getCurrent = (logro: typeof LOGROS[0]) => {
-    switch (logro.type) {
-      case "match":      return Math.min(savedMatchCount, logro.target);
-      case "classified": return Math.min(savedGroupCount * 2, logro.target);
-      case "groups":     return Math.min(savedGroupCount, logro.target);
-      case "bracket":    return Math.min(savedBracketCount, logro.target);
-      case "champion":   return hasChampionPred ? 1 : 0;
-      default:           return 0;
-    }
+    if (logro.type === "groups") return Math.min(savedGroupCount, logro.target);
+    if (logro.type === "champion") return hasChampionPred ? 1 : 0;
+    return 0;
   };
 
   return (
@@ -1622,7 +1597,7 @@ function PointsAndAchievementsModal({
                 ))}
                 <div className="bg-[#0f1a0f] border border-green-500/20 rounded-xl p-4 text-xs text-gray-500 leading-relaxed">
                   <span className="text-green-400 font-bold">Ejemplo completo:</span> Argentina clasifica y queda 1° →
-                  120 pts (clasificado) + 180 pts (posición exacta) = <span className="text-yellow-300 font-bold">300 pts</span> solo por ese equipo.
+                  1.200 pts (clasificado) + 1.800 pts (posición exacta) = <span className="text-yellow-300 font-bold">3.000 pts</span> solo por ese equipo.
                 </div>
               </div>
             )}

@@ -1,19 +1,19 @@
 import prisma from "./db";
 
 export const DEFAULT_POINT_RULES = {
-  GROUP_SIGN:       { label: "Acertar resultado (ganador/perdedor)",       points: 150 },
-  GROUP_DRAW_BONUS: { label: "Bonus por acertar empate exacto",            points: 100 },
-  EXACT_SCORE:      { label: "Bonus por marcador exacto (Modo Hardcore)",  points: 150 },
-  GROUP_CLASSIFIED:       { label: "Acertar equipo clasificado 1° o 2°",       points: 400 },
-  GROUP_POSITION:         { label: "Acertar posición exacta en grupo (1° o 2°)", points: 600 },
-  GROUP_THIRD_QUALIFIED:  { label: "Acertar 3° que avanza como mejor tercero",   points: 250 },
-  ROUND_OF_32:      { label: "Acertar equipo que pasa en Ronda de 32",     points: 700 },
-  ROUND_OF_16:      { label: "Acertar equipo que pasa en Octavos",         points: 1200 },
-  QUARTER_FINALS:   { label: "Acertar equipo que pasa en Cuartos",         points: 2000 },
-  SEMI_FINALS:      { label: "Acertar equipo que pasa en Semifinal",       points: 3500 },
-  CHAMPION:         { label: "Acertar campeón",                            points: 10000 },
-  RUNNER_UP:        { label: "Acertar finalista (subcampeón)",             points: 5000 },
-  FINAL_EXACT:      { label: "Acertar campeón + subcampeón (bonus extra)", points: 15000 },
+  GROUP_SIGN:       { label: "Acertar resultado (ganador/perdedor)",       points: 500 },
+  GROUP_DRAW_BONUS: { label: "Bonus por acertar empate exacto",            points: 300 },
+  EXACT_SCORE:      { label: "Bonus por marcador exacto (Modo Hardcore)",  points: 500 },
+  GROUP_CLASSIFIED:       { label: "Acertar equipo clasificado 1° o 2°",       points: 1200 },
+  GROUP_POSITION:         { label: "Acertar posición exacta en grupo (1° o 2°)", points: 1800 },
+  GROUP_THIRD_QUALIFIED:  { label: "Acertar 3° que avanza como mejor tercero",   points: 800 },
+  ROUND_OF_32:      { label: "Acertar equipo que pasa en Ronda de 32",     points: 2000 },
+  ROUND_OF_16:      { label: "Acertar equipo que pasa en Octavos",         points: 3500 },
+  QUARTER_FINALS:   { label: "Acertar equipo que pasa en Cuartos",         points: 6000 },
+  SEMI_FINALS:      { label: "Acertar equipo que pasa en Semifinal",       points: 10000 },
+  CHAMPION:         { label: "Acertar campeón",                            points: 30000 },
+  RUNNER_UP:        { label: "Acertar finalista (subcampeón)",             points: 15000 },
+  FINAL_EXACT:      { label: "Acertar campeón + subcampeón (bonus extra)", points: 40000 },
   SPECIAL_CHAMPION:    { label: "Campeón predicho antes del torneo",       points: 60 },
   SPECIAL_TOP_SCORER:  { label: "Goleador del torneo",                     points: 40 },
   SPECIAL_REVELATION:  { label: "Selección revelación",                    points: 20 },
@@ -21,24 +21,12 @@ export const DEFAULT_POINT_RULES = {
 };
 
 export const DEFAULT_ACHIEVEMENTS = {
-  // Categoría A: Partidos de grupos — solo se gana el tier más alto
-  A1_MATCH:         { name: "Buen arranque",         description: "Acertar 28 o más partidos de fase de grupos",                   points: 2000  },
-  A2_MATCH:         { name: "Especialista",           description: "Acertar 40 o más partidos de fase de grupos",                   points: 9000  },
-  A3_MATCH:         { name: "Máquina de grupos",      description: "Acertar 54 o más partidos de fase de grupos",                   points: 22000 },
-  // Categoría B: Clasificados — solo se gana el tier más alto
-  B1_CLASSIFIED:    { name: "Ojo de halcón",          description: "Acertar 14 o más equipos clasificados de grupos",               points: 3000  },
-  B2_CLASSIFIED:    { name: "Ojo clínico",             description: "Acertar 19 o más equipos clasificados de grupos",               points: 10000 },
-  B3_CLASSIFIED:    { name: "Tabla casi perfecta",    description: "Acertar 22 o más equipos clasificados de grupos",               points: 25000 },
-  // Categoría C: Eliminatorias — solo se gana el tier más alto
-  C1_BRACKET:       { name: "Bracket fuerte",         description: "Acertar el 65% o más de las predicciones de eliminatorias",     points: 6000  },
-  C2_BRACKET:       { name: "Bracket experto",        description: "Acertar el 80% o más de las predicciones de eliminatorias",     points: 18000 },
-  C3_BRACKET:       { name: "Bracket perfecto",       description: "Acertar toda la llave eliminatoria",                            points: 48000 },
-  // Categoría D: Especial
-  D_PERFECT_TABLE:  { name: "Tabla perfecta",         description: "Acertar el 1° y 2° exacto en los 12 grupos",                   points: 28000 },
-  // Combos — se suman encima de los tiers individuales
-  X1_SOLIDO:        { name: "Prode sólido",           description: "Ser Especialista + Ojo clínico + Bracket fuerte (o superior)",  points: 20000 },
-  X2_EXPERTO:       { name: "Prode experto",          description: "Ser Máquina + Tabla casi perfecta + Bracket experto (o sup.)",  points: 50000 },
-  X3_PERFECTO:      { name: "Prode perfecto",         description: "Máquina + Tabla casi perfecta + Bracket perfecto + Tabla perfecta", points: 80000 },
+  // Logro 1: acertar 1° y 2° exacto en al menos 4 grupos
+  L1_EAGLE_EYE:    { name: "Ojo de águila",   description: "Acertar el 1° y 2° exacto en al menos 4 grupos",        points: 15000 },
+  // Logro 2: acertar al menos 6 de los 8 clasificados a cuartos de final
+  L2_BRACKET_PRO:  { name: "Bracket de lujo", description: "Acertar al menos 6 de los 8 clasificados a cuartos de final", points: 20000 },
+  // Logro 3: acertar el campeón (predicción especial antes del torneo)
+  L3_CHAMPION:     { name: "Lo vi venir",     description: "Acertar el campeón del torneo en la predicción especial", points: 50000 },
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -81,14 +69,9 @@ function calculateGroupQualifiers(
 // ── Achievement calculation (idempotent) ─────────────────────────────────────
 
 interface AchievementStats {
-  groupCorrect: number;
-  classifiedCorrect: number;
-  groupsChecked: number;
-  groupsPositionPerfect: number;
-  bracketCorrect: number;
-  bracketFinished: number;
-  finalChampionCorrect: boolean;
-  finalRunnerUpCorrect: boolean;
+  groupsPositionPerfect: number;  // grupos con 1° y 2° exacto
+  bracketQfCorrect: number;       // equipos acertados que llegaron a cuartos
+  specialChampionCorrect: boolean; // acertó el campeón en predicción especial
 }
 
 async function applyAchievements(userId: string, stats: AchievementStats): Promise<number> {
@@ -99,39 +82,16 @@ async function applyAchievements(userId: string, stats: AchievementStats): Promi
   for (const r of rules) ruleMap[r.key] = { id: r.id, points: r.points };
 
   const earned: string[] = [];
-  const { groupCorrect, classifiedCorrect, groupsChecked, groupsPositionPerfect,
-          bracketCorrect, bracketFinished } = stats;
+  const { groupsPositionPerfect, bracketQfCorrect, specialChampionCorrect } = stats;
 
-  // ── Categoría A: Partidos de grupos (exclusivo — solo el tier más alto)
-  if (groupCorrect >= 54)      earned.push("A3_MATCH");
-  else if (groupCorrect >= 40) earned.push("A2_MATCH");
-  else if (groupCorrect >= 28) earned.push("A1_MATCH");
+  // L1: Ojo de águila — 1° y 2° exacto en al menos 4 grupos
+  if (groupsPositionPerfect >= 4) earned.push("L1_EAGLE_EYE");
 
-  // ── Categoría B: Clasificados (exclusivo — solo el tier más alto)
-  if (classifiedCorrect >= 22)      earned.push("B3_CLASSIFIED");
-  else if (classifiedCorrect >= 19) earned.push("B2_CLASSIFIED");
-  else if (classifiedCorrect >= 14) earned.push("B1_CLASSIFIED");
+  // L2: Bracket de lujo — al menos 6 de los 8 clasificados a cuartos
+  if (bracketQfCorrect >= 6) earned.push("L2_BRACKET_PRO");
 
-  // ── Categoría C: Eliminatorias (exclusivo — solo el tier más alto)
-  if (bracketFinished > 0) {
-    const pct = bracketCorrect / bracketFinished;
-    if (bracketCorrect === bracketFinished)  earned.push("C3_BRACKET");
-    else if (pct >= 0.80)                    earned.push("C2_BRACKET");
-    else if (pct >= 0.65)                    earned.push("C1_BRACKET");
-  }
-
-  // ── Categoría D: Tabla perfecta (especial — acumula)
-  if (groupsChecked >= 12 && groupsPositionPerfect >= 12) earned.push("D_PERFECT_TABLE");
-
-  // ── Combos (se suman encima de los tiers individuales)
-  const hasA2orBetter = earned.includes("A2_MATCH") || earned.includes("A3_MATCH");
-  const hasB2orBetter = earned.includes("B2_CLASSIFIED") || earned.includes("B3_CLASSIFIED");
-  const hasC1orBetter = earned.includes("C1_BRACKET") || earned.includes("C2_BRACKET") || earned.includes("C3_BRACKET");
-  const hasC2orBetter = earned.includes("C2_BRACKET") || earned.includes("C3_BRACKET");
-
-  if (hasA2orBetter && hasB2orBetter && hasC1orBetter) earned.push("X1_SOLIDO");
-  if (earned.includes("A3_MATCH") && earned.includes("B3_CLASSIFIED") && hasC2orBetter) earned.push("X2_EXPERTO");
-  if (earned.includes("A3_MATCH") && earned.includes("B3_CLASSIFIED") && earned.includes("C3_BRACKET") && earned.includes("D_PERFECT_TABLE")) earned.push("X3_PERFECTO");
+  // L3: Lo vi venir — acertar el campeón en la predicción especial
+  if (specialChampionCorrect) earned.push("L3_CHAMPION");
 
   // Remove achievements no longer earned
   await prisma.userAchievement.deleteMany({
@@ -163,14 +123,9 @@ export async function calculateUserPoints(userId: string): Promise<number> {
 
   let predictionPoints = 0;
   const achievementStats: AchievementStats = {
-    groupCorrect: 0,
-    classifiedCorrect: 0,
-    groupsChecked: 0,
     groupsPositionPerfect: 0,
-    bracketCorrect: 0,
-    bracketFinished: 0,
-    finalChampionCorrect: false,
-    finalRunnerUpCorrect: false,
+    bracketQfCorrect: 0,
+    specialChampionCorrect: false,
   };
 
   // ── 1. Group stage match predictions ────────────────────────────────────
@@ -190,7 +145,6 @@ export async function calculateUserPoints(userId: string): Promise<number> {
     if (p.predictedOutcome && p.predictedOutcome === m.realOutcome) {
       earned += pts("GROUP_SIGN");
       if (m.realOutcome === "draw") earned += pts("GROUP_DRAW_BONUS");
-      achievementStats.groupCorrect++;
 
       // Hardcore bonus: exact scoreline
       if (
@@ -232,7 +186,6 @@ export async function calculateUserPoints(userId: string): Promise<number> {
       continue;
     }
 
-    achievementStats.groupsChecked++;
     const { first, second, third } = calculateGroupQualifiers(gp.group.teams, gp.group.matches);
     let earned = 0;
     let positionPerfect = true;
@@ -240,7 +193,6 @@ export async function calculateUserPoints(userId: string): Promise<number> {
     if (gp.firstTeamId) {
       if (gp.firstTeamId === first || gp.firstTeamId === second) {
         earned += pts("GROUP_CLASSIFIED");
-        achievementStats.classifiedCorrect++;
         if (gp.firstTeamId === first) earned += pts("GROUP_POSITION");
         else positionPerfect = false;
       } else positionPerfect = false;
@@ -249,7 +201,6 @@ export async function calculateUserPoints(userId: string): Promise<number> {
     if (gp.secondTeamId) {
       if (gp.secondTeamId === first || gp.secondTeamId === second) {
         earned += pts("GROUP_CLASSIFIED");
-        achievementStats.classifiedCorrect++;
         if (gp.secondTeamId === second) earned += pts("GROUP_POSITION");
         else positionPerfect = false;
       } else positionPerfect = false;
@@ -286,52 +237,55 @@ export async function calculateUserPoints(userId: string): Promise<number> {
     SEMI_FINALS:    "SEMI_FINALS",
   };
 
+  let finalChampionCorrect = false;
+  let finalRunnerUpCorrect = false;
+
   for (const bp of bracketPredictions) {
     if (!bp.predictedTeamId) {
       if (bp.pointsEarned !== 0) await prisma.bracketPrediction.update({ where: { id: bp.id }, data: { pointsEarned: 0 } });
       continue;
     }
 
-    const match = matchByCode.get(bp.matchSlot) ?? null;
+    // CHAMPION phase uses matchSlot "1" — map to the actual final match (103)
+    const lookupSlot = bp.phase === "CHAMPION" ? "103" : bp.matchSlot;
+    const match = matchByCode.get(lookupSlot) ?? null;
 
     if (!match) {
       if (bp.pointsEarned !== 0) await prisma.bracketPrediction.update({ where: { id: bp.id }, data: { pointsEarned: 0 } });
       continue;
     }
 
-    achievementStats.bracketFinished++;
     let earned = 0;
 
-    if (bp.phase === "FINAL" && match.winnerTeamId) {
+    if (bp.phase === "CHAMPION" && match.winnerTeamId) {
       if (bp.predictedTeamId === match.winnerTeamId) {
         earned = pts("CHAMPION");
-        achievementStats.bracketCorrect++;
-        achievementStats.finalChampionCorrect = true;
+        finalChampionCorrect = true;
+        achievementStats.specialChampionCorrect = true;
       } else if (
         bp.predictedTeamId === match.homeTeamId ||
         bp.predictedTeamId === match.awayTeamId
       ) {
         earned = pts("RUNNER_UP");
-        achievementStats.bracketCorrect++;
-        achievementStats.finalRunnerUpCorrect = true;
+        finalRunnerUpCorrect = true;
       }
     } else {
       const ruleKey = phaseRuleMap[bp.phase];
       if (ruleKey && match.winnerTeamId && bp.predictedTeamId === match.winnerTeamId) {
         earned = pts(ruleKey);
-        achievementStats.bracketCorrect++;
+        if (bp.phase === "QUARTER_FINALS") achievementStats.bracketQfCorrect++;
       }
-    }
-
-    // FINAL_EXACT bonus: both champion and runner-up correct
-    if (achievementStats.finalChampionCorrect && achievementStats.finalRunnerUpCorrect) {
-      predictionPoints += pts("FINAL_EXACT");
     }
 
     predictionPoints += earned;
     if (bp.pointsEarned !== earned) {
       await prisma.bracketPrediction.update({ where: { id: bp.id }, data: { pointsEarned: earned } });
     }
+  }
+
+  // FINAL_EXACT bonus: both champion and runner-up correct
+  if (finalChampionCorrect && finalRunnerUpCorrect) {
+    predictionPoints += pts("FINAL_EXACT");
   }
 
   // ── 4. Bonus points (bonus actions + purchase codes + referrals) ─────────
