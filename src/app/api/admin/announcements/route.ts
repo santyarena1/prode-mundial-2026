@@ -107,6 +107,18 @@ export async function POST(request: NextRequest) {
       rawHtml,
     });
 
+    await prisma.emailLog.create({
+      data: {
+        subject,
+        message,
+        ctaUrl: ctaUrl || null,
+        ctaLabel: ctaLabel || null,
+        recipientCount: users.length,
+        sentCount: result.sent,
+        failedCount: result.failed,
+      },
+    });
+
     return NextResponse.json({ ...result, total: users.length });
   } catch (error) {
     console.error("Announcements POST error:", error);
