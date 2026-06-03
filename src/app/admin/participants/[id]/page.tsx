@@ -38,6 +38,20 @@ interface UserDetail {
     id: string; status: string; pointsEarned: number; predictedOutcome?: string | null; createdAt: string;
     match: { matchCode: string; phase: string; homeTeam?: { name: string } | null; awayTeam?: { name: string } | null };
   }>;
+  groupPredictions: Array<{
+    id: string; pointsEarned: number;
+    group: { name: string };
+    firstTeam?: { name: string; flag?: string | null } | null;
+    secondTeam?: { name: string; flag?: string | null } | null;
+    thirdTeam?: { name: string; flag?: string | null } | null;
+  }>;
+  bracketPredictions: Array<{
+    id: string; phase: string; matchSlot: string; pointsEarned: number;
+    predictedTeam?: { name: string; flag?: string | null } | null;
+  }>;
+  specialPredictions: Array<{
+    id: string; type: string; predictedValue: string; pointsEarned: number;
+  }>;
   userAchievements: Array<{
     id: string; pointsEarned: number; awardedAt: string;
     achievementRule: { name: string; description: string };
@@ -154,10 +168,17 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
   if (loading) return <LoadingScreen />;
   if (!user) return <div className="text-gray-500 p-8">Usuario no encontrado</div>;
 
+  const lockedPredictions = user.predictions.filter(p => p.status === "locked");
+  const totalPredictionCount =
+    lockedPredictions.length +
+    (user.groupPredictions?.length ?? 0) +
+    (user.bracketPredictions?.length ?? 0) +
+    (user.specialPredictions?.length ?? 0);
+
   const tabs: { key: Tab; label: string; count: number; icon: React.ReactNode }[] = [
     { key: "bonuses", label: "Bonus", count: user.bonuses.length, icon: <Zap className="w-4 h-4" /> },
     { key: "redemptions", label: "Premios", count: user.redemptions.length, icon: <Gift className="w-4 h-4" /> },
-    { key: "predictions", label: "Predicciones", count: user.predictions.filter(p => p.status === "locked").length, icon: <Target className="w-4 h-4" /> },
+    { key: "predictions", label: "Predicciones", count: totalPredictionCount, icon: <Target className="w-4 h-4" /> },
     { key: "achievements", label: "Logros", count: user.userAchievements.length, icon: <Medal className="w-4 h-4" /> },
   ];
 
@@ -309,29 +330,178 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
 
       {/* Predictions tab */}
       {tab === "predictions" && (
-        <div className="space-y-2">
-          {user.predictions.filter(p => p.status === "locked").length === 0 && (
+        <div className="space-y-6">
+          {totalPredictionCount === 0 && (
             <Card className="p-6 text-center text-gray-600">Sin predicciones guardadas</Card>
           )}
-          {user.predictions.filter(p => p.status === "locked").map(p => (
-            <Card key={p.id} className="p-4 flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-3 min-w-0">
-                <Target className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-white text-sm font-semibold line-clamp-1">
-                    {p.match.homeTeam?.name ?? "?"} vs {p.match.awayTeam?.name ?? "?"} — <span className="text-gray-400">{p.predictedOutcome ?? "sin resultado"}</span>
-                  </p>
-                  <p className="text-gray-600 text-xs">{p.match.phase} · {new Date(p.createdAt).toLocaleDateString("es-AR")}</p>
+
+          {/* ── Partidos de grupos ── */}
+          {lockedPredictions.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-4 bg-blue-500 rounded-full" />
+                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Partidos de grupos</h3>
+                <span className="text-xs text-gray-600 ml-1">({lockedPredictions.length})</span>
+                <span className="ml-auto text-xs text-yellow-500 font-bold">
+                  {lockedPredictions.reduce((s, p) => s + p.pointsEarned, 0).toLocaleString("es-AR")} pts ganados
+                </span>
+              </div>
+              <div className="space-y-1">
+                {lockedPredictions.map(p => {
+                  const outcome = p.predictedOutcome;
+                  const outcomeLabel =
+                    outcome === "home" ? `Local (${p.match.homeTeam?.name ?? "?"})` :
+                    outcome === "away" ? `Visitante (${p.match.awayTeam?.name ?? "?"})` :
+                    outcome === "draw" ? "Empate" : outcome ?? "—";
+                  const outcomeColor =
+                    outcome === "home" ? "text-green-400" :
+                    outcome === "away" ? "text-orange-400" :
+                    outcome === "draw" ? "text-yellow-400" : "text-gray-500";
+                  return (
+                    <div key={p.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#111] border border-[#1a1a1a] hover:border-[#2a2a2a] transition-colors">
+                      <div className="flex-1 min-w-0 flex items-center gap-2">
+                        <span className="text-white text-xs font-medium truncate">
+                          {p.match.homeTeam?.name ?? "?"} <span className="text-gray-600">vs</span> {p.match.awayTeam?.name ?? "?"}
+                        </span>
+                        <span className="text-[10px] text-gray-700">·</span>
+                        <span className={`text-xs font-semibold ${outcomeColor} flex-shrink-0`}>{outcomeLabel}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {p.pointsEarned > 0
+                          ? <span className="text-yellow-400 text-xs font-bold">+{p.pointsEarned.toLocaleString("es-AR")}</span>
+                          : <span className="text-gray-700 text-xs">0 pts</span>
+                        }
+                        <button onClick={() => deleteItem("prediction", p.id, "predicción")} disabled={deleting[p.id]} className="text-gray-800 hover:text-red-400 transition-colors disabled:opacity-40 ml-1">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Posiciones de grupos ── */}
+          {(user.groupPredictions?.length ?? 0) > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-4 bg-purple-500 rounded-full" />
+                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Posiciones de grupos</h3>
+                <span className="text-xs text-gray-600 ml-1">({user.groupPredictions.length})</span>
+                <span className="ml-auto text-xs text-yellow-500 font-bold">
+                  {user.groupPredictions.reduce((s, g) => s + g.pointsEarned, 0).toLocaleString("es-AR")} pts ganados
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {user.groupPredictions.map(gp => (
+                  <div key={gp.id} className="px-3 py-2.5 rounded-lg bg-[#111] border border-[#1a1a1a]">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-gray-400 text-xs font-bold uppercase tracking-wider">{gp.group.name}</span>
+                      {gp.pointsEarned > 0
+                        ? <span className="text-yellow-400 text-xs font-bold">+{gp.pointsEarned.toLocaleString("es-AR")}</span>
+                        : <span className="text-gray-700 text-xs">0 pts</span>
+                      }
+                    </div>
+                    <div className="space-y-1">
+                      {gp.firstTeam && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-yellow-500 w-4">1°</span>
+                          <span className="text-white text-xs">{gp.firstTeam.name}</span>
+                        </div>
+                      )}
+                      {gp.secondTeam && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-gray-400 w-4">2°</span>
+                          <span className="text-white text-xs">{gp.secondTeam.name}</span>
+                        </div>
+                      )}
+                      {gp.thirdTeam && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-gray-600 w-4">3°</span>
+                          <span className="text-gray-400 text-xs">{gp.thirdTeam.name}</span>
+                        </div>
+                      )}
+                      {!gp.firstTeam && !gp.secondTeam && (
+                        <span className="text-gray-700 text-xs">Sin predicción</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Eliminatorias ── */}
+          {(user.bracketPredictions?.length ?? 0) > 0 && (() => {
+            const PHASE_ORDER = ["ROUND_OF_32", "ROUND_OF_16", "QUARTER_FINALS", "SEMI_FINALS", "RUNNER_UP", "CHAMPION"];
+            const PHASE_LABEL: Record<string, string> = {
+              ROUND_OF_32: "Ronda de 32", ROUND_OF_16: "Octavos", QUARTER_FINALS: "Cuartos",
+              SEMI_FINALS: "Semifinal", RUNNER_UP: "Subcampeón", CHAMPION: "Campeón",
+            };
+            const byPhase = PHASE_ORDER.reduce((acc, ph) => {
+              const items = user.bracketPredictions.filter(b => b.phase === ph);
+              if (items.length) acc[ph] = items;
+              return acc;
+            }, {} as Record<string, typeof user.bracketPredictions>);
+
+            return (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-1 h-4 bg-orange-500 rounded-full" />
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Eliminatorias</h3>
+                  <span className="text-xs text-gray-600 ml-1">({user.bracketPredictions.length})</span>
+                  <span className="ml-auto text-xs text-yellow-500 font-bold">
+                    {user.bracketPredictions.reduce((s, b) => s + b.pointsEarned, 0).toLocaleString("es-AR")} pts ganados
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {PHASE_ORDER.filter(ph => byPhase[ph]).map(ph => (
+                    <div key={ph}>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 mb-1.5 pl-1">{PHASE_LABEL[ph]}</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                        {byPhase[ph].map(b => (
+                          <div key={b.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-[#111] border border-[#1a1a1a]">
+                            <span className="text-white text-xs font-medium truncate">
+                              {b.predictedTeam?.name ?? <span className="text-gray-600 italic">Sin predicción</span>}
+                            </span>
+                            {b.pointsEarned > 0
+                              ? <span className="text-yellow-400 text-xs font-bold flex-shrink-0">+{b.pointsEarned.toLocaleString("es-AR")}</span>
+                              : <span className="text-gray-700 text-xs flex-shrink-0">0</span>
+                            }
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div className="flex items-center gap-3 flex-shrink-0">
-                {p.pointsEarned > 0 && <span className="text-yellow-400 font-black text-sm">+{p.pointsEarned} pts</span>}
-                <button onClick={() => deleteItem("prediction", p.id, "predicción")} disabled={deleting[p.id]} className="text-gray-700 hover:text-red-400 transition-colors disabled:opacity-40">
-                  <Trash2 className="w-4 h-4" />
-                </button>
+            );
+          })()}
+
+          {/* ── Especiales ── */}
+          {(user.specialPredictions?.length ?? 0) > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-4 bg-yellow-500 rounded-full" />
+                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Predicciones especiales</h3>
               </div>
-            </Card>
-          ))}
+              <div className="space-y-1">
+                {user.specialPredictions.map(sp => (
+                  <div key={sp.id} className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-[#111] border border-[#1a1a1a]">
+                    <div>
+                      <p className="text-gray-400 text-[10px] uppercase tracking-wider">{sp.type}</p>
+                      <p className="text-white text-sm font-semibold">{sp.predictedValue}</p>
+                    </div>
+                    {sp.pointsEarned > 0
+                      ? <span className="text-yellow-400 text-sm font-bold">+{sp.pointsEarned.toLocaleString("es-AR")}</span>
+                      : <span className="text-gray-700 text-xs">0 pts</span>
+                    }
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
