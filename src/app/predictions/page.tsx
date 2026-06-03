@@ -1503,9 +1503,9 @@ const POINTS_TABLE = [
     { label: "🔥 Bonus marcador exacto (Hardcore)", pts: "+500",   note: "se suma al resultado acertado" },
   ]},
   { section: "Clasificados de grupo", items: [
-    { label: "Acertar equipo clasificado",          pts: "1.200",  note: "por cada clasificado" },
-    { label: "Acertar la posición exacta",          pts: "+1.800", note: "extra si acertás 1° o 2° exacto" },
-    { label: "Ejemplo: Argentina 1° exacto",        pts: "3.000",  note: "1.200 + 1.800 = 3.000 pts" },
+    { label: "Acertar equipo clasificado",          pts: "1.500",  note: "por cada clasificado" },
+    { label: "Acertar la posición exacta",          pts: "+500",   note: "extra si acertás 1° o 2° exacto" },
+    { label: "Ejemplo: Argentina 1° exacto",        pts: "2.000",  note: "1.500 + 500 = 2.000 pts" },
   ]},
   { section: "Eliminatorias", items: [
     { label: "Equipo que pasa en Ronda de 32",      pts: "2.000",  note: "× 32 equipos" },
@@ -1599,7 +1599,7 @@ function PointsAndAchievementsModal({
                 ))}
                 <div className="bg-[#0f1a0f] border border-green-500/20 rounded-xl p-4 text-xs text-gray-500 leading-relaxed">
                   <span className="text-green-400 font-bold">Ejemplo completo:</span> Argentina clasifica y queda 1° →
-                  1.200 pts (clasificado) + 1.800 pts (posición exacta) = <span className="text-yellow-300 font-bold">3.000 pts</span> solo por ese equipo.
+                  1.500 pts (clasificado) + 500 pts (posición exacta) = <span className="text-yellow-300 font-bold">2.000 pts</span> solo por ese equipo.
                 </div>
               </div>
             )}
