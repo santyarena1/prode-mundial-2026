@@ -65,11 +65,11 @@ interface Group {
 type Outcome = "home" | "away" | "draw";
 
 const ELIMINATORIAS_PHASES = [
-  { key: "ROUND_OF_32",    label: "16vos", fullLabel: "Ronda de 32",      slots: 16, icon: "⚽", pts: 700,   ptsLabel: "700 pts c/u" },
-  { key: "ROUND_OF_16",    label: "8vos",  fullLabel: "Octavos de Final",  slots: 8,  icon: "🔥", pts: 1200,  ptsLabel: "1.200 pts c/u" },
-  { key: "QUARTER_FINALS", label: "4tos",  fullLabel: "Cuartos de Final",  slots: 4,  icon: "⚡", pts: 2000,  ptsLabel: "2.000 pts c/u" },
-  { key: "SEMI_FINALS",    label: "Semis", fullLabel: "Semifinales",        slots: 2,  icon: "🌟", pts: 3500,  ptsLabel: "3.500 pts c/u" },
-  { key: "CHAMPION",       label: "Final", fullLabel: "Campeón del Mundo", slots: 1,  icon: "🏆", pts: 10000, ptsLabel: "10.000 / 5.000 pts" },
+  { key: "ROUND_OF_32",    label: "16vos", fullLabel: "Ronda de 32",      slots: 16, icon: "⚽", pts: 2000,  ptsLabel: "2.000 pts c/u" },
+  { key: "ROUND_OF_16",    label: "8vos",  fullLabel: "Octavos de Final",  slots: 8,  icon: "🔥", pts: 3500,  ptsLabel: "3.500 pts c/u" },
+  { key: "QUARTER_FINALS", label: "4tos",  fullLabel: "Cuartos de Final",  slots: 4,  icon: "⚡", pts: 6000,  ptsLabel: "6.000 pts c/u" },
+  { key: "SEMI_FINALS",    label: "Semis", fullLabel: "Semifinales",        slots: 2,  icon: "🌟", pts: 10000, ptsLabel: "10.000 pts c/u" },
+  { key: "CHAMPION",       label: "Final", fullLabel: "Campeón del Mundo", slots: 1,  icon: "🏆", pts: 30000, ptsLabel: "30.000 / 15.000 pts" },
 ];
 
 // Maps each non-CHAMPION phase to the match numbers it uses
@@ -646,7 +646,7 @@ export default function PredictionsPage() {
             <div className="flex-1 min-w-0">
               <p className="text-orange-300 text-sm font-bold">Modo Hardcore activo</p>
               <p className="text-orange-500/70 text-xs mt-0.5">
-                Predecí el marcador exacto de cada partido. Si acertás, sumás <span className="text-orange-300 font-bold">+150 pts extra</span> por encima del resultado.
+                Predecí el marcador exacto de cada partido. Si acertás, sumás <span className="text-orange-300 font-bold">+500 pts extra</span> por encima del resultado.
               </p>
             </div>
           </motion.div>
@@ -709,20 +709,20 @@ export default function PredictionsPage() {
                   <span className="text-lg leading-none">⚽</span>
                   <div>
                     <p className="text-white font-bold text-xs">Ganador / Perdedor</p>
-                    <p className="text-yellow-400 font-black text-sm">150 pts</p>
+                    <p className="text-yellow-400 font-black text-sm">500 pts</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 bg-[#111] border border-[#1e1e1e] rounded-lg px-3 py-2">
                   <span className="text-lg leading-none">🤝</span>
                   <div>
                     <p className="text-white font-bold text-xs">Empate exacto</p>
-                    <p className="text-yellow-400 font-black text-sm">250 pts</p>
+                    <p className="text-yellow-400 font-black text-sm">800 pts</p>
                   </div>
                 </div>
               </div>
               <p className="text-gray-700 text-[10px] mt-2 leading-relaxed">
-                El empate suma 250 pts (150 base + 100 bonus). Hay 48 partidos en fase de grupos.
-                {hardcoreMode && <span className="text-orange-700"> · Modo Hardcore: +150 pts extra por marcador exacto.</span>}
+                El empate suma 800 pts (500 base + 300 bonus). Hay 48 partidos en fase de grupos.
+                {hardcoreMode && <span className="text-orange-700"> · Modo Hardcore: +500 pts extra por marcador exacto.</span>}
               </p>
             </div>
             <div className="bg-[#161616] border border-[#222] rounded-xl p-4 mb-1">
@@ -1048,7 +1048,7 @@ export default function PredictionsPage() {
                         </div>
                         <p className="text-gray-600 text-xs mt-0.5">
                           {currentPhase.key === "CHAMPION"
-                            ? "Campeón: 10.000 pts · Subcampeón: 5.000 pts · Ambos exactos: +15.000 pts"
+                            ? "Campeón: 30.000 pts · Subcampeón: 15.000 pts · Ambos exactos: +40.000 pts"
                             : `${savedInPhase} de ${currentPhase.slots} equipos guardados`}
                         </p>
                       </div>
@@ -1258,7 +1258,7 @@ export default function PredictionsPage() {
                     Activando el <strong className="text-orange-400">Modo Hardcore</strong>, en vez de predecir solo el resultado, predecís el <strong className="text-white">marcador exacto</strong>.
                   </p>
                   <p className="text-gray-400 text-sm">
-                    Si acertás el marcador, ganás <strong className="text-orange-400">+150 pts extra</strong> por encima del puntaje normal.
+                    Si acertás el marcador, ganás <strong className="text-orange-400">+500 pts extra</strong> por encima del puntaje normal.
                   </p>
                 </div>
 
@@ -1320,8 +1320,8 @@ export default function PredictionsPage() {
                         icon: "🏟️",
                         title: "Partidos de grupos",
                         rows: [
-                          { label: "Acertar ganador o perdedor", pts: "150 pts" },
-                          { label: "Acertar empate exacto",       pts: "250 pts" },
+                          { label: "Acertar ganador o perdedor", pts: "500 pts" },
+                          { label: "Acertar empate exacto",       pts: "800 pts" },
                         ],
                         note: "48 partidos en fase de grupos",
                       },
@@ -1329,20 +1329,20 @@ export default function PredictionsPage() {
                         icon: "🥇",
                         title: "Clasificados por grupo",
                         rows: [
-                          { label: "Equipo que clasifica",        pts: "400 pts" },
-                          { label: "Posición exacta (1° o 2°)",   pts: "+600 pts" },
+                          { label: "Equipo que clasifica",        pts: "1.500 pts" },
+                          { label: "Posición exacta (1° o 2°)",   pts: "+500 pts" },
                         ],
-                        note: "Máximo 1.000 pts por equipo · 12 grupos",
+                        note: "Máximo 2.000 pts por equipo · 12 grupos",
                       },
                       {
                         icon: "🏆",
                         title: "Eliminatorias",
                         rows: [
-                          { label: "Ronda de 32",  pts: "700 pts" },
-                          { label: "Octavos",      pts: "1.200 pts" },
-                          { label: "Cuartos",      pts: "2.000 pts" },
-                          { label: "Semifinal",    pts: "3.500 pts" },
-                          { label: "Campeón 🏆",   pts: "10.000 pts" },
+                          { label: "Ronda de 32",  pts: "2.000 pts" },
+                          { label: "Octavos",      pts: "3.500 pts" },
+                          { label: "Cuartos",      pts: "6.000 pts" },
+                          { label: "Semifinal",    pts: "10.000 pts" },
+                          { label: "Campeón 🏆",   pts: "30.000 pts" },
                         ],
                         note: null,
                       },

@@ -491,7 +491,7 @@ export default function SquadPredictionsPage() {
                 <p className="text-gray-400 text-xs leading-relaxed">
                   12 grupos de 4 equipos. Clasifican los <span className="text-white font-semibold">2 primeros</span> de cada grupo
                   + los <span className="text-white font-semibold">8 mejores terceros</span> del torneo.
-                  Podés predecir el 3° de cada grupo (opcional, +250 pts si ese equipo avanza).
+                  Podés predecir el 3° de cada grupo (opcional, +800 pts si ese equipo avanza).
                 </p>
               </div>
 

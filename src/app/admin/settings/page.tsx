@@ -423,20 +423,9 @@ export default function AdminSettingsPage() {
             Seguro ejecutarlo múltiples veces (upsert).
           </p>
           <div className="text-xs text-gray-600 space-y-1 mb-4">
-            <div>• Buen arranque: 10 aciertos → 2.000 pts</div>
-            <div>• Racha de aciertos: 25 → 6.000 pts</div>
-            <div>• Especialista de grupos: 40 → 15.000 pts</div>
-            <div>• Máquina de grupos: 55 → 35.000 pts</div>
-            <div>• Ojo de halcón: 12 clasificados → 5.000 pts</div>
-            <div>• Ojo clínico: 18 clasificados → 12.000 pts</div>
-            <div>• Todos clasificados: 24 → 30.000 pts</div>
-            <div>• Tabla perfecta → 50.000 pts</div>
-            <div>• Bracket fuerte 70% → 20.000 pts</div>
-            <div>• Bracket perfecto → 60.000 pts</div>
-            <div>• Fase de grupos excelente → 35.000 pts</div>
-            <div>• Fase de grupos perfecta → 80.000 pts</div>
-            <div>• Prode casi perfecto → 120.000 pts</div>
-            <div>• Prode perfecto → 250.000 pts</div>
+            <div>• Ojo de águila: 1°+2° exacto en 4+ grupos → 15.000 pts (solo Hardcore)</div>
+            <div>• Bracket de lujo: 6+ de 8 clasificados a cuartos → 20.000 pts (solo Hardcore)</div>
+            <div>• Lo vi venir: acertar al campeón → 50.000 pts (solo Hardcore)</div>
           </div>
           <Button variant="primary" size="sm" loading={applyingRules} onClick={applyNewRules} className="w-full">
             <Trophy className="w-4 h-4" /> Aplicar reglas y logros

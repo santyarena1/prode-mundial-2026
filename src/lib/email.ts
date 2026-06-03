@@ -150,7 +150,7 @@ function welcomeTemplate(firstName: string, lastName: string, email: string): st
                       Acumulá puntos con cada acierto
                     </p>
                     <p style="margin:2px 0 0;font-size:13px;color:#6b7280;">
-                      Desde 3 pts (grupo) hasta 60 pts (campeón)
+                      Desde 500 pts (partido de grupos) hasta 30.000 pts (campeón)
                     </p>
                   </td>
                 </tr>

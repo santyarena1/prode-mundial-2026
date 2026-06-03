@@ -108,49 +108,35 @@ export default function ComoJugarPage() {
         <Section title="3. Sistema de puntos — Fase de grupos">
           <Card className="p-5">
             <p className="text-gray-500 text-xs mb-4">Cada predicción acertada suma puntos automáticamente.</p>
-            <Rule pts="150" label="Acertar resultado (ganador o perdedor)" />
-            <Rule pts="250" label="Acertar empate exacto (150 + 100 bonus)" />
-            <Rule pts="400" label="Acertar equipo clasificado del grupo" />
-            <Rule pts="1.000" label="Acertar 1° o 2° posición exacta (400 + 600 extra)" />
+            <Rule pts="500" label="Acertar resultado (ganador o perdedor)" />
+            <Rule pts="800" label="Acertar empate exacto (500 + 300 bonus)" />
+            <Rule pts="1.500" label="Acertar equipo clasificado del grupo" />
+            <Rule pts="2.000" label="Acertar 1° o 2° posición exacta (1.500 + 500 extra)" />
           </Card>
         </Section>
 
         <Section title="4. Sistema de puntos — Eliminatorias">
           <Card className="p-5">
-            <Rule pts="700"    label="Acertar equipo que pasa en Ronda de 32" />
-            <Rule pts="1.200"  label="Acertar equipo que pasa en Octavos" />
-            <Rule pts="2.000"  label="Acertar equipo que pasa en Cuartos" />
-            <Rule pts="3.500"  label="Acertar equipo que pasa en Semifinal" />
-            <Rule pts="5.000"  label="Acertar finalista (subcampeón)" />
-            <Rule pts="10.000" label="Acertar al campeón" />
-            <Rule pts="+15.000" label="Bonus: campeón + subcampeón exactos" />
+            <Rule pts="2.000"  label="Acertar equipo que pasa en Ronda de 32" />
+            <Rule pts="3.500"  label="Acertar equipo que pasa en Octavos" />
+            <Rule pts="6.000"  label="Acertar equipo que pasa en Cuartos" />
+            <Rule pts="10.000" label="Acertar equipo que pasa en Semifinal" />
+            <Rule pts="15.000" label="Acertar finalista (subcampeón)" />
+            <Rule pts="30.000" label="Acertar al campeón" />
+            <Rule pts="+40.000" label="Bonus: campeón + subcampeón exactos" />
           </Card>
         </Section>
 
         {/* ── LOGROS ── */}
         <Section title="5. Logros y desafíos">
           <Card className="p-5">
-            <p className="text-gray-500 text-xs mb-4">
-              Los logros se calculan automáticamente y se suman a tu puntaje. No hace falta reclamarlos.
+            <p className="text-gray-500 text-xs mb-1">
+              Los logros se calculan automáticamente al cerrar cada fase del torneo. No hace falta reclamarlos.
             </p>
-            <p className="text-yellow-500/70 text-xs mb-3 font-medium">Partidos de grupos — solo ganás el nivel más alto que alcanzás</p>
-            <Achievement name="Buen arranque"         condition="Acertar 28+ partidos de grupos"               pts="2.000" />
-            <Achievement name="Especialista"          condition="Acertar 40+ partidos de grupos"               pts="9.000" />
-            <Achievement name="Máquina de grupos"     condition="Acertar 54+ partidos de grupos"               pts="22.000" />
-            <p className="text-yellow-500/70 text-xs mt-4 mb-3 font-medium">Clasificados — solo ganás el nivel más alto que alcanzás</p>
-            <Achievement name="Ojo de halcón"         condition="Acertar 14+ equipos clasificados"             pts="3.000" />
-            <Achievement name="Ojo clínico"           condition="Acertar 19+ equipos clasificados"             pts="10.000" />
-            <Achievement name="Tabla casi perfecta"   condition="Acertar 22+ equipos clasificados"             pts="25.000" />
-            <p className="text-yellow-500/70 text-xs mt-4 mb-3 font-medium">Eliminatorias — solo ganás el nivel más alto que alcanzás</p>
-            <Achievement name="Bracket fuerte"        condition="Acertar el 65%+ de predicciones de eliminatorias" pts="6.000" />
-            <Achievement name="Bracket experto"       condition="Acertar el 80%+ de predicciones de eliminatorias" pts="18.000" />
-            <Achievement name="Bracket perfecto"      condition="Acertar toda la llave eliminatoria"           pts="48.000" />
-            <p className="text-yellow-500/70 text-xs mt-4 mb-3 font-medium">Especial</p>
-            <Achievement name="Tabla perfecta"        condition="Acertar el 1° y 2° exacto en los 12 grupos"   pts="28.000" />
-            <p className="text-yellow-500/70 text-xs mt-4 mb-3 font-medium">Combos — se suman encima de los anteriores</p>
-            <Achievement name="Prode sólido"          condition="Especialista + Ojo clínico + Bracket fuerte (o sup.)" pts="20.000" />
-            <Achievement name="Prode experto"         condition="Máquina + Tabla casi perfecta + Bracket experto (o sup.)" pts="50.000" />
-            <Achievement name="Prode perfecto"        condition="Máquina + Tabla casi perfecta + Bracket perfecto + Tabla perfecta" pts="80.000" />
+            <p className="text-orange-400/80 text-xs mb-4 font-semibold">🔥 Solo disponibles activando el Modo Hardcore</p>
+            <Achievement name="Ojo de águila"   condition="Acertar el 1° y 2° exacto en al menos 4 grupos"          pts="15.000" />
+            <Achievement name="Bracket de lujo" condition="Acertar 6 o más de los 8 clasificados a cuartos de final" pts="20.000" />
+            <Achievement name="Lo vi venir"     condition="Acertar al campeón en la predicción del ganador"           pts="50.000" />
           </Card>
         </Section>
 
@@ -179,12 +165,12 @@ export default function ComoJugarPage() {
           <Card className="p-5">
             <div className="space-y-2">
               {[
-                { label: "Usuario casual",               range: "5.000 – 20.000" },
-                { label: "Usuario activo",               range: "20.000 – 50.000" },
-                { label: "Usuario con buena campaña",   range: "50.000 – 100.000" },
-                { label: "Usuario excelente",            range: "100.000 – 180.000" },
-                { label: "Caso muy poco frecuente",      range: "180.000 – 300.000" },
-                { label: "Prode casi perfecto",          range: "300.000 o más" },
+                { label: "Usuario casual",               range: "15.000 – 50.000" },
+                { label: "Usuario activo",               range: "50.000 – 120.000" },
+                { label: "Usuario con buena campaña",   range: "120.000 – 250.000" },
+                { label: "Usuario excelente",            range: "250.000 – 400.000" },
+                { label: "Caso muy poco frecuente",      range: "400.000 – 600.000" },
+                { label: "Prode casi perfecto",          range: "600.000 o más" },
               ].map(({ label, range }) => (
                 <div key={label} className="flex items-center justify-between py-1.5 border-b border-[#1f1f1f] last:border-0">
                   <span className="text-gray-400 text-sm">{label}</span>
