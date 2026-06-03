@@ -11,14 +11,17 @@ export async function GET() {
     const auth = await getUserFromCookies();
     if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    let user = await prisma.user.findUnique({
-      where: { id: auth.userId },
-      select: {
-        referralCode: true,
-        referralPoints: true,
-        _count: { select: { referrals: true } },
+    const selectShape = {
+      referralCode: true,
+      referralPoints: true,
+      _count: { select: { referrals: true } },
+      referrals: {
+        select: { id: true, firstName: true, lastName: true, createdAt: true },
+        orderBy: { createdAt: "desc" as const },
       },
-    });
+    };
+
+    let user = await prisma.user.findUnique({ where: { id: auth.userId }, select: selectShape });
 
     if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -28,15 +31,7 @@ export async function GET() {
       while (await prisma.user.findUnique({ where: { referralCode: code } })) {
         code = generateReferralCode();
       }
-      user = await prisma.user.update({
-        where: { id: auth.userId },
-        data: { referralCode: code },
-        select: {
-          referralCode: true,
-          referralPoints: true,
-          _count: { select: { referrals: true } },
-        },
-      });
+      user = await prisma.user.update({ where: { id: auth.userId }, data: { referralCode: code }, select: selectShape });
     }
 
     const setting = await prisma.setting.findUnique({ where: { key: "referral_points" } });
@@ -47,6 +42,11 @@ export async function GET() {
       referralPoints: user.referralPoints,
       referralCount: user._count.referrals,
       pointsPerReferral,
+      referrals: user.referrals.map(r => ({
+        id: r.id,
+        name: `${r.firstName} ${r.lastName.charAt(0)}.`,
+        joinedAt: r.createdAt,
+      })),
     });
   } catch (error) {
     console.error("Referral GET error:", error);

@@ -48,6 +48,7 @@ interface ReferralData {
   referralPoints: number;
   referralCount: number;
   pointsPerReferral: number;
+  referrals: { id: string; name: string; joinedAt: string }[];
 }
 
 export default function BonusesPage() {
@@ -314,6 +315,30 @@ export default function BonusesPage() {
                 </div>
               </div>
             </Card>
+            {referral.referrals.length > 0 && (
+              <Card className="p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Users className="w-4 h-4 text-green-400" />
+                  <h4 className="text-white font-bold text-sm">Amigos que se registraron</h4>
+                  <span className="ml-auto text-xs text-gray-600">{referral.referrals.length}</span>
+                </div>
+                <div className="space-y-2">
+                  {referral.referrals.map(r => (
+                    <div key={r.id} className="flex items-center justify-between py-2 border-b border-[#1a1a1a] last:border-0">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-full bg-green-600/20 border border-green-600/30 flex items-center justify-center flex-shrink-0">
+                          <span className="text-green-400 text-xs font-black">{r.name.charAt(0)}</span>
+                        </div>
+                        <span className="text-gray-200 text-sm font-semibold">{r.name}</span>
+                      </div>
+                      <span className="text-gray-600 text-xs">
+                        {new Date(r.joinedAt).toLocaleDateString("es-AR", { day: "numeric", month: "short" })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
             <div className="bg-[#111] border border-[#222] rounded-xl p-4">
               <p className="text-gray-600 text-xs leading-relaxed">
                 💡 Cada vez que alguien se registra usando tu código, los puntos se acreditan automáticamente — no necesitás hacer nada más.
