@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Resend } from "resend";
 import prisma from "@/lib/db";
-import nodemailer from "nodemailer";
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,20 +23,15 @@ export async function POST(req: NextRequest) {
     // Send email notification to configured address (best-effort)
     try {
       const setting = await prisma.setting.findUnique({ where: { key: "contact_email" } });
-      const to = setting?.value?.trim() || process.env.SMTP_USER;
-      if (to) {
-        const transporter = nodemailer.createTransport({
-          host:   process.env.SMTP_HOST || "smtp.gmail.com",
-          port:   parseInt(process.env.SMTP_PORT || "465"),
-          secure: process.env.SMTP_SECURE === "true",
-          auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-        });
-        await transporter.sendMail({
-          from:    `"Prode Mundial 2026" <${process.env.EMAIL_FROM_ADDRESS || process.env.SMTP_USER}>`,
+      const to = setting?.value?.trim() || process.env.RESEND_FROM?.match(/<(.+)>/)?.[1];
+      if (to && process.env.RESEND_API_KEY) {
+        const resend = new Resend(process.env.RESEND_API_KEY.replace(/^﻿/, "").trim());
+        const from = process.env.RESEND_FROM || "Prode Mundial Gamer <no-reply@thegamershop-premios.com>";
+        await resend.emails.send({
+          from,
           to,
           subject: `[Contacto] ${subject.trim()}`,
-          text:    `Nuevo mensaje de contacto\n\nNombre: ${name}\nEmail: ${email}\nAsunto: ${subject}\n\n${message}`,
-          html:    `<h2>Nuevo mensaje de contacto</h2><p><b>Nombre:</b> ${name}</p><p><b>Email:</b> ${email}</p><p><b>Asunto:</b> ${subject}</p><hr/><p style="white-space:pre-wrap">${message}</p>`,
+          html: `<h2>Nuevo mensaje de contacto</h2><p><b>Nombre:</b> ${name}</p><p><b>Email:</b> ${email}</p><p><b>Asunto:</b> ${subject}</p><hr/><p style="white-space:pre-wrap">${message}</p>`,
         });
       }
     } catch {
