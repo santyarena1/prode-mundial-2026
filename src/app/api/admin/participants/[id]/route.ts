@@ -26,7 +26,7 @@ export async function GET(
           orderBy: { createdAt: "desc" },
         },
         groupPredictions: { include: { group: true, firstTeam: true, secondTeam: true } },
-        bracketPredictions: { include: { predictedTeam: true }, orderBy: { phase: "asc", matchSlot: "asc" } },
+        bracketPredictions: { include: { predictedTeam: true }, orderBy: [{ phase: "asc" }, { matchSlot: "asc" }] },
         specialPredictions: true,
         bonuses: { include: { bonusAction: true }, orderBy: { createdAt: "desc" } },
         redemptions: { include: { prize: true }, orderBy: { createdAt: "desc" } },
