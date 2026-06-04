@@ -481,6 +481,22 @@ export default function PredictionsPage() {
       const [phase, slot] = key.split(":");
       const score = pendingBracketScores[key];
       const teamId = savedBracket[key];
+
+      // Winner validation
+      if (score.home! !== score.away!) {
+        const bm = (BRACKET_MATCHES[phase] ?? []).find(m => m.matchNum === parseInt(slot));
+        if (bm) {
+          const lt = resolveSource(bm.leftSource);
+          const rt = resolveSource(bm.rightSource);
+          if (score.home! > score.away! && lt && teamId !== lt.id) {
+            toast.error("El marcador no puede cambiar el equipo elegido"); continue;
+          }
+          if (score.away! > score.home! && rt && teamId !== rt.id) {
+            toast.error("El marcador no puede cambiar el equipo elegido"); continue;
+          }
+        }
+      }
+
       try {
         const res = await apiFetch("/api/participant/bracket-predictions", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -496,7 +512,7 @@ export default function PredictionsPage() {
 
     if (ok > 0) toast.success(`${ok} selección${ok > 1 ? "es" : ""} confirmada${ok > 1 ? "s" : ""} ✓`);
     setSavingBracket(false);
-  }, [pendingBracket, savedBracket, savedBracketScores, activeElimTab, hardcoreMode, pendingBracketScores]);
+  }, [pendingBracket, savedBracket, savedBracketScores, activeElimTab, hardcoreMode, pendingBracketScores, resolveSource]);
 
   const handleToggleHardcore = useCallback(async () => {
     setTogglingHardcore(true);
@@ -624,7 +640,20 @@ export default function PredictionsPage() {
           if (!k.startsWith(`${activeElimTab}:`)) return false;
           if (savedBracketScores[k]) return false;
           const s = pendingBracketScores[k];
-          return s?.home !== undefined && s?.away !== undefined;
+          if (s?.home === undefined || s?.away === undefined) return false;
+          // Winner validation: only count if scores respect the locked pick
+          if (s.home !== s.away) {
+            const [phase, slot] = k.split(":");
+            const bm = (BRACKET_MATCHES[phase] ?? []).find(m => m.matchNum === parseInt(slot));
+            if (bm) {
+              const lt = resolveSource(bm.leftSource);
+              const rt = resolveSource(bm.rightSource);
+              const pickedId = savedBracket[k];
+              if (s.home > s.away && lt && pickedId !== lt.id) return false;
+              if (s.away > s.home && rt && pickedId !== rt.id) return false;
+            }
+          }
+          return true;
         }).length
       : 0);
   const savedInPhase = Object.keys(savedBracket).filter(k => k.startsWith(`${activeElimTab}:`)).length;
@@ -2242,51 +2271,71 @@ function BracketMatchCard2({
               <Lock className="w-3 h-3 text-green-700 ml-1" />
             </div>
           ) : pickedTeamId ? (
-            <>
-              <p className="text-[9px] text-orange-500/70 font-bold uppercase tracking-widest text-center mb-2">
-                🔥 Marcador del partido
-              </p>
-              <div className="flex items-center justify-center gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-600 text-[9px] font-bold uppercase truncate max-w-[40px]">
-                    {leftTeam?.code ?? "LOC"}
-                  </span>
-                  <input
-                    type="number" min={0} max={30}
-                    value={pendingBracketScore?.home ?? ""}
-                    onChange={e => onPickBracketScore("home", Math.max(0, Math.min(30, parseInt(e.target.value) || 0)))}
-                    placeholder="0"
-                    className="w-11 h-9 rounded-lg bg-[#1a1a1a] border border-[#333] text-white text-center font-black text-base focus:outline-none focus:border-orange-500/70 transition-colors"
-                  />
-                </div>
-                <span className="text-gray-700 font-black text-sm">—</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number" min={0} max={30}
-                    value={pendingBracketScore?.away ?? ""}
-                    onChange={e => onPickBracketScore("away", Math.max(0, Math.min(30, parseInt(e.target.value) || 0)))}
-                    placeholder="0"
-                    className="w-11 h-9 rounded-lg bg-[#1a1a1a] border border-[#333] text-white text-center font-black text-base focus:outline-none focus:border-orange-500/70 transition-colors"
-                  />
-                  <span className="text-gray-600 text-[9px] font-bold uppercase truncate max-w-[40px]">
-                    {rightTeam?.code ?? "VIS"}
-                  </span>
-                </div>
-              </div>
-              {hasPendingScore && (
-                <p className={`text-center text-[9px] font-bold mt-1.5 ${
-                  pendingBracketScore!.home! > pendingBracketScore!.away! ? "text-red-400/80" :
-                  pendingBracketScore!.away! > pendingBracketScore!.home! ? "text-blue-400/80" :
-                  "text-amber-500/80"
-                }`}>
-                  → {pendingBracketScore!.home! > pendingBracketScore!.away!
-                    ? `Gana ${leftTeam?.code ?? "local"}`
-                    : pendingBracketScore!.away! > pendingBracketScore!.home!
-                    ? `Gana ${rightTeam?.code ?? "visita"}`
-                    : "Empate (sin penales)"}
-                </p>
-              )}
-            </>
+            (() => {
+              const isScoreUpgrade = isLocked && !savedBracketScore;
+              const wrongWinner = isScoreUpgrade && hasPendingScore &&
+                pendingBracketScore!.home! !== pendingBracketScore!.away! &&
+                !!leftTeam && !!rightTeam && (
+                  (pendingBracketScore!.home! > pendingBracketScore!.away! && pickedTeamId !== leftTeam.id) ||
+                  (pendingBracketScore!.away! > pendingBracketScore!.home! && pickedTeamId !== rightTeam.id)
+                );
+              const pickedTeamCode = leftPicked ? leftTeam?.code : rightPicked ? rightTeam?.code : null;
+              const inputBorder = wrongWinner
+                ? "border-red-500/60 focus:border-red-500"
+                : "border-[#333] focus:border-orange-500/70";
+              return (
+                <>
+                  <p className="text-[9px] text-orange-500/70 font-bold uppercase tracking-widest text-center mb-2">
+                    🔥 Marcador del partido
+                  </p>
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600 text-[9px] font-bold uppercase truncate max-w-[40px]">
+                        {leftTeam?.code ?? "LOC"}
+                      </span>
+                      <input
+                        type="number" min={0} max={30}
+                        value={pendingBracketScore?.home ?? ""}
+                        onChange={e => onPickBracketScore("home", Math.max(0, Math.min(30, parseInt(e.target.value) || 0)))}
+                        placeholder="0"
+                        className={`w-11 h-9 rounded-lg bg-[#1a1a1a] border text-white text-center font-black text-base focus:outline-none transition-colors ${inputBorder}`}
+                      />
+                    </div>
+                    <span className="text-gray-700 font-black text-sm">—</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number" min={0} max={30}
+                        value={pendingBracketScore?.away ?? ""}
+                        onChange={e => onPickBracketScore("away", Math.max(0, Math.min(30, parseInt(e.target.value) || 0)))}
+                        placeholder="0"
+                        className={`w-11 h-9 rounded-lg bg-[#1a1a1a] border text-white text-center font-black text-base focus:outline-none transition-colors ${inputBorder}`}
+                      />
+                      <span className="text-gray-600 text-[9px] font-bold uppercase truncate max-w-[40px]">
+                        {rightTeam?.code ?? "VIS"}
+                      </span>
+                    </div>
+                  </div>
+                  {wrongWinner && (
+                    <p className="text-red-400 text-[9px] text-center mt-1.5 font-semibold">
+                      El marcador no puede cambiar el ganador — tiene que ganar {pickedTeamCode ?? "el equipo elegido"}
+                    </p>
+                  )}
+                  {hasPendingScore && !wrongWinner && (
+                    <p className={`text-center text-[9px] font-bold mt-1.5 ${
+                      pendingBracketScore!.home! > pendingBracketScore!.away! ? "text-red-400/80" :
+                      pendingBracketScore!.away! > pendingBracketScore!.home! ? "text-blue-400/80" :
+                      "text-amber-500/80"
+                    }`}>
+                      → {pendingBracketScore!.home! > pendingBracketScore!.away!
+                        ? `Gana ${leftTeam?.code ?? "local"}`
+                        : pendingBracketScore!.away! > pendingBracketScore!.home!
+                        ? `Gana ${rightTeam?.code ?? "visita"}`
+                        : "Empate (sin penales)"}
+                    </p>
+                  )}
+                </>
+              );
+            })()
           ) : (
             <p className="text-[9px] text-gray-800 text-center py-0.5">Elegí el ganador para ingresar el marcador</p>
           )}
