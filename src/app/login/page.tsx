@@ -4,8 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { Mail, Eye, EyeOff, MessageCircle } from "lucide-react";
-import { buildWhatsAppUrl } from "@/lib/purchase-code";
+import { Mail, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
@@ -22,27 +21,11 @@ export default function LoginPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
-  const [forgotWhatsappUrl, setForgotWhatsappUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      apiFetch("/api/auth/me"),
-      fetch("/api/public/contact"),
-    ]).then(([meRes, contactRes]) => {
-      if (meRes.ok) {
-        router.replace("/dashboard");
-        return;
-      }
-      setCheckingAuth(false);
-      if (contactRes.ok) {
-        contactRes.json().then((contact) => {
-          const msg =
-            "Hola The Gamer Shop! Olvidé mi contraseña del Prode Mundial 2026. Mi email de registro es: ";
-          setForgotWhatsappUrl(
-            buildWhatsAppUrl(contact.whatsappNumber || "", msg)
-          );
-        });
-      }
+    apiFetch("/api/auth/me").then((res) => {
+      if (res.ok) router.replace("/dashboard");
+      else setCheckingAuth(false);
     });
   }, [router]);
 
@@ -172,22 +155,13 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-6 space-y-3 text-center">
-            {forgotWhatsappUrl ? (
-              <a
-                href={forgotWhatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-1.5 text-sm text-gray-500 hover:text-green-400 transition-colors"
-              >
-                <MessageCircle className="w-4 h-4" />
-                ¿Olvidaste la contraseña? Escribinos por WhatsApp
-              </a>
-            ) : (
-              <p className="text-gray-600 text-xs">
-                ¿Olvidaste la contraseña? Contactá a The Gamer Shop con el email con el que te
-                registraste.
-              </p>
-            )}
+            <Link
+              href="/forgot-password"
+              className="inline-block text-sm text-gray-500 hover:text-white transition-colors"
+            >
+              ¿Olvidaste tu contraseña?{" "}
+              <span className="text-red-400 font-medium">Recuperala por email</span>
+            </Link>
             <p className="text-gray-600 text-sm">
               ¿No tenés cuenta?{" "}
               <Link href="/register" className="text-red-400 hover:text-red-300 font-medium">

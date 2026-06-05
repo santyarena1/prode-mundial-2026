@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { Mail, Phone, User, AtSign, Lock, Eye, EyeOff } from "lucide-react";
+import { Mail, Phone, User, AtSign, Lock, Eye, EyeOff, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
@@ -50,6 +50,47 @@ function validate(data: FormData): FormErrors {
     errors.confirmPassword = "Las contraseñas no coinciden";
   if (!data.acceptedTerms) errors.acceptedTerms = "Debés aceptar las bases y condiciones";
   return errors;
+}
+
+function getPasswordStrength(pwd: string): 0 | 1 | 2 | 3 {
+  if (!pwd) return 0;
+  if (pwd.length < 6) return 1;
+  if (pwd.length < 10 || !/[0-9]/.test(pwd)) return 2;
+  return 3;
+}
+
+function PasswordStrengthBar({ password }: { password: string }) {
+  const strength = getPasswordStrength(password);
+  const labels = ["", "Débil", "Media", "Fuerte"];
+  const colors = ["", "bg-red-500", "bg-yellow-500", "bg-green-500"];
+  if (!password) return null;
+  return (
+    <div className="mt-1.5">
+      <div className="flex gap-1 mb-1">
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= strength ? colors[strength] : "bg-[#2a2a2a]"}`}
+          />
+        ))}
+      </div>
+      <p className={`text-[11px] font-semibold transition-colors ${
+        strength === 1 ? "text-red-400" : strength === 2 ? "text-yellow-400" : "text-green-400"
+      }`}>
+        Contraseña {labels[strength]}
+      </p>
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 my-1">
+      <div className="flex-1 h-px bg-[#1f1f1f]" />
+      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600">{children}</span>
+      <div className="flex-1 h-px bg-[#1f1f1f]" />
+    </div>
+  );
 }
 
 export default function RegisterPage() {
@@ -136,22 +177,26 @@ export default function RegisterPage() {
       <div className="flex items-center justify-center px-4 py-16">
         <Card className="w-full max-w-md p-8">
           {/* Header */}
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-6 px-4">
+          <div className="text-center mb-6">
+            <div className="flex justify-center mb-5 px-4">
               <Logo size="lg" href={undefined} showTagline />
             </div>
             <h1 className="text-2xl font-black uppercase text-white">Creá tu cuenta</h1>
             <p className="text-gray-500 text-sm mt-1">Unite al Prode Mundial Gamer 2026</p>
           </div>
 
-          <Link href="/login" className="block mb-4">
-            <div className="border border-[#333] hover:border-red-500/50 bg-[#0f0f0f] hover:bg-red-950/10 rounded-xl px-4 py-3 text-center transition-colors">
+          {/* Login CTA */}
+          <Link href="/login" className="block mb-5">
+            <div className="border border-[#2a2a2a] hover:border-red-500/60 bg-[#111] hover:bg-red-950/20 rounded-xl px-4 py-3 text-center transition-all">
               <span className="text-gray-400 text-sm">¿Ya tenés cuenta? </span>
-              <span className="text-red-400 font-bold text-sm">INICIÁ SESIÓN →</span>
+              <span className="text-red-400 font-bold text-sm">Iniciá sesión →</span>
             </div>
           </Link>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+
+            <SectionLabel>Tus datos</SectionLabel>
+
             <div className="grid grid-cols-2 gap-3">
               <Input
                 label="Nombre"
@@ -172,16 +217,6 @@ export default function RegisterPage() {
             </div>
 
             <Input
-              label="Teléfono"
-              type="tel"
-              placeholder="+54 9 11 1234-5678"
-              value={form.phone}
-              onChange={(e) => handleChange("phone", e.target.value)}
-              error={errors.phone}
-              icon={<Phone className="w-4 h-4" />}
-            />
-
-            <Input
               label="Email"
               type="email"
               placeholder="juan@email.com"
@@ -189,6 +224,16 @@ export default function RegisterPage() {
               onChange={(e) => handleChange("email", e.target.value)}
               error={errors.email}
               icon={<Mail className="w-4 h-4" />}
+            />
+
+            <Input
+              label="Teléfono"
+              type="tel"
+              placeholder="+54 9 11 1234-5678"
+              value={form.phone}
+              onChange={(e) => handleChange("phone", e.target.value)}
+              error={errors.phone}
+              icon={<Phone className="w-4 h-4" />}
             />
 
             <Input
@@ -206,26 +251,31 @@ export default function RegisterPage() {
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
               />
-              <p className="text-gray-700 text-xs mt-1">Si alguien te invitó al prode, ingresá su código para darle puntos extra.</p>
+              <p className="text-gray-700 text-xs mt-1">Si alguien te invitó, ingresá su código para darle puntos extra.</p>
             </div>
 
-            <div className="relative">
-              <Input
-                label="Contraseña"
-                type={showPassword ? "text" : "password"}
-                placeholder="••••••"
-                value={form.password}
-                onChange={(e) => handleChange("password", e.target.value)}
-                error={errors.password}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-[2.1rem] text-gray-500 hover:text-gray-300 transition-colors"
-                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+            <SectionLabel>Tu contraseña</SectionLabel>
+
+            <div>
+              <div className="relative">
+                <Input
+                  label="Contraseña"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Mín. 6 caracteres"
+                  value={form.password}
+                  onChange={(e) => handleChange("password", e.target.value)}
+                  error={errors.password}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-[2.1rem] text-gray-500 hover:text-gray-300 transition-colors"
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <PasswordStrengthBar password={form.password} />
             </div>
 
             <div className="relative">
@@ -247,7 +297,7 @@ export default function RegisterPage() {
               </button>
             </div>
 
-            <label className="flex items-start gap-3 cursor-pointer group">
+            <label className="flex items-start gap-3 cursor-pointer group mt-1">
               <div className="relative mt-0.5 flex-shrink-0">
                 <input
                   type="checkbox"
@@ -281,9 +331,9 @@ export default function RegisterPage() {
               <p className="text-red-400 text-xs -mt-2">{errors.acceptedTerms}</p>
             )}
 
-            <p className="text-gray-600 text-xs flex items-start gap-1.5">
-              <span className="text-green-500 flex-shrink-0">🔒</span>
-              Tu email y teléfono se usan solo para notificarte sobre el Prode. No hacemos spam ni compartimos tus datos.
+            <p className="text-gray-600 text-xs flex items-start gap-1.5 -mt-1">
+              <span className="text-green-500 flex-shrink-0 mt-px">🔒</span>
+              Tu email y teléfono se usan solo para notificarte sobre el Prode. No hacemos spam.
             </p>
 
             <Button
@@ -291,13 +341,19 @@ export default function RegisterPage() {
               variant="primary"
               size="lg"
               loading={loading}
-              className="w-full mt-2"
+              className="w-full mt-1 py-4 text-base"
             >
-              <Lock className="w-4 h-4" />
+              <Rocket className="w-4 h-4" />
               EMPEZAR MI PRODE
             </Button>
-          </form>
 
+            <p className="text-center text-gray-600 text-sm">
+              ¿Ya tenés cuenta?{" "}
+              <Link href="/login" className="text-red-400 hover:text-red-300 font-medium">
+                Iniciá sesión
+              </Link>
+            </p>
+          </form>
         </Card>
       </div>
     </div>

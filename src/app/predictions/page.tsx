@@ -103,6 +103,7 @@ export default function PredictionsPage() {
   const [savingGroup, setSavingGroup] = useState<Record<string, boolean>>({});
   const [savingBracket, setSavingBracket] = useState(false);
   const [savingMatchScore, setSavingMatchScore] = useState<Record<string, boolean>>({});
+  const [savingBracketMatch, setSavingBracketMatch] = useState<Record<string, boolean>>({});
 
   const [activeTab, setActiveTab] = useState<"matches" | "groups" | "eliminatorias">("matches");
   const [activeElimTab, setActiveElimTab] = useState(ELIMINATORIAS_PHASES[0].key);
@@ -419,6 +420,41 @@ export default function PredictionsPage() {
     } catch { toast.error("Error de conexión"); }
     setSavingMatchScore(prev => ({ ...prev, [matchId]: false }));
   }, []);
+
+  const handleSaveBracketMatchScore = useCallback(async (phase: string, slot: string, home: number, away: number) => {
+    const key = `${phase}:${slot}`;
+    const teamId = savedBracket[key];
+    if (!teamId) return;
+
+    // Winner validation
+    if (home !== away) {
+      const matchNum = parseInt(slot);
+      const bm = (BRACKET_MATCHES[phase] ?? []).find(m => m.matchNum === matchNum);
+      if (bm) {
+        const lt = resolveSource(bm.leftSource);
+        const rt = resolveSource(bm.rightSource);
+        if (home > away && lt && teamId !== lt.id) { toast.error("El marcador no puede cambiar el equipo elegido"); return; }
+        if (away > home && rt && teamId !== rt.id) { toast.error("El marcador no puede cambiar el equipo elegido"); return; }
+      }
+    }
+
+    setSavingBracketMatch(prev => ({ ...prev, [key]: true }));
+    try {
+      const res = await apiFetch("/api/participant/bracket-predictions", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phase, matchSlot: slot, predictedTeamId: teamId, predictedHomeScore: home, predictedAwayScore: away }),
+      });
+      if (res.ok) {
+        setSavedBracketScores(prev => ({ ...prev, [key]: { home, away } }));
+        setPendingBracketScores(prev => { const n = { ...prev }; delete n[key]; return n; });
+        toast.success("Marcador confirmado ✓");
+      } else {
+        const d = await res.json();
+        toast.error(d.error || "Error al guardar marcador");
+      }
+    } catch { toast.error("Error de conexión"); }
+    setSavingBracketMatch(prev => ({ ...prev, [key]: false }));
+  }, [savedBracket, resolveSource]);
 
   const handlePickBracket = useCallback((phase: string, slot: string, teamId: string) => {
     const key = `${phase}:${slot}`;
@@ -1194,6 +1230,8 @@ export default function PredictionsPage() {
                             pendingBracketScore={pendingBracketScores[`${match.phase}:${match.matchNum}`]}
                             savedBracketScore={savedBracketScores[`${match.phase}:${match.matchNum}`]}
                             onPickBracketScore={(side, value) => handlePickBracketScore(match.phase, match.matchNum, side, value)}
+                            onSaveBracketScore={(home, away) => handleSaveBracketMatchScore(match.phase, String(match.matchNum), home, away)}
+                            savingBracketScore={savingBracketMatch[`${match.phase}:${match.matchNum}`]}
                             delay={i * 0.06}
                             onPick={(teamId) => handlePickBracket(match.phase, String(match.matchNum), teamId)}
                             changesRemaining={changesRemaining}
@@ -2040,6 +2078,7 @@ function BracketMatchCard2({
   match, leftTeam, rightTeam, leftCandidates, rightCandidates,
   pickedTeamId, isLocked, isPending,
   hardcoreMode, pendingBracketScore, savedBracketScore, onPickBracketScore,
+  onSaveBracketScore, savingBracketScore,
   delay, onPick,
   changesRemaining, onUseChange, usingChange,
 }: {
@@ -2055,6 +2094,8 @@ function BracketMatchCard2({
   pendingBracketScore?: { home?: number; away?: number };
   savedBracketScore?: { home: number; away: number };
   onPickBracketScore: (side: "home" | "away", value: number) => void;
+  onSaveBracketScore?: (home: number, away: number) => void;
+  savingBracketScore?: boolean;
   delay?: number;
   onPick: (teamId: string) => void;
   changesRemaining?: number;
@@ -2092,6 +2133,9 @@ function BracketMatchCard2({
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.25, ease: "easeOut" }}
       className={`relative overflow-hidden rounded-2xl border transition-all ${
+        isLocked && savedBracketScore ? "border-green-500/20 bg-gradient-to-br from-[#0d110d] to-[#0a0a0a]" :
+        isLocked && hardcoreMode && !savedBracketScore && hasPendingScore ? "border-orange-500/30 bg-orange-500/5" :
+        isLocked && hardcoreMode && !savedBracketScore ? "border-orange-500/15 bg-[#0f0d0a]" :
         isLocked ? "border-green-500/20 bg-gradient-to-br from-[#0d110d] to-[#0a0a0a]" :
         isPending ? "border-amber-500/15 bg-[#0d0d0d]" :
         teamsKnown ? "border-blue-500/20 bg-[#0a0c10]" : "border-[#1e1e1e] bg-[#0d0d0d]"
@@ -2282,12 +2326,18 @@ function BracketMatchCard2({
               const pickedTeamCode = leftPicked ? leftTeam?.code : rightPicked ? rightTeam?.code : null;
               const inputBorder = wrongWinner
                 ? "border-red-500/60 focus:border-red-500"
-                : "border-[#333] focus:border-orange-500/70";
+                : isScoreUpgrade ? "border-orange-500/40 focus:border-orange-500/70" : "border-[#333] focus:border-orange-500/70";
               return (
                 <>
-                  <p className="text-[9px] text-orange-500/70 font-bold uppercase tracking-widest text-center mb-2">
-                    🔥 Marcador del partido
-                  </p>
+                  {isScoreUpgrade ? (
+                    <p className="text-[10px] text-orange-400/80 text-center mb-2 font-semibold">
+                      Agregá el marcador — el equipo elegido ({pickedTeamCode ?? "—"}) ya está fijo
+                    </p>
+                  ) : (
+                    <p className="text-[9px] text-orange-500/70 font-bold uppercase tracking-widest text-center mb-2">
+                      🔥 Marcador del partido
+                    </p>
+                  )}
                   <div className="flex items-center justify-center gap-3">
                     <div className="flex items-center gap-2">
                       <span className="text-gray-600 text-[9px] font-bold uppercase truncate max-w-[40px]">
@@ -2320,7 +2370,7 @@ function BracketMatchCard2({
                       El marcador no puede cambiar el ganador — tiene que ganar {pickedTeamCode ?? "el equipo elegido"}
                     </p>
                   )}
-                  {hasPendingScore && !wrongWinner && (
+                  {hasPendingScore && !wrongWinner && !isScoreUpgrade && (
                     <p className={`text-center text-[9px] font-bold mt-1.5 ${
                       pendingBracketScore!.home! > pendingBracketScore!.away! ? "text-red-400/80" :
                       pendingBracketScore!.away! > pendingBracketScore!.home! ? "text-blue-400/80" :
@@ -2332,6 +2382,15 @@ function BracketMatchCard2({
                         ? `Gana ${rightTeam?.code ?? "visita"}`
                         : "Empate (sin penales)"}
                     </p>
+                  )}
+                  {isScoreUpgrade && hasPendingScore && !wrongWinner && onSaveBracketScore && (
+                    <button
+                      onClick={() => onSaveBracketScore(pendingBracketScore!.home!, pendingBracketScore!.away!)}
+                      disabled={!!savingBracketScore}
+                      className="mt-2 w-full py-2 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-black font-black text-xs transition-colors"
+                    >
+                      {savingBracketScore ? "Guardando..." : "Confirmar marcador"}
+                    </button>
                   )}
                 </>
               );
