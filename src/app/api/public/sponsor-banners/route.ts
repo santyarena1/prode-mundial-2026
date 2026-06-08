@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 
 const KEYS = [
+  "sponsor_banner_dashboard_banners",
   "sponsor_banner_dashboard_image_url",
   "sponsor_banner_dashboard_link_url",
   "sponsor_banner_dashboard_visible",
@@ -25,12 +26,23 @@ export async function GET() {
     const rows = await prisma.setting.findMany({ where: { key: { in: KEYS } } });
     const get = (k: string) => rows.find(r => r.key === k)?.value ?? "";
 
+    const rawBanners = get("sponsor_banner_dashboard_banners");
+    let dashboardBanners: Array<{ imageUrl: string; linkUrl: string; visible: boolean }> = [];
+    if (rawBanners) {
+      try { dashboardBanners = JSON.parse(rawBanners); } catch { dashboardBanners = []; }
+    } else {
+      const singleImage = get("sponsor_banner_dashboard_image_url");
+      if (singleImage) {
+        dashboardBanners = [{
+          imageUrl: singleImage,
+          linkUrl: get("sponsor_banner_dashboard_link_url"),
+          visible: get("sponsor_banner_dashboard_visible") === "true",
+        }];
+      }
+    }
+
     return NextResponse.json({
-      dashboard: {
-        imageUrl: get("sponsor_banner_dashboard_image_url"),
-        linkUrl: get("sponsor_banner_dashboard_link_url"),
-        visible: get("sponsor_banner_dashboard_visible") === "true",
-      },
+      dashboard: { banners: dashboardBanners },
       predictions: {
         text: get("sponsor_banner_predictions_text"),
         textColor: get("sponsor_banner_predictions_text_color") || "#9ca3af",

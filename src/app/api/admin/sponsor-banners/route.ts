@@ -21,7 +21,10 @@ async function upsertSetting(key: string, value: string) {
   await prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } });
 }
 
+const DASHBOARD_BANNERS_KEY = "sponsor_banner_dashboard_banners";
+
 const PRED_KEYS = [
+  DASHBOARD_BANNERS_KEY,
   "sponsor_banner_dashboard_image_url",
   "sponsor_banner_dashboard_link_url",
   "sponsor_banner_dashboard_visible",
@@ -48,12 +51,23 @@ export async function GET() {
     const rows = await prisma.setting.findMany({ where: { key: { in: PRED_KEYS } } });
     const get = (k: string) => rows.find(r => r.key === k)?.value ?? "";
 
+    const rawBanners = get(DASHBOARD_BANNERS_KEY);
+    let dashboardBanners: Array<{ imageUrl: string; linkUrl: string; visible: boolean }> = [];
+    if (rawBanners) {
+      try { dashboardBanners = JSON.parse(rawBanners); } catch { dashboardBanners = []; }
+    } else {
+      const singleImage = get("sponsor_banner_dashboard_image_url");
+      if (singleImage) {
+        dashboardBanners = [{
+          imageUrl: singleImage,
+          linkUrl: get("sponsor_banner_dashboard_link_url"),
+          visible: get("sponsor_banner_dashboard_visible") === "true",
+        }];
+      }
+    }
+
     return NextResponse.json({
-      dashboard: {
-        imageUrl: get("sponsor_banner_dashboard_image_url"),
-        linkUrl: get("sponsor_banner_dashboard_link_url"),
-        visible: get("sponsor_banner_dashboard_visible") === "true",
-      },
+      dashboard: { banners: dashboardBanners },
       predictions: {
         text: get("sponsor_banner_predictions_text"),
         textColor: get("sponsor_banner_predictions_text_color") || "#9ca3af",
@@ -111,9 +125,7 @@ export async function PUT(request: NextRequest) {
     const p = body.predictions ?? {};
 
     const pairs: [string, string][] = [
-      ["sponsor_banner_dashboard_image_url", body.dashboard?.imageUrl ?? ""],
-      ["sponsor_banner_dashboard_link_url", body.dashboard?.linkUrl ?? ""],
-      ["sponsor_banner_dashboard_visible", String(body.dashboard?.visible ?? false)],
+      [DASHBOARD_BANNERS_KEY, JSON.stringify(body.dashboard?.banners ?? [])],
       ["sponsor_banner_predictions_text", p.text ?? ""],
       ["sponsor_banner_predictions_text_color", p.textColor ?? "#9ca3af"],
       ["sponsor_banner_predictions_text_accent", p.textAccent ?? ""],

@@ -48,7 +48,7 @@ interface Redemption {
   prize: { name: string; imageUrl?: string | null; prizeType: string };
 }
 
-interface SponsorBanner {
+interface SponsorBannerItem {
   imageUrl: string;
   linkUrl: string;
   visible: boolean;
@@ -152,7 +152,8 @@ export default function DashboardPage() {
   const [showEarlyBird, setShowEarlyBird] = useState(false);
   const [earlyBirdMode, setEarlyBirdMode] = useState<"claim" | "confirmed">("confirmed");
   const [selectedRaffle, setSelectedRaffle] = useState<WeeklyRaffle | null>(null);
-  const [dashboardBanner, setDashboardBanner] = useState<SponsorBanner | null>(null);
+  const [dashboardBanners, setDashboardBanners] = useState<SponsorBannerItem[]>([]);
+  const [bannerIndex, setBannerIndex] = useState(0);
 
   useEffect(() => {
     const init = async () => {
@@ -212,7 +213,10 @@ export default function DashboardPage() {
         }
         if (bannerRes.ok) {
           const bannerData = await bannerRes.json();
-          if (bannerData.dashboard?.visible) setDashboardBanner(bannerData.dashboard);
+          const visible = (bannerData.dashboard?.banners ?? []).filter(
+            (b: SponsorBannerItem) => b.visible && b.imageUrl
+          );
+          setDashboardBanners(visible);
         }
       } catch {
         router.replace("/login");
@@ -222,6 +226,12 @@ export default function DashboardPage() {
     };
     init();
   }, [router]);
+
+  useEffect(() => {
+    if (dashboardBanners.length <= 1) return;
+    const id = setInterval(() => setBannerIndex(i => (i + 1) % dashboardBanners.length), 5000);
+    return () => clearInterval(id);
+  }, [dashboardBanners.length]);
 
   if (loading) return <LoadingScreen text="Cargando tu dashboard..." />;
   if (!user) return null;
@@ -271,18 +281,32 @@ export default function DashboardPage() {
           )}
         </motion.div>
 
-        {/* Sponsor banner */}
-        {dashboardBanner && (
+        {/* Sponsor banners carousel */}
+        {dashboardBanners.length > 0 && (
           <motion.div className="mb-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.05 }}>
-            {dashboardBanner.linkUrl ? (
-              <a href={dashboardBanner.linkUrl} target="_blank" rel="noopener noreferrer" className="block w-full rounded-xl overflow-hidden border border-[#222]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={dashboardBanner.imageUrl} alt="Sponsor" className="w-full h-auto block" />
-              </a>
-            ) : (
-              <div className="w-full rounded-xl overflow-hidden border border-[#222]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={dashboardBanner.imageUrl} alt="Sponsor" className="w-full h-auto block" />
+            {(() => {
+              const banner = dashboardBanners[bannerIndex];
+              const inner = (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={banner.imageUrl} alt="Sponsor" className="w-full h-auto block" />
+              );
+              return banner.linkUrl ? (
+                <a href={banner.linkUrl} target="_blank" rel="noopener noreferrer" className="block w-full rounded-xl overflow-hidden border border-[#222]">
+                  {inner}
+                </a>
+              ) : (
+                <div className="w-full rounded-xl overflow-hidden border border-[#222]">{inner}</div>
+              );
+            })()}
+            {dashboardBanners.length > 1 && (
+              <div className="flex justify-center gap-1.5 mt-2">
+                {dashboardBanners.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setBannerIndex(i)}
+                    className={`w-1.5 h-1.5 rounded-full transition-colors ${i === bannerIndex ? "bg-white" : "bg-[#444]"}`}
+                  />
+                ))}
               </div>
             )}
           </motion.div>

@@ -121,8 +121,14 @@ function EditModal({ sponsor, onClose, onSaved }: { sponsor: Sponsor; onClose: (
   );
 }
 
+interface DashboardBannerItem {
+  imageUrl: string;
+  linkUrl: string;
+  visible: boolean;
+}
+
 interface BannerSettings {
-  dashboard: { imageUrl: string; linkUrl: string; visible: boolean };
+  dashboard: { banners: DashboardBannerItem[] };
   predictions: {
     text: string; textColor: string;
     textAccent: string; textAccentColor: string;
@@ -210,7 +216,7 @@ export default function AdminSponsorsPage() {
   const createInputRef = useRef<HTMLInputElement>(null);
 
   const [banners, setBanners] = useState<BannerSettings>({
-    dashboard: { imageUrl: "", linkUrl: "", visible: false },
+    dashboard: { banners: [] },
     predictions: {
       text: "", textColor: "#9ca3af",
       textAccent: "", textAccentColor: "#ffffff",
@@ -221,7 +227,8 @@ export default function AdminSponsorsPage() {
     },
   });
   const [savingBanners, setSavingBanners] = useState(false);
-  const [uploadingDashboard, setUploadingDashboard] = useState(false);
+  const [uploadingDashboardIdx, setUploadingDashboardIdx] = useState<number | null>(null);
+  const [addingBanner, setAddingBanner] = useState(false);
   const [uploadingPredLogo, setUploadingPredLogo] = useState(false);
   const [uploadingPredLogo2, setUploadingPredLogo2] = useState(false);
 
@@ -239,9 +246,7 @@ export default function AdminSponsorsPage() {
           const data = await r.json();
           setBanners({
             dashboard: {
-              imageUrl: data.dashboard?.imageUrl ?? "",
-              linkUrl: data.dashboard?.linkUrl ?? "",
-              visible: data.dashboard?.visible ?? false,
+              banners: data.dashboard?.banners ?? [],
             },
             predictions: {
               text: data.predictions?.text ?? "",
@@ -323,12 +328,50 @@ export default function AdminSponsorsPage() {
     return data.url as string;
   };
 
-  const handleUploadDashboardImage = async (file: File) => {
-    setUploadingDashboard(true);
+  const handleAddDashboardBanner = async (file: File) => {
+    setAddingBanner(true);
     try {
       const url = await uploadBannerImage(file, "dashboard");
-      if (url) setBanners(b => ({ ...b, dashboard: { ...b.dashboard, imageUrl: url } }));
-    } finally { setUploadingDashboard(false); }
+      if (url) {
+        setBanners(b => ({
+          ...b,
+          dashboard: {
+            banners: [...b.dashboard.banners, { imageUrl: url, linkUrl: "", visible: true }],
+          },
+        }));
+      }
+    } finally { setAddingBanner(false); }
+  };
+
+  const handleReplaceDashboardBanner = async (file: File, idx: number) => {
+    setUploadingDashboardIdx(idx);
+    try {
+      const url = await uploadBannerImage(file, "dashboard");
+      if (url) {
+        setBanners(b => {
+          const updated = b.dashboard.banners.map((item, i) =>
+            i === idx ? { ...item, imageUrl: url } : item
+          );
+          return { ...b, dashboard: { banners: updated } };
+        });
+      }
+    } finally { setUploadingDashboardIdx(null); }
+  };
+
+  const handleRemoveDashboardBanner = (idx: number) => {
+    setBanners(b => ({
+      ...b,
+      dashboard: { banners: b.dashboard.banners.filter((_, i) => i !== idx) },
+    }));
+  };
+
+  const handleUpdateDashboardBanner = (idx: number, patch: Partial<DashboardBannerItem>) => {
+    setBanners(b => ({
+      ...b,
+      dashboard: {
+        banners: b.dashboard.banners.map((item, i) => i === idx ? { ...item, ...patch } : item),
+      },
+    }));
   };
 
   const handleUploadPredLogo = async (file: File) => {
@@ -475,55 +518,69 @@ export default function AdminSponsorsPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* ── DASHBOARD BANNER ── */}
+          {/* ── DASHBOARD BANNERS ── */}
           <Card className="p-5 flex flex-col gap-5">
             <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider text-gray-300 mb-0.5">Banner del Dashboard</h3>
-              <p className="text-gray-600 text-xs">Imagen horizontal debajo del saludo al usuario · 1200 × 80 px recomendado</p>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-gray-300 mb-0.5">Banners del Dashboard</h3>
+              <p className="text-gray-600 text-xs">Se rotan automáticamente cada 5 s · imagen horizontal recomendada</p>
             </div>
 
-            {/* Preview */}
-            <div className="w-full h-[80px] rounded-xl border border-dashed border-[#333] bg-[#0f0f0f] overflow-hidden flex items-center justify-center">
-              {banners.dashboard.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={banners.dashboard.imageUrl} alt="Preview banner" className="w-full h-full object-cover" />
-              ) : (
-                <div className="flex flex-col items-center gap-1 text-gray-700">
-                  <ImageIcon className="w-6 h-6" />
-                  <span className="text-xs">Sin imagen</span>
+            {banners.dashboard.banners.length === 0 && (
+              <div className="flex flex-col items-center gap-2 py-6 text-gray-700 border border-dashed border-[#333] rounded-xl">
+                <ImageIcon className="w-8 h-8" />
+                <span className="text-xs">Sin banners aún</span>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-4">
+              {banners.dashboard.banners.map((item, idx) => (
+                <div key={idx} className="border border-[#2a2a2a] rounded-xl p-3 flex flex-col gap-3">
+                  {/* Preview */}
+                  <div className="w-full rounded-lg overflow-hidden border border-[#333] bg-[#0f0f0f]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={item.imageUrl} alt={`Banner ${idx + 1}`} className="w-full h-auto block" />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Input
+                      label="URL de destino al hacer clic (opcional)"
+                      placeholder="https://thegamershop.com"
+                      value={item.linkUrl}
+                      onChange={e => handleUpdateDashboardBanner(idx, { linkUrl: e.target.value })}
+                    />
+                    <div className="flex items-center justify-between gap-3">
+                      <Toggle
+                        checked={item.visible}
+                        onChange={v => handleUpdateDashboardBanner(idx, { visible: v })}
+                        label="Visible"
+                      />
+                      <div className="flex items-center gap-2">
+                        <UploadButton
+                          label="Reemplazar imagen"
+                          uploading={uploadingDashboardIdx === idx}
+                          onFile={f => handleReplaceDashboardBanner(f, idx)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDashboardBanner(idx)}
+                          className="text-gray-600 hover:text-red-400 transition-colors"
+                          title="Eliminar banner"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
 
-            <div className="space-y-3">
-              <UploadButton
-                label="Subir imagen"
-                uploading={uploadingDashboard}
-                onFile={handleUploadDashboardImage}
-                hint="JPG, PNG, WebP, GIF o SVG · máx. 2 MB"
-              />
-              {banners.dashboard.imageUrl && (
-                <div className="flex items-center gap-2 bg-[#0f0f0f] border border-[#222] rounded-lg px-3 py-2">
-                  <span className="text-xs text-gray-500 font-mono break-all flex-1 line-clamp-1">{banners.dashboard.imageUrl}</span>
-                  <button
-                    type="button"
-                    onClick={() => { navigator.clipboard.writeText(banners.dashboard.imageUrl); toast.success("URL copiada"); }}
-                    className="text-gray-600 hover:text-white text-xs flex-shrink-0"
-                  >Copiar</button>
-                </div>
-              )}
-              <Input
-                label="URL de destino al hacer clic (opcional)"
-                placeholder="https://thegamershop.com"
-                value={banners.dashboard.linkUrl}
-                onChange={e => setBanners(b => ({ ...b, dashboard: { ...b.dashboard, linkUrl: e.target.value } }))}
-              />
-              <Toggle
-                checked={banners.dashboard.visible}
-                onChange={v => setBanners(b => ({ ...b, dashboard: { ...b.dashboard, visible: v } }))}
-                label="Visible en el dashboard"
-              />
-            </div>
+            <UploadButton
+              label="Agregar nuevo banner"
+              uploading={addingBanner}
+              onFile={handleAddDashboardBanner}
+              hint="JPG, PNG, WebP, GIF o SVG · máx. 2 MB"
+            />
           </Card>
 
           {/* ── PREDICTIONS CTA ── */}
