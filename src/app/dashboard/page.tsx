@@ -275,14 +275,14 @@ export default function DashboardPage() {
         {dashboardBanner && (
           <motion.div className="mb-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.05 }}>
             {dashboardBanner.linkUrl ? (
-              <a href={dashboardBanner.linkUrl} target="_blank" rel="noopener noreferrer" className="block w-full rounded-xl overflow-hidden border border-[#222] h-[80px]">
+              <a href={dashboardBanner.linkUrl} target="_blank" rel="noopener noreferrer" className="block w-full rounded-xl overflow-hidden border border-[#222] h-[60px] sm:h-[80px]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={dashboardBanner.imageUrl} alt="Sponsor" className="w-full h-full object-cover" />
+                <img src={dashboardBanner.imageUrl} alt="Sponsor" className="w-full h-full object-cover object-center" />
               </a>
             ) : (
-              <div className="w-full rounded-xl overflow-hidden border border-[#222] h-[80px]">
+              <div className="w-full rounded-xl overflow-hidden border border-[#222] h-[60px] sm:h-[80px]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={dashboardBanner.imageUrl} alt="Sponsor" className="w-full h-full object-cover" />
+                <img src={dashboardBanner.imageUrl} alt="Sponsor" className="w-full h-full object-cover object-center" />
               </div>
             )}
           </motion.div>
