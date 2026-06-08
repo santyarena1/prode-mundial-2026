@@ -1,19 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { randomUUID } from "crypto";
+import sharp from "sharp";
 import prisma from "@/lib/db";
 import { getAdminFromCookies } from "@/lib/cookies";
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"]);
-const MAX_BYTES = 2 * 1024 * 1024;
+const MAX_BYTES = 10 * 1024 * 1024;
+
+async function compressImage(buffer: Buffer, mimeType: string): Promise<{ buffer: Buffer; contentType: string }> {
+  if (mimeType === "image/svg+xml" || mimeType === "image/gif") {
+    return { buffer, contentType: mimeType };
+  }
+  const compressed = await sharp(buffer)
+    .resize({ width: 1600, withoutEnlargement: true })
+    .webp({ quality: 82 })
+    .toBuffer();
+  return { buffer: compressed, contentType: "image/webp" };
+}
 
 async function uploadBannerImage(file: File, folder: string): Promise<string> {
   if (!ALLOWED_TYPES.has(file.type)) throw new Error("Formato no permitido. Usá JPG, PNG, WebP, GIF o SVG.");
-  if (file.size > MAX_BYTES) throw new Error("La imagen no puede superar 2 MB.");
-  const ext = file.type === "image/svg+xml" ? "svg" : (file.name.split(".").pop() || "png");
+  if (file.size > MAX_BYTES) throw new Error("La imagen no puede superar 10 MB.");
+  const raw = Buffer.from(await file.arrayBuffer());
+  const { buffer, contentType } = await compressImage(raw, file.type);
+  const ext = contentType === "image/webp" ? "webp" : (contentType === "image/svg+xml" ? "svg" : "gif");
   const filename = `sponsor-banners/${folder}/${randomUUID()}.${ext}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const blob = await put(filename, buffer, { access: "public", contentType: file.type });
+  const blob = await put(filename, buffer, { access: "public", contentType });
   return blob.url;
 }
 

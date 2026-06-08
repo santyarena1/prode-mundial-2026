@@ -579,7 +579,7 @@ export default function AdminSponsorsPage() {
               label="Agregar nuevo banner"
               uploading={addingBanner}
               onFile={handleAddDashboardBanner}
-              hint="JPG, PNG, WebP, GIF o SVG · máx. 2 MB"
+              hint="JPG, PNG, WebP, GIF o SVG · máx. 10 MB (se comprime automáticamente)"
             />
           </Card>
 
