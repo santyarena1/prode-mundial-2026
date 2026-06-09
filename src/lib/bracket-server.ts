@@ -13,13 +13,21 @@ export async function buildBracketContext(userId: string): Promise<BracketContex
     prisma.worldCupGroup.findMany({
       include: {
         teams: { select: { id: true, name: true, code: true, flagUrl: true } },
-        matches: { where: { phase: "GROUP_STAGE" }, select: { id: true, phase: true } },
+        matches: {
+          where: { phase: "GROUP_STAGE" },
+          select: { id: true, phase: true, homeTeamId: true, awayTeamId: true },
+        },
       },
       orderBy: { name: "asc" },
     }),
     prisma.prediction.findMany({
       where: { userId },
-      select: { matchId: true, predictedOutcome: true },
+      select: {
+        matchId: true,
+        predictedOutcome: true,
+        predictedHomeScore: true,
+        predictedAwayScore: true,
+      },
     }),
     prisma.groupPrediction.findMany({
       where: { userId },
@@ -37,8 +45,17 @@ export async function buildBracketContext(userId: string): Promise<BracketContex
   }
 
   const savedPreds: Record<string, string> = {};
+  const savedScores: Record<string, { home: number; away: number }> = {};
   for (const p of predictions) {
     if (p.predictedOutcome) savedPreds[p.matchId] = p.predictedOutcome;
+    if (
+      p.predictedHomeScore !== null &&
+      p.predictedHomeScore !== undefined &&
+      p.predictedAwayScore !== null &&
+      p.predictedAwayScore !== undefined
+    ) {
+      savedScores[p.matchId] = { home: p.predictedHomeScore, away: p.predictedAwayScore };
+    }
   }
 
   const savedGroupPreds: Record<string, { first?: string; second?: string; third?: string }> = {};
@@ -67,6 +84,7 @@ export async function buildBracketContext(userId: string): Promise<BracketContex
     savedPreds,
     savedGroupPreds,
     savedBracket: normalizeSavedBracket(rawBracket),
+    savedScores,
   };
 }
 

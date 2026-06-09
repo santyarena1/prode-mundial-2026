@@ -9,7 +9,9 @@ import {
   normalizeSavedBracket,
   isPhaseUnlocked,
   getDownstreamBracketKeys,
-  validateBracketPick,
+  computeThirdPlaceRankings,
+  getQualifyingThirdTeamIds,
+  deriveProjectedGroupStandings,
   type BracketContext,
 } from "./bracket-validation";
 
@@ -47,6 +49,50 @@ const baseCtx: BracketContext = {
 
 assert(isPhaseUnlocked("ROUND_OF_32", baseCtx), "R32 unlocked when groups complete");
 assert(!isPhaseUnlocked("ROUND_OF_16", baseCtx), "R16 locked without R32");
+
+// Third-place ranking derives from match predictions, not stale savedGroupPreds
+const thirdCtx: BracketContext = {
+  groups: Array.from({ length: 12 }, (_, i) => {
+    const letter = String.fromCharCode(65 + i);
+    return {
+      id: `g${letter}`,
+      name: letter,
+      teams: [
+        { id: `t${letter}1`, name: `T${letter}1`, code: `${letter}1` },
+        { id: `t${letter}2`, name: `T${letter}2`, code: `${letter}2` },
+        { id: `t${letter}3`, name: `T${letter}3`, code: `${letter}3` },
+      ],
+      matches: [
+        { id: `m${letter}1`, phase: "GROUP_STAGE", homeTeamId: `t${letter}1`, awayTeamId: `t${letter}2` },
+      ],
+    };
+  }),
+  allTeams: [],
+  savedPreds: Object.fromEntries(
+    Array.from({ length: 12 }, (_, i) => [`m${String.fromCharCode(65 + i)}1`, "home"])
+  ),
+  savedGroupPreds: {}, // intentionally empty — standings must still derive
+  savedBracket: {},
+  savedScores: Object.fromEntries(
+    Array.from({ length: 12 }, (_, i) => [
+      `m${String.fromCharCode(65 + i)}1`,
+      { home: 3 - Math.floor(i / 4), away: 0 },
+    ])
+  ),
+};
+thirdCtx.allTeams = thirdCtx.groups.flatMap((g) => g.teams);
+
+const rankings = computeThirdPlaceRankings(thirdCtx);
+assert(rankings.length === 12, "12 projected thirds from match predictions alone");
+assert(rankings.filter((r) => r.qualifies).length === 8, "exactly 8 qualify");
+
+const qualifying = getQualifyingThirdTeamIds(thirdCtx);
+assert(!qualifying.has(rankings[11].teamId), "worst third does not qualify");
+assert(qualifying.has(rankings[0].teamId), "best third qualifies");
+
+const derivedA = deriveProjectedGroupStandings(thirdCtx.groups[0], thirdCtx);
+assert(derivedA?.first === "tA1", "group A leader derived from match predictions");
+assert(derivedA?.third === "tA2", "group A third derived from standings");
 
 // Downstream invalidation
 const downstream = getDownstreamBracketKeys("ROUND_OF_32", "73");

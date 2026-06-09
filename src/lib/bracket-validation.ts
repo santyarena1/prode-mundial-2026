@@ -24,11 +24,18 @@ export interface BracketTeam {
   flagUrl?: string | null;
 }
 
+export interface BracketGroupMatch {
+  id: string;
+  phase: string;
+  homeTeamId?: string | null;
+  awayTeamId?: string | null;
+}
+
 export interface BracketGroup {
   id: string;
   name: string;
   teams: BracketTeam[];
-  matches: Array<{ id: string; phase: string }>;
+  matches: BracketGroupMatch[];
 }
 
 export interface BracketContext {
@@ -38,6 +45,214 @@ export interface BracketContext {
   savedGroupPreds: Record<string, { first?: string; second?: string; third?: string }>;
   /** Confirmed bracket picks only — pending picks must NOT feed downstream resolution */
   savedBracket: Record<string, string>;
+  /** Pending (unconfirmed) bracket picks — used only for validation UX */
+  pendingBracket?: Record<string, string>;
+  savedScores?: Record<string, { home: number; away: number }>;
+}
+
+export interface ThirdPlaceRanking {
+  teamId: string;
+  groupLetter: string;
+  groupId: string;
+  pts: number;
+  gd: number;
+  gf: number;
+  rank: number;
+  qualifies: boolean;
+  team: BracketTeam;
+}
+
+const BEST_THIRDS_COUNT = 8;
+
+/** All R32 matches that include a third-place slot */
+export function getThirdSlotMatches(): BracketMatch[] {
+  return (BRACKET_MATCHES.ROUND_OF_32 ?? []).filter(
+    (m) => m.leftSource.startsWith("3") || m.rightSource.startsWith("3")
+  );
+}
+
+export function isGroupPredictionComplete(group: BracketGroup, ctx: BracketContext): boolean {
+  const groupMatches = group.matches.filter((m) => m.phase === "GROUP_STAGE");
+  return groupMatches.length > 0 && groupMatches.every((m) => !!ctx.savedPreds[m.id]);
+}
+
+/** Standings derived from saved match predictions — same logic as the group table UI */
+export function deriveProjectedGroupStandings(
+  group: BracketGroup,
+  ctx: BracketContext
+): { first: string | null; second: string | null; third: string | null } | null {
+  if (!isGroupPredictionComplete(group, ctx)) return null;
+
+  const stats = computeGroupTeamStats(group, ctx);
+  const sorted = group.teams
+    .map((t) => ({ id: t.id, ...(stats[t.id] ?? { pts: 0, gd: 0, gf: 0 }) }))
+    .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+
+  return {
+    first: sorted[0]?.id ?? null,
+    second: sorted[1]?.id ?? null,
+    third: sorted[2]?.id ?? null,
+  };
+}
+
+function getGroupPositions(
+  group: BracketGroup,
+  ctx: BracketContext
+): { first?: string; second?: string; third?: string } {
+  const derived = deriveProjectedGroupStandings(group, ctx);
+  if (derived) {
+    return {
+      first: derived.first ?? undefined,
+      second: derived.second ?? undefined,
+      third: derived.third ?? undefined,
+    };
+  }
+  return ctx.savedGroupPreds[group.id] ?? {};
+}
+
+function computeGroupTeamStats(
+  group: BracketGroup,
+  ctx: BracketContext
+): Record<string, { pts: number; gd: number; gf: number }> {
+  const stats: Record<string, { pts: number; gd: number; gf: number }> = {};
+  for (const t of group.teams) stats[t.id] = { pts: 0, gd: 0, gf: 0 };
+
+  for (const m of group.matches) {
+    if (m.phase !== "GROUP_STAGE") continue;
+    if (!m.homeTeamId || !m.awayTeamId) continue;
+    const outcome = ctx.savedPreds[m.id];
+    if (!outcome) continue;
+
+    if (!stats[m.homeTeamId]) stats[m.homeTeamId] = { pts: 0, gd: 0, gf: 0 };
+    if (!stats[m.awayTeamId]) stats[m.awayTeamId] = { pts: 0, gd: 0, gf: 0 };
+
+    if (outcome === "home") stats[m.homeTeamId].pts += 3;
+    else if (outcome === "away") stats[m.awayTeamId].pts += 3;
+    else {
+      stats[m.homeTeamId].pts += 1;
+      stats[m.awayTeamId].pts += 1;
+    }
+
+    const score = ctx.savedScores?.[m.id];
+    if (score) {
+      stats[m.homeTeamId].gd += score.home - score.away;
+      stats[m.awayTeamId].gd += score.away - score.home;
+      stats[m.homeTeamId].gf += score.home;
+      stats[m.awayTeamId].gf += score.away;
+    }
+  }
+
+  return stats;
+}
+
+/** Projected 3rd-place finishers ranked — top 8 qualify for R32 */
+export function computeThirdPlaceRankings(ctx: BracketContext): ThirdPlaceRanking[] {
+  const entries: Omit<ThirdPlaceRanking, "rank" | "qualifies">[] = [];
+
+  for (const group of ctx.groups) {
+    const standings = deriveProjectedGroupStandings(group, ctx);
+    if (!standings?.third) continue;
+
+    const stats = computeGroupTeamStats(group, ctx);
+    const s = stats[standings.third] ?? { pts: 0, gd: 0, gf: 0 };
+    const team = ctx.allTeams.find((t) => t.id === standings.third);
+    if (!team) continue;
+
+    entries.push({
+      teamId: standings.third,
+      groupLetter: group.name,
+      groupId: group.id,
+      pts: s.pts,
+      gd: s.gd,
+      gf: s.gf,
+      team,
+    });
+  }
+
+  entries.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+
+  return entries.map((e, i) => ({
+    ...e,
+    rank: i + 1,
+    qualifies: i < BEST_THIRDS_COUNT,
+  }));
+}
+
+export function getQualifyingThirdTeamIds(ctx: BracketContext): Set<string> {
+  return new Set(
+    computeThirdPlaceRankings(ctx)
+      .filter((r) => r.qualifies)
+      .map((r) => r.teamId)
+  );
+}
+
+export function getAllProjectedThirdTeamIds(ctx: BracketContext): Set<string> {
+  const ids = new Set<string>();
+  for (const group of ctx.groups) {
+    const third = deriveProjectedGroupStandings(group, ctx)?.third
+      ?? ctx.savedGroupPreds[group.id]?.third;
+    if (third) ids.add(third);
+  }
+  return ids;
+}
+
+export function isProjectedThirdTeamId(ctx: BracketContext, teamId: string): boolean {
+  return getAllProjectedThirdTeamIds(ctx).has(teamId);
+}
+
+export function getThirdSideSource(match: BracketMatch): string | null {
+  if (match.leftSource.startsWith("3")) return match.leftSource;
+  if (match.rightSource.startsWith("3")) return match.rightSource;
+  return null;
+}
+
+/** Third-place teams assigned to R32 slots (only actual 3° picks, not 1°/2° winners) */
+export function getAssignedThirdTeamIds(
+  ctx: BracketContext,
+  bracket: Record<string, string>,
+  excludeKey?: string
+): Set<string> {
+  const assigned = new Set<string>();
+  const projectedThirds = getAllProjectedThirdTeamIds(ctx);
+
+  for (const match of getThirdSlotMatches()) {
+    const key = bracketKey("ROUND_OF_32", String(match.matchNum));
+    if (excludeKey && key === excludeKey) continue;
+    const teamId = bracket[key];
+    if (teamId && projectedThirds.has(teamId)) assigned.add(teamId);
+  }
+
+  return assigned;
+}
+
+/** @deprecated use getAssignedThirdTeamIds */
+export function getUsedThirdPlaceTeamIds(
+  savedBracket: Record<string, string>,
+  excludeKey?: string
+): Set<string> {
+  const used = new Set<string>();
+  for (const match of getThirdSlotMatches()) {
+    const key = bracketKey("ROUND_OF_32", String(match.matchNum));
+    if (excludeKey && key === excludeKey) continue;
+    const teamId = savedBracket[key];
+    if (teamId) used.add(teamId);
+  }
+  return used;
+}
+
+export function getUsedThirdPlaceTeamIdsFromContext(
+  ctx: BracketContext,
+  savedBracket: Record<string, string>,
+  pendingBracket: Record<string, string> = {},
+  excludeKey?: string
+): Set<string> {
+  const used = getAssignedThirdTeamIds(ctx, savedBracket, excludeKey);
+  for (const [key, teamId] of Object.entries(pendingBracket)) {
+    if (!key.startsWith("ROUND_OF_32:")) continue;
+    if (excludeKey && key === excludeKey) continue;
+    if (isProjectedThirdTeamId(ctx, teamId)) used.add(teamId);
+  }
+  return used;
 }
 
 /** Maps legacy numeric slots (1..N) to FIFA match numbers */
@@ -89,9 +304,9 @@ export function resolveSource(source: string, ctx: BracketContext): BracketTeam 
   const groupLetter = source[1];
   const group = ctx.groups.find((g) => g.name === groupLetter);
   if (!group) return null;
-  const gp = ctx.savedGroupPreds[group.id];
-  if (!gp) return null;
+  const gp = getGroupPositions(group, ctx);
   const teamId = pos === "1" ? gp.first : gp.second;
+  if (!teamId) return null;
   return ctx.allTeams.find((t) => t.id === teamId) ?? null;
 }
 
@@ -119,44 +334,40 @@ export function getThirdPlaceCandidates(
   excludeTeamIds: Set<string> = new Set()
 ): BracketTeam[] {
   if (!source.startsWith("3")) return [];
+  const qualifying = getQualifyingThirdTeamIds(ctx);
   const groupLetters = source.slice(1).split("");
   const teams: BracketTeam[] = [];
   for (const letter of groupLetters) {
     const group = ctx.groups.find((g) => g.name === letter);
     if (!group) continue;
-    const gp = ctx.savedGroupPreds[group.id];
-    if (!gp?.third) continue;
-    if (excludeTeamIds.has(gp.third)) continue;
-    const team = ctx.allTeams.find((t) => t.id === gp.third);
+    const third =
+      deriveProjectedGroupStandings(group, ctx)?.third
+      ?? ctx.savedGroupPreds[group.id]?.third;
+    if (!third) continue;
+    if (!qualifying.has(third)) continue;
+    if (excludeTeamIds.has(third)) continue;
+    const team = ctx.allTeams.find((t) => t.id === third);
     if (team) teams.push(team);
   }
   return teams;
 }
 
-/** Third-place teams already picked in ROUND_OF_32 (excluding current match) */
-export function getUsedThirdPlaceTeamIds(
-  savedBracket: Record<string, string>,
-  excludeKey?: string
-): Set<string> {
-  const used = new Set<string>();
-  for (const match of BRACKET_MATCHES.ROUND_OF_32 ?? []) {
-    const key = bracketKey("ROUND_OF_32", String(match.matchNum));
-    if (excludeKey && key === excludeKey) continue;
-    const hasThird =
-      match.leftSource.startsWith("3") || match.rightSource.startsWith("3");
-    if (!hasThird) continue;
-    const teamId = savedBracket[key];
-    if (teamId) used.add(teamId);
+/** Resolve one side of a bracket match for display / validation */
+export function resolveBracketSideTeam(
+  source: string,
+  pickedTeamId: string | null | undefined,
+  ctx: BracketContext
+): BracketTeam | null {
+  if (source.startsWith("3")) {
+    if (!pickedTeamId || !isProjectedThirdTeamId(ctx, pickedTeamId)) return null;
+    return ctx.allTeams.find((t) => t.id === pickedTeamId) ?? null;
   }
-  return used;
+  return resolveSource(source, ctx);
 }
 
 export function isGroupStageComplete(ctx: BracketContext): boolean {
   if (ctx.groups.length === 0) return false;
-  return ctx.groups.every((group) => {
-    const groupMatches = group.matches.filter((m) => m.phase === "GROUP_STAGE");
-    return groupMatches.length > 0 && groupMatches.every((m) => !!ctx.savedPreds[m.id]);
-  });
+  return ctx.groups.every((group) => isGroupPredictionComplete(group, ctx));
 }
 
 export function countCompletedGroups(ctx: BracketContext): number {
@@ -250,15 +461,24 @@ export function validateBracketPick(
   const { left, right } = resolveMatchTeams(match, ctx);
 
   if (isThirdSlot) {
-    if (left && left.id === teamId) return { valid: true };
-    if (right && right.id === teamId) return { valid: true };
+    const fixedSide = match.leftSource.startsWith("3") ? right : left;
+    if (fixedSide && fixedSide.id === teamId) return { valid: true };
 
-    const sideSource = match.leftSource.startsWith("3") ? match.leftSource : match.rightSource;
-    const exclude = getUsedThirdPlaceTeamIds(ctx.savedBracket, key);
+    if (!isProjectedThirdTeamId(ctx, teamId)) {
+      return { valid: false, error: "Solo podés elegir uno de los dos equipos del cruce." };
+    }
+
+    const sideSource = getThirdSideSource(match)!;
+    const bracketForAssignment = { ...ctx.savedBracket, ...ctx.pendingBracket };
+    const exclude = getAssignedThirdTeamIds(ctx, bracketForAssignment, key);
     const candidates = getThirdPlaceCandidates(sideSource, ctx, exclude);
     if (!candidates.some((t) => t.id === teamId)) {
       if (exclude.has(teamId)) {
-        return { valid: false, error: "Ese tercero ya fue elegido en otro cruce." };
+        return { valid: false, error: "Ese tercero ya fue asignado a otro cruce." };
+      }
+      const qualifying = getQualifyingThirdTeamIds(ctx);
+      if (!qualifying.has(teamId)) {
+        return { valid: false, error: "Ese tercero no está entre los 8 mejores según tu tabla de grupos." };
       }
       return { valid: false, error: "El equipo no es candidato válido para este cruce." };
     }
@@ -323,8 +543,15 @@ export function isBracketPickStale(
   const { left, right } = resolveMatchTeams(match, ctx, isThird ? pickedTeamId : undefined);
 
   if (isThird) {
-    const sideSource = match.leftSource.startsWith("3") ? match.leftSource : match.rightSource;
-    const exclude = getUsedThirdPlaceTeamIds(ctx.savedBracket, bracketKey(phase, slot));
+    const fixed = resolveSource(
+      match.leftSource.startsWith("3") ? match.rightSource : match.leftSource,
+      ctx
+    );
+    if (fixed && pickedTeamId === fixed.id) return false;
+
+    const sideSource = getThirdSideSource(match)!;
+    const exclude = getAssignedThirdTeamIds(ctx, ctx.savedBracket, bracketKey(phase, slot));
+    if (!getQualifyingThirdTeamIds(ctx).has(pickedTeamId)) return true;
     return !getThirdPlaceCandidates(sideSource, ctx, exclude).some((t) => t.id === pickedTeamId);
   }
 

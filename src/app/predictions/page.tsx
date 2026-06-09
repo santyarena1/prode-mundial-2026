@@ -41,7 +41,10 @@ import {
   normalizeMatchSlot,
   resolveSource as resolveBracketSource,
   getThirdPlaceCandidates as getThirdCandidates,
-  getUsedThirdPlaceTeamIds,
+  getAssignedThirdTeamIds,
+  computeThirdPlaceRankings,
+  resolveBracketSideTeam,
+  validateBracketPick,
   isPhaseUnlocked as checkPhaseUnlocked,
   getPhaseUnlockBlockReason,
   getEligibleChampionTeams,
@@ -242,11 +245,23 @@ export default function PredictionsPage() {
   // ── Bracket context (confirmed picks only for downstream resolution) ────────
 
   const bracketCtx: BracketContext = {
-    groups,
+    groups: groups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      teams: g.teams,
+      matches: g.matches.map((m) => ({
+        id: m.id,
+        phase: m.phase,
+        homeTeamId: m.homeTeam?.id ?? null,
+        awayTeamId: m.awayTeam?.id ?? null,
+      })),
+    })),
     allTeams,
     savedPreds: savedPreds as Record<string, string>,
     savedGroupPreds,
     savedBracket,
+    pendingBracket,
+    savedScores,
   };
 
   const isPhaseUnlocked = useCallback(
@@ -275,19 +290,11 @@ export default function PredictionsPage() {
 
   const getThirdPlaceCandidates = useCallback(
     (source: string, excludeKey?: string): Team[] => {
-      const exclude = getUsedThirdPlaceTeamIds(savedBracket, excludeKey);
-      const pendingExclude = new Set(exclude);
-      for (const match of BRACKET_MATCHES.ROUND_OF_32 ?? []) {
-        const key = bracketKey("ROUND_OF_32", String(match.matchNum));
-        if (excludeKey && key === excludeKey) continue;
-        const pendingId = pendingBracket[key];
-        if (pendingId && (match.leftSource.startsWith("3") || match.rightSource.startsWith("3"))) {
-          pendingExclude.add(pendingId);
-        }
-      }
-      return getThirdCandidates(source, bracketCtx, pendingExclude) as Team[];
+      const bracketForAssignment = { ...savedBracket, ...pendingBracket };
+      const exclude = getAssignedThirdTeamIds(bracketCtx, bracketForAssignment, excludeKey);
+      return getThirdCandidates(source, bracketCtx, exclude) as Team[];
     },
-    [groups, allTeams, savedPreds, savedGroupPreds, savedBracket, pendingBracket]
+    [groups, allTeams, savedPreds, savedGroupPreds, savedBracket, pendingBracket, savedScores]
   );
 
   useEffect(() => {
@@ -438,43 +445,17 @@ export default function PredictionsPage() {
     const key = bracketKey(phase, slot);
     if (savedBracket[key]) return;
 
-    const isThirdPick =
-      phase === "ROUND_OF_32" &&
-      (() => {
-        const m = (BRACKET_MATCHES.ROUND_OF_32 ?? []).find(
-          (bm) => bm.matchNum === parseInt(normalizeMatchSlot(phase, slot), 10)
-        );
-        return m && (m.leftSource.startsWith("3") || m.rightSource.startsWith("3"));
-      })();
-
-    if (isThirdPick) {
-      const used = getUsedThirdPlaceTeamIds(savedBracket, key);
-      for (const [k, v] of Object.entries(pendingBracket)) {
-        if (!k.startsWith("ROUND_OF_32:") || k === key) continue;
-        const mn = parseInt(k.split(":")[1], 10);
-        const m = (BRACKET_MATCHES.ROUND_OF_32 ?? []).find((bm) => bm.matchNum === mn);
-        if (m && (m.leftSource.startsWith("3") || m.rightSource.startsWith("3"))) used.add(v);
-      }
-      if (used.has(teamId)) {
-        toast.error("Ese tercero ya fue elegido en otro cruce");
-        return;
-      }
-    } else if (phase !== "CHAMPION") {
-      const match = (BRACKET_MATCHES[phase] ?? []).find(
-        (m) => m.matchNum === parseInt(normalizeMatchSlot(phase, slot), 10)
-      );
-      if (match) {
-        const lt = resolveBracketSource(match.leftSource, bracketCtx) as Team | null;
-        const rt = resolveBracketSource(match.rightSource, bracketCtx) as Team | null;
-        if (lt && rt && teamId !== lt.id && teamId !== rt.id) {
-          toast.error("Solo podés elegir uno de los dos equipos del cruce");
-          return;
-        }
-      }
+    const validation = validateBracketPick(phase, slot, teamId, {
+      ...bracketCtx,
+      savedBracket: { ...savedBracket, ...pendingBracket },
+    });
+    if (!validation.valid) {
+      toast.error(validation.error || "Selección inválida");
+      return;
     }
 
     setPendingBracket(prev => ({ ...prev, [key]: teamId }));
-  }, [savedBracket, pendingBracket, groups, allTeams, savedPreds, savedGroupPreds]);
+  }, [savedBracket, pendingBracket, bracketCtx]);
 
   const handlePickBracketScore = useCallback((phase: string, matchNum: number, side: "home" | "away", value: number) => {
     const key = bracketKey(phase, String(matchNum));
@@ -1236,23 +1217,62 @@ export default function PredictionsPage() {
 
                     {/* Third-place tracker (R32 only) */}
                     {currentPhase.key === "ROUND_OF_32" && (() => {
-                      const used = getUsedThirdPlaceTeamIds(savedBracket);
-                      for (const [k, v] of Object.entries(pendingBracket)) {
-                        if (!k.startsWith("ROUND_OF_32:")) continue;
-                        const mn = parseInt(k.split(":")[1], 10);
-                        const m = (BRACKET_MATCHES.ROUND_OF_32 ?? []).find((bm) => bm.matchNum === mn);
-                        if (m && (m.leftSource.startsWith("3") || m.rightSource.startsWith("3"))) used.add(v);
+                      const rankings = computeThirdPlaceRankings(bracketCtx);
+                      const assigned = getAssignedThirdTeamIds(
+                        bracketCtx,
+                        { ...savedBracket, ...pendingBracket }
+                      );
+                      const qualifying = rankings.filter((r) => r.qualifies);
+                      const groupsReady = rankings.length;
+                      if (groupsReady === 0) {
+                        return (
+                          <div className="mb-4 px-3 py-2.5 bg-[#111] border border-[#222] rounded-xl text-xs text-gray-500">
+                            Completá todos los partidos de grupos para calcular los 8 mejores terceros.
+                          </div>
+                        );
                       }
                       return (
-                        <div className="mb-4 flex items-center gap-2 px-3 py-2 bg-[#111] border border-[#222] rounded-xl">
-                          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Mejores 3°</span>
-                          <div className="flex-1 h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-amber-500/70 rounded-full transition-all"
-                              style={{ width: `${Math.min(100, (used.size / 8) * 100)}%` }}
-                            />
+                        <div className="mb-4 bg-[#111] border border-[#222] rounded-xl overflow-hidden">
+                          <div className="px-3 py-2.5 flex items-center justify-between border-b border-[#1a1a1a]">
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
+                              8 mejores terceros
+                              {groupsReady < 12 && (
+                                <span className="text-gray-600 font-normal normal-case ml-1">
+                                  ({groupsReady}/12 grupos)
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-xs font-bold text-amber-400 tabular-nums">
+                              {assigned.size}/8 terceros asignados
+                            </span>
                           </div>
-                          <span className="text-xs font-bold text-amber-400 tabular-nums">{used.size}/8</span>
+                          <div className="px-3 py-2 flex flex-wrap gap-1.5">
+                            {qualifying.map((r) => {
+                              const isAssigned = assigned.has(r.teamId);
+                              return (
+                                <span
+                                  key={r.teamId}
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                    isAssigned
+                                      ? "bg-green-500/15 text-green-400 border border-green-500/25"
+                                      : "bg-[#1a1a1a] text-gray-400 border border-[#252525]"
+                                  }`}
+                                >
+                                  {r.team.code} · {r.pts}pts
+                                  {isAssigned && " ✓"}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          {rankings.length > 8 && (
+                            <p className="px-3 pb-2 text-[10px] text-gray-600">
+                              Quedan afuera:{" "}
+                              {rankings
+                                .filter((r) => !r.qualifies)
+                                .map((r) => r.team.code)
+                                .join(", ")}
+                            </p>
+                          )}
                         </div>
                       );
                     })()}
@@ -1296,12 +1316,18 @@ export default function PredictionsPage() {
                           const matchKey = bracketKey(match.phase, String(match.matchNum));
                           const pickedId = savedBracket[matchKey] || pendingBracket[matchKey] || null;
                           const isStale = !!savedBracket[matchKey] && isBracketPickStale(match.phase, String(match.matchNum), pickedId, bracketCtx);
+                          const leftTeam = match.leftSource.startsWith("3")
+                            ? (resolveBracketSideTeam(match.leftSource, pickedId, bracketCtx) as Team | null)
+                            : resolveSource(match.leftSource);
+                          const rightTeam = match.rightSource.startsWith("3")
+                            ? (resolveBracketSideTeam(match.rightSource, pickedId, bracketCtx) as Team | null)
+                            : resolveSource(match.rightSource);
                           return (
                           <BracketMatchCard2
                             key={match.matchNum}
                             match={match}
-                            leftTeam={resolveSource(match.leftSource)}
-                            rightTeam={resolveSource(match.rightSource)}
+                            leftTeam={leftTeam}
+                            rightTeam={rightTeam}
                             leftCandidates={match.leftSource.startsWith("3") ? getThirdPlaceCandidates(match.leftSource, matchKey) : []}
                             rightCandidates={match.rightSource.startsWith("3") ? getThirdPlaceCandidates(match.rightSource, matchKey) : []}
                             pickedTeamId={pickedId}
@@ -2568,8 +2594,8 @@ function ThirdPickerSide({
         </div>
       )}
       {isOpen && !isLocked && candidates.length === 0 && (
-        <p className="text-[10px] text-gray-700 text-center py-1">
-          Completá los grupos para ver los 3°
+        <p className="text-[10px] text-amber-700/80 text-center py-1 px-2 leading-tight">
+          Ningún 3° de estos grupos está entre tus 8 mejores terceros. Revisá la tabla de grupos.
         </p>
       )}
     </div>
