@@ -12,6 +12,8 @@ import {
   computeThirdPlaceRankings,
   getQualifyingThirdTeamIds,
   deriveProjectedGroupStandings,
+  getThirdPlaceCandidateEntries,
+  getThirdPlaceCandidates,
   type BracketContext,
 } from "./bracket-validation";
 
@@ -93,6 +95,25 @@ assert(qualifying.has(rankings[0].teamId), "best third qualifies");
 const derivedA = deriveProjectedGroupStandings(thirdCtx.groups[0], thirdCtx);
 assert(derivedA?.first === "tA1", "group A leader derived from match predictions");
 assert(derivedA?.third === "tA2", "group A third derived from standings");
+
+// Slot candidates include non-top-8 thirds when eligible for that cruce
+const slotCtx: BracketContext = {
+  ...thirdCtx,
+  savedBracket: {},
+};
+const top8 = getQualifyingThirdTeamIds(slotCtx);
+const slotEntries = getThirdPlaceCandidateEntries("3DEIJL", slotCtx);
+assert(slotEntries.length === 5, "P87 slot lists all 5 projected thirds from D/E/I/J/L");
+assert(
+  slotEntries.some((e) => !e.qualifies),
+  "slot includes thirds outside top 8 when needed"
+);
+assert(
+  getThirdPlaceCandidates("3DEIJL", slotCtx).every((t) =>
+    slotEntries.some((e) => e.team.id === t.id)
+  ),
+  "getThirdPlaceCandidates mirrors entries"
+);
 
 // Downstream invalidation
 const downstream = getDownstreamBracketKeys("ROUND_OF_32", "73");

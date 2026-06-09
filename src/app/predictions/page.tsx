@@ -40,7 +40,7 @@ import {
   normalizeSavedBracket,
   normalizeMatchSlot,
   resolveSource as resolveBracketSource,
-  getThirdPlaceCandidates as getThirdCandidates,
+  getThirdPlaceCandidateEntries as getThirdCandidateEntries,
   getAssignedThirdTeamIds,
   computeThirdPlaceRankings,
   resolveBracketSideTeam,
@@ -288,11 +288,11 @@ export default function PredictionsPage() {
     [groups, allTeams, savedPreds, savedGroupPreds, savedBracket]
   );
 
-  const getThirdPlaceCandidates = useCallback(
-    (source: string, excludeKey?: string): Team[] => {
+  const getThirdPlaceCandidateEntries = useCallback(
+    (source: string, excludeKey?: string) => {
       const bracketForAssignment = { ...savedBracket, ...pendingBracket };
       const exclude = getAssignedThirdTeamIds(bracketCtx, bracketForAssignment, excludeKey);
-      return getThirdCandidates(source, bracketCtx, exclude) as Team[];
+      return getThirdCandidateEntries(source, bracketCtx, exclude);
     },
     [groups, allTeams, savedPreds, savedGroupPreds, savedBracket, pendingBracket, savedScores]
   );
@@ -1328,8 +1328,9 @@ export default function PredictionsPage() {
                             match={match}
                             leftTeam={leftTeam}
                             rightTeam={rightTeam}
-                            leftCandidates={match.leftSource.startsWith("3") ? getThirdPlaceCandidates(match.leftSource, matchKey) : []}
-                            rightCandidates={match.rightSource.startsWith("3") ? getThirdPlaceCandidates(match.rightSource, matchKey) : []}
+                            leftCandidateEntries={match.leftSource.startsWith("3") ? getThirdPlaceCandidateEntries(match.leftSource, matchKey) as { team: Team; groupLetter: string; qualifies: boolean }[] : []}
+                            rightCandidateEntries={match.rightSource.startsWith("3") ? getThirdPlaceCandidateEntries(match.rightSource, matchKey) as { team: Team; groupLetter: string; qualifies: boolean }[] : []}
+                            allTeams={allTeams}
                             pickedTeamId={pickedId}
                             isLocked={!!savedBracket[matchKey]}
                             isStale={isStale}
@@ -2184,8 +2185,8 @@ function MatchCard({
 // ─── Bracket Match Card 2 (connected to group predictions / bracket winners) ──
 
 function BracketMatchCard2({
-  match, leftTeam, rightTeam, leftCandidates, rightCandidates,
-  pickedTeamId, isLocked, isPending, isStale = false,
+  match, leftTeam, rightTeam, leftCandidateEntries, rightCandidateEntries,
+  allTeams, pickedTeamId, isLocked, isPending, isStale = false,
   hardcoreMode, pendingBracketScore, savedBracketScore, onPickBracketScore,
   onSaveBracketScore, savingBracketScore,
   delay, onPick,
@@ -2194,8 +2195,9 @@ function BracketMatchCard2({
   match: BracketMatch;
   leftTeam: Team | null;
   rightTeam: Team | null;
-  leftCandidates: Team[];
-  rightCandidates: Team[];
+  leftCandidateEntries: { team: Team; groupLetter: string; qualifies: boolean }[];
+  rightCandidateEntries: { team: Team; groupLetter: string; qualifies: boolean }[];
+  allTeams: Team[];
   pickedTeamId: string | null;
   isLocked: boolean;
   isPending: boolean;
@@ -2269,7 +2271,8 @@ function BracketMatchCard2({
           {isLeftThird && !leftTeam ? (
             <ThirdPickerSide
               source={match.leftSource}
-              candidates={leftCandidates}
+              candidateEntries={leftCandidateEntries}
+              allTeams={allTeams}
               pickedTeamId={pickedTeamId}
               isOpen={thirdPickMode === "left"}
               isLocked={isLocked}
@@ -2339,7 +2342,8 @@ function BracketMatchCard2({
           {isRightThird && !rightTeam ? (
             <ThirdPickerSide
               source={match.rightSource}
-              candidates={rightCandidates}
+              candidateEntries={rightCandidateEntries}
+              allTeams={allTeams}
               pickedTeamId={pickedTeamId}
               isOpen={thirdPickMode === "right"}
               isLocked={isLocked}
@@ -2521,19 +2525,59 @@ function BracketMatchCard2({
 
 // ─── Third-place picker side ───────────────────────────────────────────────────
 
+function ThirdPickerOption({
+  team, subtitle, pickedTeamId, onPick, muted = false,
+}: {
+  team: Team;
+  subtitle: string;
+  pickedTeamId: string | null;
+  onPick: (teamId: string) => void;
+  muted?: boolean;
+}) {
+  return (
+    <button
+      onClick={() => onPick(team.id)}
+      className={`w-full flex items-center gap-2 px-3 py-2.5 text-left transition-all ${
+        pickedTeamId === team.id
+          ? "bg-red-600/20 text-white"
+          : muted
+            ? "text-amber-700/80 hover:bg-[#1e1e1e] hover:text-amber-600"
+            : "text-gray-400 hover:bg-[#1e1e1e] hover:text-white"
+      }`}
+    >
+      {team.flagUrl
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img src={team.flagUrl} alt="" className="w-8 h-[22px] object-cover rounded flex-shrink-0 shadow" />
+        : <div className="w-8 h-[22px] bg-[#2a2a2a] rounded flex-shrink-0 flex items-center justify-center text-[10px] font-bold text-gray-600">{team.code}</div>
+      }
+      <div className="flex-1 min-w-0">
+        <span className="text-xs font-bold block truncate">{team.name}</span>
+        <span className="text-[9px] text-gray-600 block truncate">{subtitle}</span>
+      </div>
+      {pickedTeamId === team.id && <CheckCircle2 className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />}
+    </button>
+  );
+}
+
 function ThirdPickerSide({
-  source, candidates, pickedTeamId, isOpen, isLocked, onToggle, onPick,
+  source, candidateEntries, allTeams, pickedTeamId, isOpen, isLocked, onToggle, onPick,
 }: {
   source: string;
-  candidates: Team[];
+  candidateEntries: { team: Team; groupLetter: string; qualifies: boolean }[];
+  allTeams: Team[];
   pickedTeamId: string | null;
   isOpen: boolean;
   isLocked: boolean;
   onToggle: () => void;
   onPick: (teamId: string) => void;
 }) {
-  const picked = candidates.find(t => t.id === pickedTeamId) ?? null;
+  const picked =
+    candidateEntries.find((e) => e.team.id === pickedTeamId)?.team
+    ?? allTeams.find((t) => t.id === pickedTeamId)
+    ?? null;
   const label = getSourceLabel(source);
+  const qualifyingEntries = candidateEntries.filter((e) => e.qualifies);
+  const fallbackEntries = candidateEntries.filter((e) => !e.qualifies);
 
   return (
     <div className="flex flex-col items-center gap-2 w-full">
@@ -2570,32 +2614,51 @@ function ThirdPickerSide({
       </motion.button>
 
       {/* Inline candidate picker */}
-      {isOpen && !isLocked && candidates.length > 0 && (
+      {isOpen && !isLocked && candidateEntries.length > 0 && (
         <div className="w-full bg-[#141414] border border-[#2a2a2a] rounded-xl overflow-hidden">
-          {candidates.map(team => (
-            <button
-              key={team.id}
-              onClick={() => onPick(team.id)}
-              className={`w-full flex items-center gap-2 px-3 py-2.5 text-left transition-all ${
-                pickedTeamId === team.id
-                  ? "bg-red-600/20 text-white"
-                  : "text-gray-400 hover:bg-[#1e1e1e] hover:text-white"
-              }`}
-            >
-              {team.flagUrl
-                // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={team.flagUrl} alt="" className="w-8 h-[22px] object-cover rounded flex-shrink-0 shadow" />
-                : <div className="w-8 h-[22px] bg-[#2a2a2a] rounded flex-shrink-0 flex items-center justify-center text-[10px] font-bold text-gray-600">{team.code}</div>
-              }
-              <span className="text-xs font-bold flex-1 truncate">{team.name}</span>
-              {pickedTeamId === team.id && <CheckCircle2 className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />}
-            </button>
-          ))}
+          {qualifyingEntries.length > 0 && (
+            <>
+              {qualifyingEntries.length > 0 && fallbackEntries.length > 0 && (
+                <p className="px-3 pt-2 pb-1 text-[9px] text-gray-600 uppercase tracking-wider font-bold">
+                  Entre los 8 mejores
+                </p>
+              )}
+              {qualifyingEntries.map(({ team, groupLetter }) => (
+                <ThirdPickerOption
+                  key={team.id}
+                  team={team}
+                  subtitle={`3° Grupo ${groupLetter}`}
+                  pickedTeamId={pickedTeamId}
+                  onPick={onPick}
+                />
+              ))}
+            </>
+          )}
+          {fallbackEntries.length > 0 && (
+            <>
+              {qualifyingEntries.length > 0 && (
+                <div className="border-t border-[#222] mx-2" />
+              )}
+              <p className="px-3 pt-2 pb-1 text-[9px] text-amber-700/70 uppercase tracking-wider font-bold">
+                {qualifyingEntries.length > 0 ? "Otros de este cruce" : "Terceros disponibles"}
+              </p>
+              {fallbackEntries.map(({ team, groupLetter }) => (
+                <ThirdPickerOption
+                  key={team.id}
+                  team={team}
+                  subtitle={`3° Grupo ${groupLetter} · fuera del top 8`}
+                  pickedTeamId={pickedTeamId}
+                  onPick={onPick}
+                  muted
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
-      {isOpen && !isLocked && candidates.length === 0 && (
+      {isOpen && !isLocked && candidateEntries.length === 0 && (
         <p className="text-[10px] text-amber-700/80 text-center py-1 px-2 leading-tight">
-          Ningún 3° de estos grupos está entre tus 8 mejores terceros. Revisá la tabla de grupos.
+          No hay terceros libres para este cruce. Puede que ya estén asignados en otro partido o falten predicciones de esos grupos.
         </p>
       )}
     </div>

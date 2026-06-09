@@ -328,28 +328,77 @@ export function resolveMatchTeams(
   return { left, right };
 }
 
+export interface ThirdPlaceCandidateEntry {
+  team: BracketTeam;
+  groupLetter: string;
+  qualifies: boolean;
+}
+
+function getProjectedThirdForGroup(
+  group: BracketGroup,
+  ctx: BracketContext
+): string | null {
+  return (
+    deriveProjectedGroupStandings(group, ctx)?.third
+    ?? ctx.savedGroupPreds[group.id]?.third
+    ?? null
+  );
+}
+
+/** All projected 3° from candidate groups of a slot (ignores assignment / top-8 filter) */
+export function getSlotProjectedThirds(source: string, ctx: BracketContext): BracketTeam[] {
+  if (!source.startsWith("3")) return [];
+  const teams: BracketTeam[] = [];
+  for (const letter of source.slice(1).split("")) {
+    const group = ctx.groups.find((g) => g.name === letter);
+    if (!group) continue;
+    const third = getProjectedThirdForGroup(group, ctx);
+    if (!third) continue;
+    const team = ctx.allTeams.find((t) => t.id === third);
+    if (team) teams.push(team);
+  }
+  return teams;
+}
+
+/** Assignable 3° for a bracket slot — includes non-top-8 when needed to complete the llave */
+export function getThirdPlaceCandidateEntries(
+  source: string,
+  ctx: BracketContext,
+  excludeTeamIds: Set<string> = new Set()
+): ThirdPlaceCandidateEntry[] {
+  if (!source.startsWith("3")) return [];
+  const qualifying = getQualifyingThirdTeamIds(ctx);
+  const entries: ThirdPlaceCandidateEntry[] = [];
+
+  for (const letter of source.slice(1).split("")) {
+    const group = ctx.groups.find((g) => g.name === letter);
+    if (!group) continue;
+    const third = getProjectedThirdForGroup(group, ctx);
+    if (!third || excludeTeamIds.has(third)) continue;
+    const team = ctx.allTeams.find((t) => t.id === third);
+    if (!team) continue;
+    entries.push({
+      team,
+      groupLetter: letter,
+      qualifies: qualifying.has(third),
+    });
+  }
+
+  entries.sort(
+    (a, b) =>
+      Number(b.qualifies) - Number(a.qualifies) ||
+      a.groupLetter.localeCompare(b.groupLetter)
+  );
+
+  return entries;
+}
+
 export function getThirdPlaceCandidates(
   source: string,
   ctx: BracketContext,
   excludeTeamIds: Set<string> = new Set()
 ): BracketTeam[] {
-  if (!source.startsWith("3")) return [];
-  const qualifying = getQualifyingThirdTeamIds(ctx);
-  const groupLetters = source.slice(1).split("");
-  const teams: BracketTeam[] = [];
-  for (const letter of groupLetters) {
-    const group = ctx.groups.find((g) => g.name === letter);
-    if (!group) continue;
-    const third =
-      deriveProjectedGroupStandings(group, ctx)?.third
-      ?? ctx.savedGroupPreds[group.id]?.third;
-    if (!third) continue;
-    if (!qualifying.has(third)) continue;
-    if (excludeTeamIds.has(third)) continue;
-    const team = ctx.allTeams.find((t) => t.id === third);
-    if (team) teams.push(team);
-  }
-  return teams;
+  return getThirdPlaceCandidateEntries(source, ctx, excludeTeamIds).map((e) => e.team);
 }
 
 /** Resolve one side of a bracket match for display / validation */
@@ -476,10 +525,6 @@ export function validateBracketPick(
       if (exclude.has(teamId)) {
         return { valid: false, error: "Ese tercero ya fue asignado a otro cruce." };
       }
-      const qualifying = getQualifyingThirdTeamIds(ctx);
-      if (!qualifying.has(teamId)) {
-        return { valid: false, error: "Ese tercero no está entre los 8 mejores según tu tabla de grupos." };
-      }
       return { valid: false, error: "El equipo no es candidato válido para este cruce." };
     }
     return { valid: true };
@@ -551,7 +596,6 @@ export function isBracketPickStale(
 
     const sideSource = getThirdSideSource(match)!;
     const exclude = getAssignedThirdTeamIds(ctx, ctx.savedBracket, bracketKey(phase, slot));
-    if (!getQualifyingThirdTeamIds(ctx).has(pickedTeamId)) return true;
     return !getThirdPlaceCandidates(sideSource, ctx, exclude).some((t) => t.id === pickedTeamId);
   }
 
