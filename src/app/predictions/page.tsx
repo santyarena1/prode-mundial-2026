@@ -34,6 +34,7 @@ import {
 } from "@/lib/bracket-structure";
 import {
   ELIMINATORIAS_PHASES,
+  type ElimPhaseKey,
   BracketContext,
   bracketKey,
   normalizeSavedBracket,
@@ -105,7 +106,7 @@ export default function PredictionsPage() {
   const [savingBracketMatch, setSavingBracketMatch] = useState<Record<string, boolean>>({});
 
   const [activeTab, setActiveTab] = useState<"matches" | "groups" | "eliminatorias">("matches");
-  const [activeElimTab, setActiveElimTab] = useState(ELIMINATORIAS_PHASES[0].key);
+  const [activeElimTab, setActiveElimTab] = useState<ElimPhaseKey>(ELIMINATORIAS_PHASES[0].key);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   const [changeCost, setChangeCost] = useState(800);

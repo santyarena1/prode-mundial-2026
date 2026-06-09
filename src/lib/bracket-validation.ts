@@ -8,6 +8,8 @@ export const ELIMINATORIAS_PHASES = [
   { key: "CHAMPION", label: "Final", fullLabel: "Campeón del Mundo", slots: 1, icon: "🏆", ptsLabel: "30.000 / 15.000 pts" },
 ] as const;
 
+export type ElimPhaseKey = (typeof ELIMINATORIAS_PHASES)[number]["key"];
+
 export const PHASE_MATCH_NUMS: Record<string, number[]> = {
   ROUND_OF_32: [73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88],
   ROUND_OF_16: [89, 90, 91, 92, 93, 94, 95, 96],
