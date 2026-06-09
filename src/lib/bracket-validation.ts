@@ -510,31 +510,62 @@ export function validateBracketPick(
   const { left, right } = resolveMatchTeams(match, ctx);
 
   if (isThirdSlot) {
-    const fixedSide = match.leftSource.startsWith("3") ? right : left;
-    if (fixedSide && fixedSide.id === teamId) return { valid: true };
-
-    if (!isProjectedThirdTeamId(ctx, teamId)) {
-      return { valid: false, error: "Solo podés elegir uno de los dos equipos del cruce." };
-    }
+    const fixedTeam = getFixedSideTeam(match, ctx);
+    if (fixedTeam?.id === teamId) return { valid: true };
 
     const sideSource = getThirdSideSource(match)!;
-    const bracketForAssignment = { ...ctx.savedBracket, ...ctx.pendingBracket };
+    const bracketForAssignment = { ...ctx.savedBracket, ...(ctx.pendingBracket ?? {}) };
     const exclude = getAssignedThirdTeamIds(ctx, bracketForAssignment, key);
     const candidates = getThirdPlaceCandidates(sideSource, ctx, exclude);
-    if (!candidates.some((t) => t.id === teamId)) {
-      if (exclude.has(teamId)) {
-        return { valid: false, error: "Ese tercero ya fue asignado a otro cruce." };
-      }
-      return { valid: false, error: "El equipo no es candidato válido para este cruce." };
+
+    if (candidates.some((t) => t.id === teamId)) return { valid: true };
+
+    if (exclude.has(teamId)) {
+      return {
+        valid: false,
+        error: formatBracketMatchError(
+          match.matchNum,
+          "Ese tercero ya fue asignado a otro cruce."
+        ),
+      };
     }
-    return { valid: true };
+
+    if (!getAllProjectedThirdTeamIds(ctx).has(teamId)) {
+      return {
+        valid: false,
+        error: formatBracketMatchError(
+          match.matchNum,
+          "Elegí el rival directo del cruce o un 3° de los grupos indicados."
+        ),
+      };
+    }
+
+    return {
+      valid: false,
+      error: formatBracketMatchError(
+        match.matchNum,
+        "Ese 3° no puede ir en este cruce."
+      ),
+    };
   }
 
   if (!left || !right) {
-    return { valid: false, error: "Los equipos del cruce aún no están definidos." };
+    return {
+      valid: false,
+      error: formatBracketMatchError(
+        match.matchNum,
+        "Faltan equipos en el cruce. Completá la fase de grupos o la ronda anterior."
+      ),
+    };
   }
   if (teamId !== left.id && teamId !== right.id) {
-    return { valid: false, error: "Solo podés elegir uno de los dos equipos del cruce." };
+    return {
+      valid: false,
+      error: formatBracketMatchError(
+        match.matchNum,
+        `Elegí a ${left.code} o ${right.code} — no otro equipo.`
+      ),
+    };
   }
   if (existingPick && existingPick !== teamId) {
     // allowed when unlocking — caller handles downstream
@@ -588,10 +619,7 @@ export function isBracketPickStale(
   const { left, right } = resolveMatchTeams(match, ctx, isThird ? pickedTeamId : undefined);
 
   if (isThird) {
-    const fixed = resolveSource(
-      match.leftSource.startsWith("3") ? match.rightSource : match.leftSource,
-      ctx
-    );
+    const fixed = getFixedSideTeam(match, ctx);
     if (fixed && pickedTeamId === fixed.id) return false;
 
     const sideSource = getThirdSideSource(match)!;
@@ -606,4 +634,45 @@ export function isBracketPickStale(
 export function getBracketMatchByKey(phase: string, matchSlot: string): BracketMatch | undefined {
   const slot = normalizeMatchSlot(phase, matchSlot);
   return (BRACKET_MATCHES[phase] ?? []).find((m) => m.matchNum === parseInt(slot, 10));
+}
+
+export function formatBracketMatchError(matchNum: number, message: string): string {
+  return `P${matchNum}: ${message}`;
+}
+
+/** Fixed seeded side (1X / 2X) in a third-place bracket match */
+export function getFixedSideTeam(match: BracketMatch, ctx: BracketContext): BracketTeam | null {
+  const fixedSource = match.leftSource.startsWith("3") ? match.rightSource : match.leftSource;
+  return resolveSource(fixedSource, ctx);
+}
+
+export function validatePendingBracketPicks(
+  phase: string,
+  pending: Record<string, string>,
+  ctx: BracketContext,
+  savedBracket: Record<string, string>
+): { key: string; matchNum: number; error: string }[] {
+  const errors: { key: string; matchNum: number; error: string }[] = [];
+  const mergedCtx: BracketContext = {
+    ...ctx,
+    savedBracket: { ...savedBracket, ...pending },
+    pendingBracket: pending,
+  };
+
+  for (const [key, teamId] of Object.entries(pending)) {
+    if (!key.startsWith(`${phase}:`)) continue;
+    const [p, slot] = key.split(":");
+    if (!p || !slot) continue;
+    const result = validateBracketPick(p, slot, teamId, mergedCtx);
+    if (!result.valid) {
+      const matchNum = parseInt(normalizeMatchSlot(p, slot), 10);
+      errors.push({
+        key,
+        matchNum,
+        error: result.error || formatBracketMatchError(matchNum, "Selección inválida."),
+      });
+    }
+  }
+
+  return errors.sort((a, b) => a.matchNum - b.matchNum);
 }

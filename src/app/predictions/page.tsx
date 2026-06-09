@@ -45,6 +45,7 @@ import {
   computeThirdPlaceRankings,
   resolveBracketSideTeam,
   validateBracketPick,
+  validatePendingBracketPicks,
   isPhaseUnlocked as checkPhaseUnlocked,
   getPhaseUnlockBlockReason,
   getEligibleChampionTeams,
@@ -102,6 +103,7 @@ export default function PredictionsPage() {
 
   const [pendingPreds, setPendingPreds] = useState<Record<string, Outcome>>({});
   const [pendingBracket, setPendingBracket] = useState<Record<string, string>>({});
+  const [bracketFieldErrors, setBracketFieldErrors] = useState<Record<string, string>>({});
 
   const [savingGroup, setSavingGroup] = useState<Record<string, boolean>>({});
   const [savingBracket, setSavingBracket] = useState(false);
@@ -455,6 +457,11 @@ export default function PredictionsPage() {
     }
 
     setPendingBracket(prev => ({ ...prev, [key]: teamId }));
+    setBracketFieldErrors(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
   }, [savedBracket, pendingBracket, bracketCtx]);
 
   const handlePickBracketScore = useCallback((phase: string, matchNum: number, side: "home" | "away", value: number) => {
@@ -477,8 +484,28 @@ export default function PredictionsPage() {
       : [];
 
     if (phasePending.length === 0 && phaseScoreUpgrades.length === 0) return;
+
+    const preErrors = validatePendingBracketPicks(
+      activeElimTab,
+      pendingBracket,
+      bracketCtx,
+      savedBracket
+    );
+    if (preErrors.length > 0) {
+      const errorMap = Object.fromEntries(preErrors.map((e) => [e.key, e.error]));
+      setBracketFieldErrors((prev) => ({ ...prev, ...errorMap }));
+      toast.error(preErrors[0].error, { duration: 6000 });
+      document.getElementById(`bracket-match-${preErrors[0].matchNum}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      return;
+    }
+
     setSavingBracket(true);
+    setBracketFieldErrors({});
     let ok = 0;
+    let failed = false;
 
     // Save new picks
     for (const [key, teamId] of phasePending) {
@@ -502,8 +529,31 @@ export default function PredictionsPage() {
             setPendingBracketScores(prev => { const n = { ...prev }; delete n[key]; return n; });
           }
           ok++;
-        } else { const d = await res.json(); toast.error(d.error || "Error"); }
-      } catch { toast.error("Error de conexión"); }
+        } else {
+          const d = await res.json();
+          const matchNum = parseInt(slot, 10);
+          const msg = d.error
+            ? (String(d.error).startsWith("P") ? d.error : `P${matchNum}: ${d.error}`)
+            : `P${matchNum}: Error al guardar`;
+          setBracketFieldErrors(prev => ({ ...prev, [key]: msg }));
+          toast.error(msg, { duration: 6000 });
+          document.getElementById(`bracket-match-${matchNum}`)?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+          failed = true;
+          break;
+        }
+      } catch {
+        toast.error("Error de conexión");
+        failed = true;
+        break;
+      }
+    }
+
+    if (failed) {
+      setSavingBracket(false);
+      return;
     }
 
     // Save score-only upgrades on already-locked bracket predictions
@@ -540,9 +590,9 @@ export default function PredictionsPage() {
       } catch { toast.error("Error de conexión"); }
     }
 
-    if (ok > 0) toast.success(`${ok} selección${ok > 1 ? "es" : ""} confirmada${ok > 1 ? "s" : ""} ✓`);
+    if (ok > 0) toast.success(`${ok} selección${ok > 1 ? "es" : ""} guardada${ok > 1 ? "s" : ""} ✓`);
     setSavingBracket(false);
-  }, [pendingBracket, savedBracket, savedBracketScores, activeElimTab, hardcoreMode, pendingBracketScores, resolveSource]);
+  }, [pendingBracket, savedBracket, savedBracketScores, activeElimTab, hardcoreMode, pendingBracketScores, resolveSource, bracketCtx]);
 
   const handleToggleHardcore = useCallback(async () => {
     setTogglingHardcore(true);
@@ -702,6 +752,14 @@ export default function PredictionsPage() {
         }).length
       : 0);
   const savedInPhase = Object.keys(savedBracket).filter(k => k.startsWith(`${activeElimTab}:`)).length;
+  const pendingInPhase = Object.keys(pendingBracket).filter(
+    (k) => k.startsWith(`${activeElimTab}:`) && !savedBracket[k]
+  ).length;
+  const phaseMatchCount = (BRACKET_MATCHES[currentPhase.key] ?? []).length;
+  const emptyInPhase = Math.max(0, phaseMatchCount - savedInPhase - pendingInPhase);
+  const errorsInPhase = Object.keys(bracketFieldErrors).filter((k) =>
+    k.startsWith(`${activeElimTab}:`)
+  ).length;
   const currentPhaseUnlocked = isPhaseUnlocked(activeElimTab);
 
   // Ensure active elim tab is always an unlocked phase
@@ -1200,10 +1258,30 @@ export default function PredictionsPage() {
                         <p className="text-gray-600 text-xs mt-0.5">
                           {currentPhase.key === "CHAMPION"
                             ? "Campeón: 30.000 pts · Subcampeón: 15.000 pts · Ambos exactos: +40.000 pts"
-                            : `${savedInPhase} de ${currentPhase.slots} equipos guardados`}
+                            : `${savedInPhase} guardados · ${pendingInPhase} pendientes · ${emptyInPhase} sin elegir`}
                         </p>
                       </div>
                     </div>
+
+                    {/* Phase status legend */}
+                    {currentPhase.key !== "CHAMPION" && (
+                      <div className="mb-4 flex flex-wrap items-center gap-2 text-[10px]">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/25 text-green-400 font-bold">
+                          <CheckCircle2 className="w-3 h-3" /> Guardado
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-400 font-bold">
+                          Pendiente de confirmar
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#1a1a1a] border border-[#333] text-gray-500 font-bold">
+                          Sin elegir
+                        </span>
+                        {errorsInPhase > 0 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/25 text-red-400 font-bold">
+                            <AlertTriangle className="w-3 h-3" /> {errorsInPhase} con error
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Progress bar */}
                     {currentPhase.key !== "CHAMPION" && (
@@ -1315,7 +1393,10 @@ export default function PredictionsPage() {
                         {(BRACKET_MATCHES[currentPhase.key] ?? []).map((match: BracketMatch, i: number) => {
                           const matchKey = bracketKey(match.phase, String(match.matchNum));
                           const pickedId = savedBracket[matchKey] || pendingBracket[matchKey] || null;
-                          const isStale = !!savedBracket[matchKey] && isBracketPickStale(match.phase, String(match.matchNum), pickedId, bracketCtx);
+                          const isSaved = !!savedBracket[matchKey];
+                          const isPending = !!pendingBracket[matchKey] && !isSaved;
+                          const fieldError = bracketFieldErrors[matchKey];
+                          const isStale = isSaved && !!pickedId && isBracketPickStale(match.phase, String(match.matchNum), pickedId, bracketCtx);
                           const leftTeam = match.leftSource.startsWith("3")
                             ? (resolveBracketSideTeam(match.leftSource, pickedId, bracketCtx) as Team | null)
                             : resolveSource(match.leftSource);
@@ -1332,9 +1413,10 @@ export default function PredictionsPage() {
                             rightCandidateEntries={match.rightSource.startsWith("3") ? getThirdPlaceCandidateEntries(match.rightSource, matchKey) as { team: Team; groupLetter: string; qualifies: boolean }[] : []}
                             allTeams={allTeams}
                             pickedTeamId={pickedId}
-                            isLocked={!!savedBracket[matchKey]}
+                            isLocked={isSaved}
+                            isPending={isPending}
                             isStale={isStale}
-                            isPending={!!pendingBracket[matchKey] && !savedBracket[matchKey]}
+                            validationError={fieldError}
                             hardcoreMode={hardcoreMode}
                             pendingBracketScore={pendingBracketScores[matchKey]}
                             savedBracketScore={savedBracketScores[matchKey]}
@@ -2186,7 +2268,7 @@ function MatchCard({
 
 function BracketMatchCard2({
   match, leftTeam, rightTeam, leftCandidateEntries, rightCandidateEntries,
-  allTeams, pickedTeamId, isLocked, isPending, isStale = false,
+  allTeams, pickedTeamId, isLocked, isPending, isStale = false, validationError,
   hardcoreMode, pendingBracketScore, savedBracketScore, onPickBracketScore,
   onSaveBracketScore, savingBracketScore,
   delay, onPick,
@@ -2202,6 +2284,7 @@ function BracketMatchCard2({
   isLocked: boolean;
   isPending: boolean;
   isStale?: boolean;
+  validationError?: string;
   hardcoreMode: boolean;
   pendingBracketScore?: { home?: number; away?: number };
   savedBracketScore?: { home: number; away: number };
@@ -2216,9 +2299,20 @@ function BracketMatchCard2({
 }) {
   const [thirdPickMode, setThirdPickMode] = useState<"left" | "right" | null>(null);
 
-  const pickedTeam = (leftTeam || rightTeam)
-    ? ([leftTeam, rightTeam].find(t => t?.id === pickedTeamId) ?? null)
+  const pickedTeam = pickedTeamId
+    ? allTeams.find((t) => t.id === pickedTeamId) ?? null
     : null;
+
+  const hasError = !!validationError;
+  const statusLabel = hasError
+    ? "Error"
+    : isLocked
+      ? "Guardado"
+      : isPending
+        ? "Pendiente"
+        : pickedTeamId
+          ? "Pendiente"
+          : null;
 
   const isLeftThird = match.leftSource.startsWith("3");
   const isRightThird = match.rightSource.startsWith("3");
@@ -2242,27 +2336,49 @@ function BracketMatchCard2({
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+    <motion.div
+      id={`bracket-match-${match.matchNum}`}
+      initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.25, ease: "easeOut" }}
       className={`relative overflow-hidden rounded-2xl border transition-all ${
+        hasError ? "border-red-500/50 bg-red-950/25 ring-1 ring-red-500/30" :
         isStale ? "border-red-500/40 bg-red-950/20" :
         isLocked && savedBracketScore ? "border-green-500/20 bg-gradient-to-br from-[#0d110d] to-[#0a0a0a]" :
         isLocked && hardcoreMode && !savedBracketScore && hasPendingScore ? "border-orange-500/30 bg-orange-500/5" :
         isLocked && hardcoreMode && !savedBracketScore ? "border-orange-500/15 bg-[#0f0d0a]" :
-        isLocked ? "border-green-500/20 bg-gradient-to-br from-[#0d110d] to-[#0a0a0a]" :
-        isPending ? "border-amber-500/15 bg-[#0d0d0d]" :
+        isLocked ? "border-green-500/30 bg-gradient-to-br from-[#0d110d] to-[#0a0a0a]" :
+        isPending ? "border-amber-500/40 bg-amber-500/[0.04]" :
         teamsKnown ? "border-blue-500/20 bg-[#0a0c10]" : "border-[#1e1e1e] bg-[#0d0d0d]"
       }`}>
 
       {/* Match number badge */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center">
         <div className={`px-3 py-0.5 border border-t-0 rounded-b-lg ${
-          isStale ? "bg-red-950/80 border-red-500/30" : "bg-[#111] border-[#252525]"
+          hasError ? "bg-red-950/90 border-red-500/40" :
+          isStale ? "bg-red-950/80 border-red-500/30" :
+          isLocked ? "bg-green-950/80 border-green-500/30" :
+          isPending ? "bg-amber-950/80 border-amber-500/30" :
+          "bg-[#111] border-[#252525]"
         }`}>
-          <span className={`text-[9px] font-bold uppercase tracking-widest ${isStale ? "text-red-400" : "text-gray-700"}`}>
+          <span className={`text-[9px] font-bold uppercase tracking-widest ${
+            hasError ? "text-red-300" :
+            isStale ? "text-red-400" :
+            isLocked ? "text-green-400" :
+            isPending ? "text-amber-400" :
+            "text-gray-700"
+          }`}>
             P{match.matchNum}{isStale ? " · revisar" : ""}
           </span>
         </div>
+        {statusLabel && (
+          <span className={`mt-0.5 px-2 py-px rounded-full text-[8px] font-black uppercase tracking-wider ${
+            hasError ? "bg-red-500/20 text-red-300" :
+            isLocked ? "bg-green-500/20 text-green-300" :
+            "bg-amber-500/20 text-amber-300"
+          }`}>
+            {statusLabel}
+          </span>
+        )}
       </div>
 
       <div className="flex items-stretch min-h-[130px] pt-4">
@@ -2402,10 +2518,27 @@ function BracketMatchCard2({
         </div>
       </div>
 
-      {/* Winner indicator */}
-      {pickedTeam && !isLocked && (
+      {/* Winner indicator / validation */}
+      {validationError && (
         <div className="px-4 pb-2 flex justify-center">
-          <span className="text-[10px] text-amber-500/70 font-bold">Ganador elegido: {pickedTeam.name}</span>
+          <p className="text-[10px] text-red-300 font-semibold text-center leading-tight flex items-start gap-1">
+            <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-px" />
+            {validationError.replace(/^P\d+:\s*/, "")}
+          </p>
+        </div>
+      )}
+      {pickedTeam && !isLocked && !validationError && (
+        <div className="px-4 pb-2 flex justify-center">
+          <span className="text-[10px] text-amber-500/80 font-bold">
+            Pendiente de guardar: {pickedTeam.name}
+          </span>
+        </div>
+      )}
+      {pickedTeam && isLocked && !validationError && (
+        <div className="px-4 pb-2 flex justify-center">
+          <span className="text-[10px] text-green-500/70 font-bold flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" /> Guardado: {pickedTeam.name}
+          </span>
         </div>
       )}
 
