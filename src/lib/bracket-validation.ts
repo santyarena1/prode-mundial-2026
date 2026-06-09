@@ -324,7 +324,8 @@ export function resolveSource(source: string, ctx: BracketContext): BracketTeam 
     const matchNum = source.slice(1);
     const phase = getPhaseForMatchNum(parseInt(matchNum, 10));
     if (!phase) return null;
-    const teamId = ctx.savedBracket[bracketKey(phase, matchNum)];
+    const key = bracketKey(phase, matchNum);
+    const teamId = ctx.savedBracket[key] ?? ctx.pendingBracket?.[key];
     return ctx.allTeams.find((t) => t.id === teamId) ?? null;
   }
   if (source.startsWith("3")) return null;
@@ -575,10 +576,8 @@ export function getBracketMatchIncompleteMessage(
     );
   }
   if (c.step === "pick_winner") {
-    return formatBracketMatchError(
-      match.matchNum,
-      `Tocá quién pasa: ${fixed?.name ?? "el favorito"} o ${rival?.name ?? "el tercero elegido"}.`
-    );
+    const hint = formatMatchPickHint(match, ctx, key);
+    return formatBracketMatchError(match.matchNum, hint.replace(/^Tocá /, "Tocá quién pasa: ").replace(/^Elegí /, "Elegí quién pasa: "));
   }
   return formatBracketMatchError(match.matchNum, "Selección incompleta.");
 }
@@ -831,7 +830,7 @@ export function validateBracketPick(
       valid: false,
       error: formatBracketMatchError(
         match.matchNum,
-        `Elegí a ${left.code} o ${right.code} — no otro equipo.`
+        `Solo podés elegir a ${left.name} (${left.code}) o ${right.name} (${right.code}). Tocá uno de esos dos equipos.`
       ),
     };
   }
@@ -909,6 +908,59 @@ export function canReplaceBracketPick(
 ): boolean {
   if (!savedTeamId) return true;
   return isBracketPickStale(phase, matchSlot, savedTeamId, ctx);
+}
+
+/** Teams the user can tap as winner for this match (same logic as validation) */
+export function getMatchWinnerOptions(
+  match: BracketMatch,
+  ctx: BracketContext,
+  key: string
+): BracketTeam[] {
+  if (isThirdSlotMatch(match)) {
+    const state = getThirdSlotPickState(match, null, ctx, key);
+    const fixed = state?.fixedTeam;
+    const rivalId = ctx.thirdSlotAssignments?.[key];
+    const options: BracketTeam[] = [];
+    if (fixed) options.push(fixed);
+    if (rivalId) {
+      const rival = ctx.allTeams.find((t) => t.id === rivalId);
+      if (rival) options.push(rival);
+    }
+    return options;
+  }
+  const { left, right } = resolveMatchTeams(match, ctx);
+  return [left, right].filter((t): t is BracketTeam => !!t);
+}
+
+/** Human-readable hint listing every valid tap target for this match */
+export function formatMatchPickHint(
+  match: BracketMatch,
+  ctx: BracketContext,
+  key: string
+): string {
+  const completeness = getBracketMatchCompleteness(match, ctx, key);
+  if (completeness.step === "pick_rival" && isThirdSlotMatch(match)) {
+    const entries = getThirdSlotPickerEntries(match, ctx, key);
+    if (entries.length === 0) return "Completá las predicciones de los grupos de este cruce.";
+    return `Elegí el tercero rival: ${entries.map((e) => `${e.team.name} (3° ${e.groupLetter})`).join(", ")}.`;
+  }
+  if (completeness.step === "missing_teams") {
+    const missing: string[] = [];
+    if (match.leftSource.startsWith("W")) {
+      missing.push(`ganador de P${match.leftSource.slice(1)}`);
+    }
+    if (match.rightSource.startsWith("W")) {
+      missing.push(`ganador de P${match.rightSource.slice(1)}`);
+    }
+    if (missing.length > 0) {
+      return `Primero elegí ${missing.join(" y ")} en la ronda anterior.`;
+    }
+    return "Completá las predicciones de grupos de este cruce.";
+  }
+  const options = getMatchWinnerOptions(match, ctx, key);
+  if (options.length === 0) return "Todavía no hay equipos definidos para este cruce.";
+  if (options.length === 1) return `Tocá a ${options[0].name} (${options[0].code}).`;
+  return `Tocá a ${options.map((t) => `${t.name} (${t.code})`).join(" o ")}.`;
 }
 
 export function getBracketMatchByKey(phase: string, matchSlot: string): BracketMatch | undefined {

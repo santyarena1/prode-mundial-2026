@@ -25,6 +25,8 @@ import {
   validateThirdSlotRival,
   canReplaceBracketPick,
   isBracketPickStale,
+  resolveSource,
+  getMatchWinnerOptions,
   type BracketContext,
 } from "./bracket-validation";
 
@@ -201,6 +203,24 @@ const completePick = validateBracketPick("ROUND_OF_32", "79", p79Fixed!, complet
 assert(completePick.valid, "P79 valid when rival + fixed winner chosen");
 const completeness = getBracketMatchCompleteness(p79, completeCtx, p79Key, p79Fixed!);
 assert(completeness.isComplete, "P79 complete with both teams and winner");
+
+// Pending upstream picks resolve for W-sources (e.g. P89 pending → P97 shows left team)
+const p73Key = bracketKey("ROUND_OF_32", "73");
+const p75Key = bracketKey("ROUND_OF_32", "75");
+const p90Key = bracketKey("ROUND_OF_16", "90");
+const pendingCtx: BracketContext = {
+  ...thirdCtx,
+  savedBracket: {},
+  pendingBracket: {
+    [p73Key]: thirdCtx.allTeams[0]?.id ?? "tA1",
+    [p75Key]: thirdCtx.allTeams[1]?.id ?? "tA2",
+  },
+};
+const w73 = resolveSource("W73", pendingCtx);
+assert(!!w73, "W73 resolves from pending pick when not yet saved");
+const p90 = BRACKET_MATCHES.ROUND_OF_16!.find((m) => m.matchNum === 90)!;
+const p90Opts = getMatchWinnerOptions(p90, pendingCtx, p90Key);
+assert(p90Opts.length === 2, "P90 has both teams from pending upstream picks");
 
 // Stale R32 picks (e.g. P78) remain editable
 const p78 = BRACKET_MATCHES.ROUND_OF_32!.find((m) => m.matchNum === 78)!;

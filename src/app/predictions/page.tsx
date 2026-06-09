@@ -57,6 +57,8 @@ import {
   getEligibleChampionTeams,
   isBracketPickStale,
   canReplaceBracketPick,
+  formatMatchPickHint,
+  getMatchWinnerOptions,
   getDownstreamBracketKeys,
 } from "@/lib/bracket-validation";
 
@@ -492,7 +494,7 @@ export default function PredictionsPage() {
 
   const handleAssignThirdRival = useCallback((phase: string, slot: string, teamId: string) => {
     const key = bracketKey(phase, slot);
-    if (savedBracket[key]) return;
+    if (!canReplaceBracketPick(phase, slot, savedBracket[key], bracketCtx)) return;
 
     const match = (BRACKET_MATCHES[phase] ?? []).find((m) => m.matchNum === parseInt(slot, 10));
     if (!match) return;
@@ -540,6 +542,9 @@ export default function PredictionsPage() {
     }
 
     if (isThirdSlot && isProjectedThirdTeamId(bracketCtx, teamId) && thirdSlotAssignments[key] !== teamId) {
+      if (match) {
+        toast.error(formatMatchPickHint(match, bracketCtx, key), { duration: 6000 });
+      }
       return;
     }
 
@@ -605,8 +610,11 @@ export default function PredictionsPage() {
     let ok = 0;
     let failed = false;
 
-    // Save new picks
-    for (const [key, teamId] of phasePending) {
+    // Save new picks (ascending match order so upstream W-picks exist before downstream)
+    const sortedPending = [...phasePending].sort(
+      ([a], [b]) => parseInt(a.split(":")[1] ?? "0", 10) - parseInt(b.split(":")[1] ?? "0", 10)
+    );
+    for (const [key, teamId] of sortedPending) {
       const [phase, slot] = key.split(":");
       if (savedBracket[key] && !canReplaceBracketPick(phase, slot, savedBracket[key], bracketCtx)) continue;
       const matchNum = parseInt(slot);
@@ -1519,6 +1527,8 @@ export default function PredictionsPage() {
                           const isInvalid = !!pickedId && isBracketPickStale(match.phase, String(match.matchNum), pickedId, bracketCtx);
                           const isSaved = !!savedId && !pendingId;
                           const isLocked = isSaved && !isInvalid;
+                          const pickHint = formatMatchPickHint(match, bracketCtx, matchKey);
+                          const winnerOptions = getMatchWinnerOptions(match, bracketCtx, matchKey);
                           const completeness = getBracketMatchCompleteness(match, bracketCtx, matchKey, pickedId);
                           const isPending = completeness.isComplete && !!pendingId;
                           const fieldError = bracketFieldErrors[matchKey];
@@ -1554,6 +1564,8 @@ export default function PredictionsPage() {
                               thirdSource: thirdSlot.thirdSource,
                             } : null}
                             matchCompleteness={completeness}
+                            pickHint={pickHint}
+                            winnerOptions={winnerOptions as Team[]}
                             pickedTeamId={pickedId}
                             isLocked={isLocked}
                             isPending={isPending}
@@ -2411,7 +2423,7 @@ function MatchCard({
 
 function BracketMatchCard2({
   match, leftTeam, rightTeam, thirdSlot, pickedTeamId, isLocked, isPending, isStale = false, validationError,
-  matchCompleteness,
+  matchCompleteness, pickHint, winnerOptions = [],
   hardcoreMode, pendingBracketScore, savedBracketScore, onPickBracketScore,
   onSaveBracketScore, savingBracketScore,
   delay, onPick, onAssignThird,
@@ -2428,6 +2440,8 @@ function BracketMatchCard2({
     thirdSource: string;
   } | null;
   matchCompleteness?: BracketMatchCompleteness;
+  pickHint?: string;
+  winnerOptions?: Team[];
   pickedTeamId: string | null;
   isLocked: boolean;
   isPending: boolean;
@@ -2702,19 +2716,38 @@ function BracketMatchCard2({
       </div>
 
       {/* Winner indicator / validation */}
-      {validationError && (
-        <div className="px-4 pb-2 flex justify-center">
-          <p className="text-[10px] text-red-300 font-semibold text-center leading-tight flex items-start gap-1 max-w-md">
-            <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-px" />
-            <span>{validationError} Tocá {leftTeam?.code ?? "—"} o {rightTeam?.code ?? "—"} para corregir.</span>
-          </p>
-        </div>
-      )}
-      {isStale && !validationError && !isLocked && (
-        <div className="px-4 pb-2 flex justify-center">
-          <p className="text-[10px] text-red-400/90 font-semibold text-center leading-tight">
-            Esta predicción ya no coincide con tu llave. Tocá quién pasa para corregirla.
-          </p>
+      {!isLocked && (validationError || isStale || pickHint) && (
+        <div className="px-4 pb-2 flex flex-col items-center gap-1.5">
+          {validationError && (
+            <p className="text-[10px] text-red-300 font-semibold text-center leading-tight flex items-start gap-1 max-w-md">
+              <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-px" />
+              <span>{validationError}</span>
+            </p>
+          )}
+          {isStale && !validationError && (
+            <p className="text-[10px] text-red-400/90 font-semibold text-center leading-tight">
+              Esta predicción ya no coincide con tu llave.
+            </p>
+          )}
+          {pickHint && (
+            <p className="text-[10px] text-blue-300/90 font-semibold text-center leading-tight max-w-md">
+              {pickHint}
+            </p>
+          )}
+          {winnerOptions.length > 0 && (validationError || isStale || matchCompleteness?.step === "pick_winner") && (
+            <div className="flex flex-wrap justify-center gap-1.5 pt-0.5">
+              {winnerOptions.map((team) => (
+                <button
+                  key={team.id}
+                  type="button"
+                  onClick={() => onPick(team.id)}
+                  className="px-2.5 py-1 rounded-lg border border-blue-500/40 bg-blue-500/10 text-[10px] font-bold text-blue-200 hover:bg-blue-500/20 transition-colors"
+                >
+                  {team.code}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {winnerTeam && !isLocked && !validationError && (
