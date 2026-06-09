@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import { getAdminFromCookies } from "@/lib/cookies";
+import { getUserPointsBreakdown } from "@/lib/user-points-breakdown";
 
 const updateUserSchema = z.object({
   isBlocked: z.boolean().optional(),
@@ -25,18 +26,26 @@ export async function GET(
           include: { match: { include: { homeTeam: true, awayTeam: true } } },
           orderBy: { createdAt: "desc" },
         },
-        groupPredictions: { include: { group: true, firstTeam: true, secondTeam: true } },
+        groupPredictions: { include: { group: true, firstTeam: true, secondTeam: true, thirdTeam: true } },
         bracketPredictions: { include: { predictedTeam: true }, orderBy: [{ phase: "asc" }, { matchSlot: "asc" }] },
         specialPredictions: true,
         bonuses: { include: { bonusAction: true }, orderBy: { createdAt: "desc" } },
         redemptions: { include: { prize: true }, orderBy: { createdAt: "desc" } },
         userAchievements: { include: { achievementRule: true }, orderBy: { awardedAt: "desc" } },
+        referredBy: { select: { id: true, firstName: true, lastName: true, referralCode: true } },
+        referrals: {
+          select: { id: true, firstName: true, lastName: true, createdAt: true },
+          orderBy: { createdAt: "desc" },
+        },
+        purchaseCodes: { orderBy: { updatedAt: "desc" } },
       },
     });
 
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-    return NextResponse.json({ user });
+    const pointsBreakdown = await getUserPointsBreakdown(id);
+
+    return NextResponse.json({ user, pointsBreakdown });
   } catch (error) {
     console.error("Participant GET error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

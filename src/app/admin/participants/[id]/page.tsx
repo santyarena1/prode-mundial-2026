@@ -3,14 +3,22 @@
 import React, { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { ArrowLeft, Trophy, Star, Zap, Gift, Medal, Target, Trash2, CheckCircle2, XCircle, Clock, Plus, Minus } from "lucide-react";
+import { ArrowLeft, Trophy, Star, Zap, Gift, Medal, Target, Trash2, CheckCircle2, XCircle, Clock, Plus, Minus, Coins, Users, Ticket, History } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { LoadingScreen } from "@/components/ui/LoadingSpinner";
+import Link from "next/link";
+import {
+  CATEGORY_COLORS,
+  CATEGORY_LABELS,
+  type PointsBreakdownSummary,
+  type PointsLedgerCategory,
+  type PointsLedgerEntry,
+} from "@/lib/user-points-breakdown";
 
-type Tab = "bonuses" | "redemptions" | "predictions" | "achievements";
+type Tab = "origen" | "bonuses" | "redemptions" | "predictions" | "achievements";
 
 interface UserDetail {
   id: string;
@@ -22,9 +30,23 @@ interface UserDetail {
   totalPoints: number;
   predictionPoints: number;
   bonusPoints: number;
+  achievementPoints: number;
   spentPoints: number;
   referralPoints: number;
+  hardcoreMode?: boolean;
   referralCode?: string | null;
+  referredBy?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    referralCode: string | null;
+  } | null;
+  referrals?: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    createdAt: string;
+  }>;
   createdAt: string;
   bonuses: Array<{
     id: string; status: string; pointsEarned: number; createdAt: string;
@@ -58,6 +80,22 @@ interface UserDetail {
   }>;
 }
 
+interface PointsBreakdownData {
+  summary: PointsBreakdownSummary;
+  ledger: PointsLedgerEntry[];
+  referredBy: UserDetail["referredBy"];
+  referrals: NonNullable<UserDetail["referrals"]>;
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  approved: "Aprobado",
+  pending: "Pendiente",
+  rejected: "Rechazado",
+  redeemed: "Canjeado",
+  available: "Disponible",
+  delivered: "Entregado",
+};
+
 const STATUS_BADGE: Record<string, React.ReactElement> = {
   approved: <Badge variant="success"><CheckCircle2 className="w-3 h-3 mr-1" />Aprobado</Badge>,
   pending: <Badge variant="warning"><Clock className="w-3 h-3 mr-1" />Pendiente</Badge>,
@@ -69,8 +107,9 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
   const { id } = use(params);
   const router = useRouter();
   const [user, setUser] = useState<UserDetail | null>(null);
+  const [pointsBreakdown, setPointsBreakdown] = useState<PointsBreakdownData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>("bonuses");
+  const [tab, setTab] = useState<Tab>("origen");
   const [deleting, setDeleting] = useState<Record<string, boolean>>({});
   const [manualPoints, setManualPoints] = useState("");
   const [manualNote, setManualNote] = useState("");
@@ -79,11 +118,16 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deletingUser, setDeletingUser] = useState(false);
 
-  useEffect(() => {
+  const loadParticipant = () =>
     fetch(`/api/admin/participants/${id}`)
       .then(r => r.json())
-      .then(d => setUser(d.user))
-      .finally(() => setLoading(false));
+      .then(d => {
+        setUser(d.user);
+        setPointsBreakdown(d.pointsBreakdown ?? null);
+      });
+
+  useEffect(() => {
+    loadParticipant().finally(() => setLoading(false));
   }, [id]);
 
   const deleteBonus = async (bonusId: string) => {
@@ -146,7 +190,7 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error || "Error"); return; }
-      setUser(u => u ? { ...u, totalPoints: data.totalPoints, bonusPoints: data.bonusPoints } : u);
+      await loadParticipant();
       setManualPoints("");
       setManualNote("");
       toast.success(operation === "add" ? `+${pts} puntos acreditados` : `-${pts} puntos descontados`);
@@ -176,6 +220,7 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
     (user.specialPredictions?.length ?? 0);
 
   const tabs: { key: Tab; label: string; count: number; icon: React.ReactNode }[] = [
+    { key: "origen", label: "Origen", count: pointsBreakdown?.ledger.filter(e => !e.id.startsWith("summary-")).length ?? 0, icon: <Coins className="w-4 h-4" /> },
     { key: "bonuses", label: "Bonus", count: user.bonuses.length, icon: <Zap className="w-4 h-4" /> },
     { key: "redemptions", label: "Premios", count: user.redemptions.length, icon: <Gift className="w-4 h-4" /> },
     { key: "predictions", label: "Predicciones", count: totalPredictionCount, icon: <Target className="w-4 h-4" /> },
@@ -211,13 +256,24 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
               {user.referralCode && (
                 <p className="text-gray-700 text-xs mt-0.5">Código de invitación: <span className="text-gray-400 font-mono">{user.referralCode}</span></p>
               )}
+              {user.referredBy && (
+                <p className="text-gray-700 text-xs mt-0.5">
+                  Se registró con el código de{" "}
+                  <Link href={`/admin/participants/${user.referredBy.id}`} className="text-emerald-500 hover:text-emerald-400">
+                    {user.referredBy.firstName} {user.referredBy.lastName}
+                  </Link>
+                  {user.referredBy.referralCode ? ` (${user.referredBy.referralCode})` : ""}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex gap-3 flex-wrap">
             {[
               { label: "Total pts", value: user.totalPoints, color: "text-yellow-400" },
+              { label: "Disponibles", value: (user.totalPoints - user.spentPoints), color: "text-lime-400" },
               { label: "Predicciones", value: user.predictionPoints, color: "text-blue-400" },
               { label: "Bonus", value: user.bonusPoints, color: "text-green-400" },
+              ...(user.achievementPoints > 0 ? [{ label: "Logros", value: user.achievementPoints, color: "text-amber-400" }] : []),
               { label: "Canjeados", value: user.spentPoints, color: "text-red-400" },
             ].map(s => (
               <div key={s.label} className="text-center px-3">
@@ -272,6 +328,65 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
           </button>
         ))}
       </div>
+
+      {/* Origen de puntos tab */}
+      {tab === "origen" && pointsBreakdown && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            {[
+              { label: "Partidos", value: pointsBreakdown.summary.predictionMatches, color: "text-blue-400" },
+              { label: "Grupos", value: pointsBreakdown.summary.predictionGroups, color: "text-purple-400" },
+              { label: "Eliminatorias", value: pointsBreakdown.summary.predictionBracket, color: "text-orange-400" },
+              { label: "Bonus / acciones", value: pointsBreakdown.summary.bonusActionPoints + pointsBreakdown.summary.referralReceivedPoints + pointsBreakdown.summary.manualAdminPoints, color: "text-green-400" },
+              { label: "Códigos", value: pointsBreakdown.summary.purchaseCodePoints, color: "text-pink-400" },
+              { label: "Referidos", value: pointsBreakdown.summary.referralPoints, color: "text-teal-400" },
+            ].map(item => (
+              <Card key={item.label} className="p-3 text-center">
+                <div className={`text-lg font-black ${item.color}`}>{item.value.toLocaleString("es-AR")}</div>
+                <div className="text-[10px] text-gray-600 uppercase tracking-wider mt-0.5">{item.label}</div>
+              </Card>
+            ))}
+          </div>
+
+          {(user.referrals?.length ?? 0) > 0 && (
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="w-4 h-4 text-teal-400" />
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-400">
+                  Invitó a {user.referrals!.length} {user.referrals!.length === 1 ? "persona" : "personas"}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {user.referrals!.map(ref => (
+                  <Link
+                    key={ref.id}
+                    href={`/admin/participants/${ref.id}`}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] text-gray-300 hover:border-teal-500/40 hover:text-teal-300 transition-colors"
+                  >
+                    {ref.firstName} {ref.lastName}
+                  </Link>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <History className="w-4 h-4 text-gray-500" />
+              <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Historial de puntos</h3>
+            </div>
+            {pointsBreakdown.ledger.length === 0 ? (
+              <Card className="p-6 text-center text-gray-600">Sin movimientos de puntos registrados</Card>
+            ) : (
+              <div className="space-y-1.5">
+                {pointsBreakdown.ledger.map(entry => (
+                  <LedgerRow key={entry.id} entry={entry} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Bonus tab */}
       {tab === "bonuses" && (
@@ -567,5 +682,61 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
         </div>
       )}
     </div>
+  );
+}
+
+function LedgerRow({ entry }: { entry: PointsLedgerEntry }) {
+  const isSummary = entry.id.startsWith("summary-");
+  const categoryLabel = CATEGORY_LABELS[entry.category as PointsLedgerCategory];
+  const categoryColor = CATEGORY_COLORS[entry.category as PointsLedgerCategory];
+  const dateLabel = isSummary
+    ? "Resumen"
+    : new Date(entry.date).toLocaleDateString("es-AR", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+  return (
+    <Card className={`p-3.5 flex items-center justify-between gap-3 flex-wrap ${isSummary ? "border-dashed border-[#333]" : ""}`}>
+      <div className="flex items-start gap-3 min-w-0">
+        <div className={`mt-0.5 ${categoryColor}`}>
+          {entry.category === "purchase_code" ? <Ticket className="w-4 h-4" /> :
+           entry.category === "referral_given" || entry.category === "referral_received" ? <Users className="w-4 h-4" /> :
+           entry.category === "redemption" ? <Gift className="w-4 h-4" /> :
+           entry.category.startsWith("prediction_") ? <Target className="w-4 h-4" /> :
+           entry.category === "achievement" ? <Medal className="w-4 h-4" /> :
+           <Zap className="w-4 h-4" />}
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-white text-sm font-semibold">{entry.label}</p>
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${categoryColor} bg-[#1a1a1a]`}>
+              {categoryLabel}
+            </span>
+          </div>
+          {entry.detail && (
+            <p className="text-gray-500 text-xs mt-0.5 truncate">{entry.detail}</p>
+          )}
+          <p className="text-gray-700 text-[10px] mt-0.5">{dateLabel}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {entry.points !== 0 ? (
+          <span className={`font-black text-sm ${entry.points > 0 ? "text-green-400" : "text-red-400"}`}>
+            {entry.points > 0 ? "+" : ""}{entry.points.toLocaleString("es-AR")} pts
+          </span>
+        ) : (
+          <span className="text-gray-600 text-xs">0 pts</span>
+        )}
+        {entry.status && entry.status !== "approved" && entry.status !== "redeemed" && (
+          <Badge variant={entry.status === "pending" ? "warning" : entry.status === "rejected" ? "error" : "default"}>
+            {STATUS_LABEL[entry.status] ?? entry.status}
+          </Badge>
+        )}
+      </div>
+    </Card>
   );
 }
