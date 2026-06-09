@@ -48,6 +48,10 @@ import {
   computeThirdPlaceRankings,
   validateBracketPick,
   validatePendingBracketPicks,
+  countSaveableBracketPicks,
+  getBracketMatchCompleteness,
+  getThirdSlotPickerEntries,
+  type BracketMatchCompleteness,
   isPhaseUnlocked as checkPhaseUnlocked,
   getPhaseUnlockBlockReason,
   getEligibleChampionTeams,
@@ -524,23 +528,20 @@ export default function PredictionsPage() {
 
     const match = (BRACKET_MATCHES[phase] ?? []).find((m) => m.matchNum === parseInt(slot, 10));
     const isThirdSlot = match && (match.leftSource.startsWith("3") || match.rightSource.startsWith("3"));
-    const nextAssignments = isThirdSlot && isProjectedThirdTeamId(bracketCtx, teamId)
-      ? { ...thirdSlotAssignments, [key]: teamId }
-      : thirdSlotAssignments;
 
     const validation = validateBracketPick(phase, slot, teamId, {
       ...bracketCtx,
       pendingBracket: { ...pendingBracket, [key]: teamId },
-      thirdSlotAssignments: nextAssignments,
     });
     if (!validation.valid) {
       toast.error(validation.error || "Selección inválida", { duration: 6000 });
       return;
     }
 
-    if (isThirdSlot && isProjectedThirdTeamId(bracketCtx, teamId)) {
-      setPendingThirdSlotAssignments(prev => ({ ...prev, [key]: teamId }));
+    if (isThirdSlot && isProjectedThirdTeamId(bracketCtx, teamId) && thirdSlotAssignments[key] !== teamId) {
+      return;
     }
+
     setPendingBracket(prev => ({ ...prev, [key]: teamId }));
     setBracketFieldErrors(prev => {
       const next = { ...prev };
@@ -555,8 +556,17 @@ export default function PredictionsPage() {
   }, []);
 
   const handleSaveCurrentPhase = useCallback(async () => {
-    // New picks (team selections)
-    const phasePending = Object.entries(pendingBracket).filter(([k]) => k.startsWith(`${activeElimTab}:`));
+    // New picks (team selections) — only matches with both teams + winner chosen
+    const phasePending = Object.entries(pendingBracket)
+      .filter(([k]) => k.startsWith(`${activeElimTab}:`))
+      .filter(([key, teamId]) => {
+        const [p, slot] = key.split(":");
+        if (!p || !slot) return false;
+        const matchNum = parseInt(normalizeMatchSlot(p, slot), 10);
+        const match = (BRACKET_MATCHES[p] ?? []).find((m) => m.matchNum === matchNum);
+        if (!match) return false;
+        return getBracketMatchCompleteness(match, bracketCtx, key, teamId).isComplete;
+      });
     // Score-only upgrades: already saved team, no saved score, pending score entered
     const phaseScoreUpgrades = hardcoreMode
       ? Object.keys(savedBracket)
@@ -602,9 +612,18 @@ export default function PredictionsPage() {
         ? { predictedHomeScore: score.home, predictedAwayScore: score.away }
         : {};
       try {
+        const match = (BRACKET_MATCHES[phase] ?? []).find((m) => m.matchNum === matchNum);
+        const isThirdSlot = match && (match.leftSource.startsWith("3") || match.rightSource.startsWith("3"));
+        const assignedThirdTeamId = isThirdSlot ? thirdSlotAssignments[key] : undefined;
         const res = await apiFetch("/api/participant/bracket-predictions", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phase, matchSlot: slot, predictedTeamId: teamId, ...scorePayload }),
+          body: JSON.stringify({
+            phase,
+            matchSlot: slot,
+            predictedTeamId: teamId,
+            ...(assignedThirdTeamId ? { assignedThirdTeamId } : {}),
+            ...scorePayload,
+          }),
         });
         if (res.ok) {
           setSavedBracket(prev => ({ ...prev, [key]: teamId }));
@@ -678,7 +697,7 @@ export default function PredictionsPage() {
 
     if (ok > 0) toast.success(`${ok} selección${ok > 1 ? "es" : ""} guardada${ok > 1 ? "s" : ""} ✓`);
     setSavingBracket(false);
-  }, [pendingBracket, savedBracket, savedBracketScores, activeElimTab, hardcoreMode, pendingBracketScores, resolveSource, bracketCtx]);
+  }, [pendingBracket, savedBracket, savedBracketScores, activeElimTab, hardcoreMode, pendingBracketScores, resolveSource, bracketCtx, thirdSlotAssignments]);
 
   const handleToggleHardcore = useCallback(async () => {
     setTogglingHardcore(true);
@@ -814,8 +833,11 @@ export default function PredictionsPage() {
     Object.keys(savedBracket).length > 0;
 
   const currentPhase = ELIMINATORIAS_PHASES.find(p => p.key === activeElimTab)!;
-  const currentPhasePendingCount =
-    Object.keys(pendingBracket).filter(k => k.startsWith(`${activeElimTab}:`)).length +
+  const currentPhasePendingCount = countSaveableBracketPicks(
+    activeElimTab,
+    pendingBracket,
+    bracketCtx
+  ) +
     (hardcoreMode
       ? Object.keys(savedBracket).filter(k => {
           if (!k.startsWith(`${activeElimTab}:`)) return false;
@@ -838,9 +860,10 @@ export default function PredictionsPage() {
         }).length
       : 0);
   const savedInPhase = Object.keys(savedBracket).filter(k => k.startsWith(`${activeElimTab}:`)).length;
-  const pendingInPhase = Object.keys(pendingBracket).filter(
+  const pendingInPhase = countSaveableBracketPicks(activeElimTab, pendingBracket, bracketCtx);
+  const draftInPhase = Object.keys(pendingBracket).filter(
     (k) => k.startsWith(`${activeElimTab}:`) && !savedBracket[k]
-  ).length;
+  ).length - pendingInPhase;
   const phaseMatchCount = (BRACKET_MATCHES[currentPhase.key] ?? []).length;
   const emptyInPhase = Math.max(0, phaseMatchCount - savedInPhase - pendingInPhase);
   const errorsInPhase = Object.keys(bracketFieldErrors).filter((k) =>
@@ -1344,7 +1367,7 @@ export default function PredictionsPage() {
                         <p className="text-gray-600 text-xs mt-0.5">
                           {currentPhase.key === "CHAMPION"
                             ? "Campeón: 30.000 pts · Subcampeón: 15.000 pts · Ambos exactos: +40.000 pts"
-                            : `${savedInPhase} guardados · ${pendingInPhase} pendientes · ${emptyInPhase} sin elegir`}
+                            : `${savedInPhase} guardados · ${pendingInPhase} listos · ${Math.max(0, draftInPhase)} incompletos · ${emptyInPhase} sin elegir`}
                         </p>
                       </div>
                     </div>
@@ -1489,10 +1512,12 @@ export default function PredictionsPage() {
                           const matchKey = bracketKey(match.phase, String(match.matchNum));
                           const pickedId = savedBracket[matchKey] || pendingBracket[matchKey] || null;
                           const isSaved = !!savedBracket[matchKey];
-                          const isPending = !!pendingBracket[matchKey] && !isSaved;
+                          const completeness = getBracketMatchCompleteness(match, bracketCtx, matchKey, pickedId);
+                          const isPending = completeness.isComplete && !!pendingBracket[matchKey] && !isSaved;
                           const fieldError = bracketFieldErrors[matchKey];
                           const isStale = isSaved && !!pickedId && isBracketPickStale(match.phase, String(match.matchNum), pickedId, bracketCtx);
                           const thirdSlot = getThirdSlotPickState(match, pickedId, bracketCtx, matchKey);
+                          const pickerEntries = getThirdSlotPickerEntries(match, bracketCtx, matchKey);
                           const isLeftThird = match.leftSource.startsWith("3");
                           const isRightThird = match.rightSource.startsWith("3");
                           const rivalId = thirdSlotAssignments[matchKey] ?? null;
@@ -1513,7 +1538,7 @@ export default function PredictionsPage() {
                             thirdSlot={thirdSlot ? {
                               fixedTeam: thirdSlot.fixedTeam as Team | null,
                               thirdPickedTeam: rivalTeam,
-                              entries: thirdSlot.entries.map((e) => ({
+                              entries: pickerEntries.map((e) => ({
                                 team: e.team as Team,
                                 groupLetter: e.groupLetter,
                                 qualifies: e.qualifies,
@@ -1521,6 +1546,7 @@ export default function PredictionsPage() {
                               fixedPicked: !!(pickedId && fixedTeam && pickedId === fixedTeam.id),
                               thirdSource: thirdSlot.thirdSource,
                             } : null}
+                            matchCompleteness={completeness}
                             pickedTeamId={pickedId}
                             isLocked={isSaved}
                             isPending={isPending}
@@ -2378,6 +2404,7 @@ function MatchCard({
 
 function BracketMatchCard2({
   match, leftTeam, rightTeam, thirdSlot, pickedTeamId, isLocked, isPending, isStale = false, validationError,
+  matchCompleteness,
   hardcoreMode, pendingBracketScore, savedBracketScore, onPickBracketScore,
   onSaveBracketScore, savingBracketScore,
   delay, onPick, onAssignThird,
@@ -2393,6 +2420,7 @@ function BracketMatchCard2({
     fixedPicked: boolean;
     thirdSource: string;
   } | null;
+  matchCompleteness?: BracketMatchCompleteness;
   pickedTeamId: string | null;
   isLocked: boolean;
   isPending: boolean;
@@ -2418,17 +2446,20 @@ function BracketMatchCard2({
     : null;
 
   const hasError = !!validationError;
+  const step = matchCompleteness?.step;
   const statusLabel = hasError
     ? "Error"
     : isLocked
       ? "Guardado"
       : isPending
-        ? "Pendiente"
-        : pickedTeamId
-          ? "Pendiente"
-          : thirdSlot && !thirdSlot.thirdPickedTeam
-            ? "Elegí el 3°"
-            : null;
+        ? "Listo para guardar"
+        : step === "pick_rival"
+          ? "Elegí el 3°"
+          : step === "pick_winner"
+            ? "Elegí ganador"
+            : step === "missing_teams"
+              ? "Faltan equipos"
+              : null;
 
   const isLeftThird = match.leftSource.startsWith("3");
   const isRightThird = match.rightSource.startsWith("3");

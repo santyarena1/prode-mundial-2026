@@ -18,6 +18,11 @@ import {
   getThirdPlaceCandidateEntries,
   getThirdPlaceCandidates,
   getThirdSlotPickState,
+  getThirdSlotMatches,
+  getThirdSlotPickerEntries,
+  getBracketMatchCompleteness,
+  validateBracketPick,
+  validateThirdSlotRival,
   type BracketContext,
 } from "./bracket-validation";
 
@@ -134,5 +139,65 @@ assert(colPick?.thirdPickedTeam === null, "fixed pick must not populate third si
 // Downstream invalidation
 const downstream = getDownstreamBracketKeys("ROUND_OF_32", "73");
 assert(downstream.includes("ROUND_OF_16:90"), "W73 feeds P90");
+
+// All R32 third-slot matches share picker === validation and require rival + winner
+for (const match of getThirdSlotMatches()) {
+  const key = bracketKey("ROUND_OF_32", String(match.matchNum));
+  const ctx: BracketContext = { ...thirdCtx, savedBracket: {}, pendingBracket: {} };
+  const entries = getThirdSlotPickerEntries(match, ctx, key);
+  assert(entries.length > 0, `P${match.matchNum} has picker entries`);
+  const fixed = getThirdSlotPickState(match, null, ctx, key)?.fixedTeam;
+  assert(!!fixed, `P${match.matchNum} fixed side resolves`);
+  const rival = entries[0].team.id;
+  const noRival = validateBracketPick("ROUND_OF_32", String(match.matchNum), fixed!.id, {
+    ...ctx,
+    pendingBracket: { [key]: fixed!.id },
+  });
+  assert(!noRival.valid, `P${match.matchNum} blocks winner without third rival`);
+  const withRival = validateBracketPick("ROUND_OF_32", String(match.matchNum), fixed!.id, {
+    ...ctx,
+    thirdSlotAssignments: { [key]: rival },
+    pendingBracket: { [key]: fixed!.id },
+  });
+  assert(withRival.valid, `P${match.matchNum} valid with rival + winner`);
+  assert(
+    getBracketMatchCompleteness(match, {
+      ...ctx,
+      thirdSlotAssignments: { [key]: rival },
+      pendingBracket: { [key]: fixed!.id },
+    }, key, fixed!.id).isComplete,
+    `P${match.matchNum} complete when both teams + winner chosen`
+  );
+}
+
+// P79: 1A vs 3° from C/E/F/H/I — picker and validation must match
+const p79 = BRACKET_MATCHES.ROUND_OF_32!.find((m) => m.matchNum === 79)!;
+const p79Key = bracketKey("ROUND_OF_32", "79");
+const p79Ctx: BracketContext = { ...thirdCtx, savedBracket: {}, pendingBracket: {} };
+const p79Entries = getThirdSlotPickerEntries(p79, p79Ctx, p79Key);
+assert(p79Entries.length === 5, "P79 lists 5 thirds from C/E/F/H/I");
+const p79Third = p79Entries[0].team.id;
+const p79Fixed = deriveProjectedGroupStandings(p79Ctx.groups[0], p79Ctx)?.first;
+assert(!!p79Fixed, "P79 fixed side (1A) resolves");
+
+const rivalOk = validateThirdSlotRival(p79, p79Third, p79Ctx, p79Key);
+assert(rivalOk.valid, "P79 third rival assignable from picker");
+
+const incompleteWinner = validateBracketPick("ROUND_OF_32", "79", p79Fixed!, {
+  ...p79Ctx,
+  thirdSlotAssignments: {},
+  pendingBracket: { [p79Key]: p79Fixed! },
+});
+assert(!incompleteWinner.valid, "P79 cannot save winner without third rival");
+
+const completeCtx: BracketContext = {
+  ...p79Ctx,
+  thirdSlotAssignments: { [p79Key]: p79Third },
+  pendingBracket: { [p79Key]: p79Fixed! },
+};
+const completePick = validateBracketPick("ROUND_OF_32", "79", p79Fixed!, completeCtx);
+assert(completePick.valid, "P79 valid when rival + fixed winner chosen");
+const completeness = getBracketMatchCompleteness(p79, completeCtx, p79Key, p79Fixed!);
+assert(completeness.isComplete, "P79 complete with both teams and winner");
 
 console.log("✓ All bracket-validation tests passed");

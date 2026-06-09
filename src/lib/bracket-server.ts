@@ -2,6 +2,7 @@ import prisma from "./db";
 import {
   BracketContext,
   bracketKey,
+  deriveThirdSlotAssignmentsFromBracket,
   getDownstreamBracketKeys,
   normalizeMatchSlot,
   normalizeSavedBracket,
@@ -73,18 +74,27 @@ export async function buildBracketContext(userId: string): Promise<BracketContex
     rawBracket[bracketKey(bp.phase, bp.matchSlot)] = bp.predictedTeamId;
   }
 
-  return {
-    groups: groups.map((g) => ({
-      id: g.id,
-      name: g.name,
-      teams: g.teams,
-      matches: g.matches,
-    })),
-    allTeams: [...allTeamsMap.values()].sort((a, b) => a.name.localeCompare(b.name)),
+  const savedBracket = normalizeSavedBracket(rawBracket);
+  const mappedGroups = groups.map((g) => ({
+    id: g.id,
+    name: g.name,
+    teams: g.teams,
+    matches: g.matches,
+  }));
+  const allTeams = [...allTeamsMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+
+  const ctx: BracketContext = {
+    groups: mappedGroups,
+    allTeams,
     savedPreds,
     savedGroupPreds,
-    savedBracket: normalizeSavedBracket(rawBracket),
+    savedBracket,
     savedScores,
+  };
+
+  return {
+    ...ctx,
+    thirdSlotAssignments: deriveThirdSlotAssignmentsFromBracket(ctx, savedBracket),
   };
 }
 
@@ -92,9 +102,17 @@ export async function validateBracketPickForUser(
   userId: string,
   phase: string,
   matchSlot: string,
-  teamId: string
+  teamId: string,
+  assignedThirdTeamId?: string
 ): Promise<{ valid: boolean; error?: string }> {
   const ctx = await buildBracketContext(userId);
+  if (assignedThirdTeamId) {
+    const key = bracketKey(phase, matchSlot);
+    ctx.thirdSlotAssignments = {
+      ...deriveThirdSlotAssignmentsFromBracket(ctx),
+      [key]: assignedThirdTeamId,
+    };
+  }
   return validateBracketPick(phase, matchSlot, teamId, ctx);
 }
 

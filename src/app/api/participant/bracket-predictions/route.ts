@@ -13,6 +13,7 @@ const bracketPredictionSchema = z.object({
   phase: z.string().min(1),
   matchSlot: z.string().min(1),
   predictedTeamId: z.string().optional(),
+  assignedThirdTeamId: z.string().optional(),
   predictedHomeScore: z.number().int().min(0).max(30).optional(),
   predictedAwayScore: z.number().int().min(0).max(30).optional(),
 });
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Validation error", details: parsed.error.issues }, { status: 400 });
     }
 
-    let { phase, matchSlot, predictedTeamId, predictedHomeScore, predictedAwayScore } = parsed.data;
+    let { phase, matchSlot, predictedTeamId, assignedThirdTeamId, predictedHomeScore, predictedAwayScore } = parsed.data;
     matchSlot = normalizeMatchSlot(phase, matchSlot);
 
     const existing = await prisma.bracketPrediction.findFirst({
@@ -82,7 +83,8 @@ export async function POST(request: NextRequest) {
         auth.userId,
         phase,
         matchSlot,
-        predictedTeamId
+        predictedTeamId,
+        assignedThirdTeamId
       );
       if (!validation.valid) {
         return NextResponse.json({ error: validation.error || "Equipo inválido." }, { status: 400 });

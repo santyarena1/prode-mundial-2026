@@ -212,6 +212,24 @@ function getMergedThirdSlotAssignments(ctx: BracketContext): Record<string, stri
   return ctx.thirdSlotAssignments ?? {};
 }
 
+/** Infer third-slot rivals from saved winners (when the saved winner is a projected 3°) */
+export function deriveThirdSlotAssignmentsFromBracket(
+  ctx: BracketContext,
+  bracket: Record<string, string> = ctx.savedBracket,
+  extra: Record<string, string> = {}
+): Record<string, string> {
+  const merged: Record<string, string> = { ...extra };
+  for (const match of getThirdSlotMatches()) {
+    const key = bracketKey("ROUND_OF_32", String(match.matchNum));
+    if (merged[key]) continue;
+    const winnerId = bracket[key];
+    if (winnerId && isProjectedThirdTeamId(ctx, winnerId)) {
+      merged[key] = winnerId;
+    }
+  }
+  return merged;
+}
+
 /** Third-place teams assigned to R32 slots */
 export function getAssignedThirdTeamIds(
   ctx: BracketContext,
@@ -404,6 +422,185 @@ export function getThirdPlaceCandidateEntries(
   return entries;
 }
 
+function getGroupLetterForThirdTeam(teamId: string, ctx: BracketContext): string {
+  for (const group of ctx.groups) {
+    const third =
+      getProjectedThirdForGroup(group, ctx);
+    if (third === teamId) return group.name;
+  }
+  return "?";
+}
+
+/** Picker options for a third-slot match — same list used for assign + validation */
+export function getThirdSlotPickerEntries(
+  match: BracketMatch,
+  ctx: BracketContext,
+  excludeKey: string
+): ThirdPlaceCandidateEntry[] {
+  const thirdSource = getThirdSideSource(match);
+  if (!thirdSource) return [];
+
+  const bracketForAssignment = { ...ctx.savedBracket, ...(ctx.pendingBracket ?? {}) };
+  const exclude = getAssignedThirdTeamIds(ctx, bracketForAssignment, excludeKey);
+  const entries = getThirdPlaceCandidateEntries(thirdSource, ctx, exclude);
+  const assignedId = ctx.thirdSlotAssignments?.[excludeKey];
+  if (assignedId && !entries.some((e) => e.team.id === assignedId)) {
+    const slotTeams = getSlotProjectedThirds(thirdSource, ctx);
+    const team = slotTeams.find((t) => t.id === assignedId);
+    if (team) {
+      const qualifying = getQualifyingThirdTeamIds(ctx);
+      entries.push({
+        team,
+        groupLetter: getGroupLetterForThirdTeam(assignedId, ctx),
+        qualifies: qualifying.has(assignedId),
+      });
+      entries.sort(
+        (a, b) =>
+          Number(b.qualifies) - Number(a.qualifies) ||
+          a.groupLetter.localeCompare(b.groupLetter)
+      );
+    }
+  }
+  return entries;
+}
+
+export type BracketMatchStep = "missing_teams" | "pick_rival" | "pick_winner" | "complete";
+
+export type BracketMatchCompleteness = {
+  isThirdSlot: boolean;
+  hasBothTeams: boolean;
+  hasRival: boolean;
+  hasWinner: boolean;
+  isComplete: boolean;
+  step: BracketMatchStep;
+};
+
+export function isThirdSlotMatch(match: BracketMatch): boolean {
+  return match.leftSource.startsWith("3") || match.rightSource.startsWith("3");
+}
+
+export function getBracketMatchCompleteness(
+  match: BracketMatch,
+  ctx: BracketContext,
+  key: string,
+  winnerId?: string | null
+): BracketMatchCompleteness {
+  const winner =
+    winnerId ??
+    ctx.pendingBracket?.[key] ??
+    ctx.savedBracket[key] ??
+    null;
+
+  if (!isThirdSlotMatch(match)) {
+    const { left, right } = resolveMatchTeams(match, ctx);
+    const hasBothTeams = !!(left && right);
+    const hasWinner = !!(
+      winner &&
+      hasBothTeams &&
+      (winner === left!.id || winner === right!.id)
+    );
+    return {
+      isThirdSlot: false,
+      hasBothTeams,
+      hasRival: hasBothTeams,
+      hasWinner,
+      isComplete: hasBothTeams && hasWinner,
+      step: !hasBothTeams ? "missing_teams" : !hasWinner ? "pick_winner" : "complete",
+    };
+  }
+
+  const state = getThirdSlotPickState(match, winner, ctx, key);
+  const fixedTeam = state?.fixedTeam ?? null;
+  const rivalId = ctx.thirdSlotAssignments?.[key] ?? null;
+  const entries = getThirdSlotPickerEntries(match, ctx, key);
+  const hasBothTeams = !!fixedTeam && !!rivalId && entries.some((e) => e.team.id === rivalId);
+  const hasRival = !!rivalId && entries.some((e) => e.team.id === rivalId);
+  const hasWinner = !!(
+    winner &&
+    fixedTeam &&
+    rivalId &&
+    (winner === fixedTeam.id || winner === rivalId)
+  );
+
+  let step: BracketMatchStep = "complete";
+  if (!fixedTeam) step = "missing_teams";
+  else if (!hasRival) step = "pick_rival";
+  else if (!hasWinner) step = "pick_winner";
+
+  return {
+    isThirdSlot: true,
+    hasBothTeams,
+    hasRival,
+    hasWinner,
+    isComplete: hasBothTeams && hasWinner,
+    step,
+  };
+}
+
+export function getBracketMatchIncompleteMessage(
+  match: BracketMatch,
+  ctx: BracketContext,
+  key: string,
+  winnerId?: string | null
+): string {
+  const c = getBracketMatchCompleteness(match, ctx, key, winnerId);
+  const state = getThirdSlotPickState(match, winnerId, ctx, key);
+  const fixed = state?.fixedTeam;
+  const rivalId = ctx.thirdSlotAssignments?.[key];
+  const rival = rivalId ? ctx.allTeams.find((t) => t.id === rivalId) : null;
+
+  if (c.step === "missing_teams") {
+    if (c.isThirdSlot) {
+      const fixedSource = match.leftSource.startsWith("3") ? match.rightSource : match.leftSource;
+      return formatBracketMatchError(
+        match.matchNum,
+        `Completá las predicciones del Grupo ${fixedSource[1] ?? "?"} para ver el rival directo de este cruce.`
+      );
+    }
+    return formatBracketMatchError(
+      match.matchNum,
+      "Faltan equipos en el cruce. Confirmá los partidos de la ronda anterior."
+    );
+  }
+  if (c.step === "pick_rival") {
+    const groupsHint = state?.thirdSource.slice(1).split("").join(", ") ?? "";
+    const options = getThirdSlotPickerEntries(match, ctx, key)
+      .map((e) => `${e.team.name} (3° ${e.groupLetter})`)
+      .join(", ");
+    return formatBracketMatchError(
+      match.matchNum,
+      options
+        ? `Elegí qué tercero juega este cruce: ${options}.`
+        : `No hay terceros disponibles para grupos ${groupsHint}.`
+    );
+  }
+  if (c.step === "pick_winner") {
+    return formatBracketMatchError(
+      match.matchNum,
+      `Tocá quién pasa: ${fixed?.name ?? "el favorito"} o ${rival?.name ?? "el tercero elegido"}.`
+    );
+  }
+  return formatBracketMatchError(match.matchNum, "Selección incompleta.");
+}
+
+export function countSaveableBracketPicks(
+  phase: string,
+  pending: Record<string, string>,
+  ctx: BracketContext
+): number {
+  let count = 0;
+  for (const [key, teamId] of Object.entries(pending)) {
+    if (!key.startsWith(`${phase}:`)) continue;
+    const [p, slot] = key.split(":");
+    if (!p || !slot) continue;
+    const matchNum = parseInt(normalizeMatchSlot(p, slot), 10);
+    const match = (BRACKET_MATCHES[p] ?? []).find((m) => m.matchNum === matchNum);
+    if (!match) continue;
+    if (getBracketMatchCompleteness(match, ctx, key, teamId).isComplete) count++;
+  }
+  return count;
+}
+
 export interface ThirdSlotPickState {
   fixedTeam: BracketTeam | null;
   thirdSource: string;
@@ -427,8 +624,9 @@ export function getThirdSlotPickState(
 
   const fixedTeam = getFixedSideTeam(match, ctx);
   const bracketForAssignment = { ...ctx.savedBracket, ...(ctx.pendingBracket ?? {}) };
-  const exclude = getAssignedThirdTeamIds(ctx, bracketForAssignment, excludeKey);
-  const entries = getThirdPlaceCandidateEntries(thirdSource, ctx, exclude);
+  const entries = excludeKey
+    ? getThirdSlotPickerEntries(match, ctx, excludeKey)
+    : getThirdPlaceCandidateEntries(thirdSource, ctx, getAssignedThirdTeamIds(ctx, bracketForAssignment, excludeKey));
   const assignedRivalId = excludeKey ? ctx.thirdSlotAssignments?.[excludeKey] : undefined;
   const thirdPickedTeam =
     assignedRivalId && entries.some((e) => e.team.id === assignedRivalId)
@@ -589,48 +787,34 @@ export function validateBracketPick(
 
     const fixedTeam = pickState.fixedTeam;
     const rivalId = ctx.thirdSlotAssignments?.[key];
-    const isFixedWinner = fixedTeam?.id === teamId;
-    const isRivalWinner = rivalId === teamId;
-    const isThirdWinner = pickState.entries.some((e) => e.team.id === teamId);
+    const pickerEntries = getThirdSlotPickerEntries(match, ctx, key);
 
-    if (isFixedWinner) {
-      if (ctx.thirdSlotAssignments !== undefined) {
-        if (!rivalId) {
-          return {
-            valid: false,
-            error: explainInvalidThirdSlotPick(match, teamId, ctx, key),
-          };
-        }
-        if (!pickState.entries.some((e) => e.team.id === rivalId)) {
-          return {
-            valid: false,
-            error: formatBracketMatchError(
-              match.matchNum,
-              "El tercero elegido ya no es válido para este cruce. Volvé a elegirlo."
-            ),
-          };
-        }
-      }
-      return { valid: true };
+    if (!fixedTeam) {
+      return {
+        valid: false,
+        error: getBracketMatchIncompleteMessage(match, ctx, key, teamId),
+      };
     }
 
-    if (isRivalWinner || isThirdWinner) {
-      if (getAssignedThirdTeamIds(ctx, { ...ctx.savedBracket, ...(ctx.pendingBracket ?? {}) }, key).has(teamId)) {
-        return {
-          valid: false,
-          error: formatBracketMatchError(
-            match.matchNum,
-            "Ese tercero ya fue asignado a otro cruce."
-          ),
-        };
-      }
-      return { valid: true };
+    if (!rivalId || !pickerEntries.some((e) => e.team.id === rivalId)) {
+      return {
+        valid: false,
+        error: getBracketMatchIncompleteMessage(match, { ...ctx, thirdSlotAssignments: ctx.thirdSlotAssignments }, key, teamId),
+      };
     }
 
-    return {
-      valid: false,
-      error: explainInvalidThirdSlotPick(match, teamId, ctx, key),
-    };
+    if (teamId !== fixedTeam.id && teamId !== rivalId) {
+      const rival = ctx.allTeams.find((t) => t.id === rivalId);
+      return {
+        valid: false,
+        error: formatBracketMatchError(
+          match.matchNum,
+          `Tocá quién pasa: ${fixedTeam.name} o ${rival?.name ?? "el tercero que elegiste"}.`
+        ),
+      };
+    }
+
+    return { valid: true };
   }
 
   if (!left || !right) {
@@ -724,77 +908,28 @@ export function formatBracketMatchError(matchNum: number, message: string): stri
   return `P${matchNum}: ${message}`;
 }
 
-function explainInvalidThirdSlotPick(
-  match: BracketMatch,
-  teamId: string,
-  ctx: BracketContext,
-  excludeKey: string
-): string {
-  const state = getThirdSlotPickState(match, null, ctx, excludeKey);
-  const team = ctx.allTeams.find((t) => t.id === teamId);
-  const fixed = state?.fixedTeam;
-  const groupsHint = state?.thirdSource.slice(1).split("").join(", ") ?? "";
-
-  if (!state) {
-    return formatBracketMatchError(match.matchNum, "No se pudo cargar este cruce. Revisá las predicciones de grupos.");
-  }
-
-  if (!fixed) {
-    const fixedSource = match.leftSource.startsWith("3") ? match.rightSource : match.leftSource;
-    const groupLetter = fixedSource[1] ?? "?";
-    return formatBracketMatchError(
-      match.matchNum,
-      `Completá las predicciones del Grupo ${groupLetter} para ver el rival directo de este cruce.`
-    );
-  }
-
-  const rivalId = ctx.thirdSlotAssignments?.[excludeKey];
-  if (teamId === fixed.id && !rivalId) {
-    return formatBracketMatchError(
-      match.matchNum,
-      `Primero elegí qué tercero juega este cruce (grupos ${groupsHint}). Después tocá ${fixed.name} o ese tercero para indicar quién pasa.`
-    );
-  }
-
-  if (getAssignedThirdTeamIds(ctx, { ...ctx.savedBracket, ...(ctx.pendingBracket ?? {}) }, excludeKey).has(teamId)) {
-    return formatBracketMatchError(
-      match.matchNum,
-      `${team?.name ?? "Ese tercero"} ya está asignado a otro cruce de 16vos. Elegí otro de la lista.`
-    );
-  }
-
-  if (state.entries.length === 0) {
-    return formatBracketMatchError(
-      match.matchNum,
-      `No hay terceros libres para grupos ${groupsHint}. Revisá que esos grupos tengan predicciones completas o liberá un tercero en otro partido.`
-    );
-  }
-
-  const options = state.entries.map((e) => `${e.team.name} (3° ${e.groupLetter})`).join(", ");
-  return formatBracketMatchError(
-    match.matchNum,
-    `Tocá ${fixed.name} si crees que pasa el favorito, o elegí el tercero rival (${options}) y después tocá quién gana.`
-  );
-}
-
 export function validateThirdSlotRival(
   match: BracketMatch,
   teamId: string,
   ctx: BracketContext,
   excludeKey: string
 ): { valid: boolean; error?: string } {
-  const state = getThirdSlotPickState(match, null, ctx, excludeKey);
-  if (!state) {
+  const entries = getThirdSlotPickerEntries(match, ctx, excludeKey);
+  if (entries.length === 0) {
     return {
       valid: false,
-      error: formatBracketMatchError(match.matchNum, "No se pudo cargar este cruce."),
+      error: getBracketMatchIncompleteMessage(match, ctx, excludeKey),
     };
   }
 
-  if (!state.entries.some((e) => e.team.id === teamId)) {
+  if (!entries.some((e) => e.team.id === teamId)) {
+    const names = entries.map((e) => `${e.team.name} (3° ${e.groupLetter})`).join(", ");
     return {
       valid: false,
-      error: explainInvalidThirdSlotPick(match, teamId, ctx, excludeKey),
+      error: formatBracketMatchError(
+        match.matchNum,
+        `Ese tercero no puede jugar este cruce. Opciones válidas: ${names}.`
+      ),
     };
   }
 
@@ -836,22 +971,16 @@ export function validatePendingBracketPicks(
     if (!p || !slot) continue;
     const matchNum = parseInt(normalizeMatchSlot(p, slot), 10);
     const match = (BRACKET_MATCHES[p] ?? []).find((m) => m.matchNum === matchNum);
+    if (!match) continue;
 
-    if (match && (match.leftSource.startsWith("3") || match.rightSource.startsWith("3"))) {
-      const rivalId = ctx.thirdSlotAssignments?.[key];
-      const fixedTeam = getFixedSideTeam(match, mergedCtx);
-      const isFixedWinner = fixedTeam?.id === teamId;
-      if (ctx.thirdSlotAssignments !== undefined && isFixedWinner && !rivalId) {
-        errors.push({
-          key,
-          matchNum,
-          error: formatBracketMatchError(
-            matchNum,
-            `Elegí qué tercero juega este cruce antes de guardar. Después tocá ${fixedTeam?.name ?? "el favorito"} o ese tercero para marcar quién pasa.`
-          ),
-        });
-        continue;
-      }
+    const completeness = getBracketMatchCompleteness(match, mergedCtx, key, teamId);
+    if (!completeness.isComplete) {
+      errors.push({
+        key,
+        matchNum,
+        error: getBracketMatchIncompleteMessage(match, mergedCtx, key, teamId),
+      });
+      continue;
     }
 
     const result = validateBracketPick(p, slot, teamId, mergedCtx);
