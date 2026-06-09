@@ -868,6 +868,7 @@ export function getDownstreamBracketKeys(changedPhase: string, changedSlot: stri
   return [...new Set(toClear)];
 }
 
+/** Saved pick no longer matches the teams that should play this match */
 export function isBracketPickStale(
   phase: string,
   matchSlot: string,
@@ -897,6 +898,17 @@ export function isBracketPickStale(
 
   if (!left || !right) return true;
   return pickedTeamId !== left.id && pickedTeamId !== right.id;
+}
+
+/** Whether the user may replace an existing saved winner (stale/invalid picks are always editable) */
+export function canReplaceBracketPick(
+  phase: string,
+  matchSlot: string,
+  savedTeamId: string | null | undefined,
+  ctx: BracketContext
+): boolean {
+  if (!savedTeamId) return true;
+  return isBracketPickStale(phase, matchSlot, savedTeamId, ctx);
 }
 
 export function getBracketMatchByKey(phase: string, matchSlot: string): BracketMatch | undefined {

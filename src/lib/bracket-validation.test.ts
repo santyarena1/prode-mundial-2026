@@ -23,6 +23,8 @@ import {
   getBracketMatchCompleteness,
   validateBracketPick,
   validateThirdSlotRival,
+  canReplaceBracketPick,
+  isBracketPickStale,
   type BracketContext,
 } from "./bracket-validation";
 
@@ -199,5 +201,12 @@ const completePick = validateBracketPick("ROUND_OF_32", "79", p79Fixed!, complet
 assert(completePick.valid, "P79 valid when rival + fixed winner chosen");
 const completeness = getBracketMatchCompleteness(p79, completeCtx, p79Key, p79Fixed!);
 assert(completeness.isComplete, "P79 complete with both teams and winner");
+
+// Stale R32 picks (e.g. P78) remain editable
+const p78 = BRACKET_MATCHES.ROUND_OF_32!.find((m) => m.matchNum === 78)!;
+const p78Key = bracketKey("ROUND_OF_32", "78");
+const p78Ctx: BracketContext = { ...thirdCtx, savedBracket: { [p78Key]: "tZ9" }, pendingBracket: {} };
+assert(isBracketPickStale("ROUND_OF_32", "78", "tZ9", p78Ctx), "P78 stale when saved winner is not in the match");
+assert(canReplaceBracketPick("ROUND_OF_32", "78", "tZ9", p78Ctx), "stale P78 pick can be replaced");
 
 console.log("✓ All bracket-validation tests passed");

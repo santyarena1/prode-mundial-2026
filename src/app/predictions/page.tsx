@@ -56,6 +56,7 @@ import {
   getPhaseUnlockBlockReason,
   getEligibleChampionTeams,
   isBracketPickStale,
+  canReplaceBracketPick,
   getDownstreamBracketKeys,
 } from "@/lib/bracket-validation";
 
@@ -524,7 +525,7 @@ export default function PredictionsPage() {
 
   const handlePickBracket = useCallback((phase: string, slot: string, teamId: string) => {
     const key = bracketKey(phase, slot);
-    if (savedBracket[key]) return;
+    if (!canReplaceBracketPick(phase, slot, savedBracket[key], bracketCtx)) return;
 
     const match = (BRACKET_MATCHES[phase] ?? []).find((m) => m.matchNum === parseInt(slot, 10));
     const isThirdSlot = match && (match.leftSource.startsWith("3") || match.rightSource.startsWith("3"));
@@ -562,6 +563,8 @@ export default function PredictionsPage() {
       .filter(([key, teamId]) => {
         const [p, slot] = key.split(":");
         if (!p || !slot) return false;
+        const savedId = savedBracket[key];
+        if (savedId && !canReplaceBracketPick(p, slot, savedId, bracketCtx)) return false;
         const matchNum = parseInt(normalizeMatchSlot(p, slot), 10);
         const match = (BRACKET_MATCHES[p] ?? []).find((m) => m.matchNum === matchNum);
         if (!match) return false;
@@ -604,8 +607,8 @@ export default function PredictionsPage() {
 
     // Save new picks
     for (const [key, teamId] of phasePending) {
-      if (savedBracket[key]) continue;
       const [phase, slot] = key.split(":");
+      if (savedBracket[key] && !canReplaceBracketPick(phase, slot, savedBracket[key], bracketCtx)) continue;
       const matchNum = parseInt(slot);
       const score = hardcoreMode ? pendingBracketScores[key] : undefined;
       const scorePayload = (score?.home !== undefined && score?.away !== undefined)
@@ -1510,12 +1513,16 @@ export default function PredictionsPage() {
                       }`}>
                         {(BRACKET_MATCHES[currentPhase.key] ?? []).map((match: BracketMatch, i: number) => {
                           const matchKey = bracketKey(match.phase, String(match.matchNum));
-                          const pickedId = savedBracket[matchKey] || pendingBracket[matchKey] || null;
-                          const isSaved = !!savedBracket[matchKey];
+                          const savedId = savedBracket[matchKey] ?? null;
+                          const pendingId = pendingBracket[matchKey] ?? null;
+                          const pickedId = pendingId ?? savedId;
+                          const isInvalid = !!pickedId && isBracketPickStale(match.phase, String(match.matchNum), pickedId, bracketCtx);
+                          const isSaved = !!savedId && !pendingId;
+                          const isLocked = isSaved && !isInvalid;
                           const completeness = getBracketMatchCompleteness(match, bracketCtx, matchKey, pickedId);
-                          const isPending = completeness.isComplete && !!pendingBracket[matchKey] && !isSaved;
+                          const isPending = completeness.isComplete && !!pendingId;
                           const fieldError = bracketFieldErrors[matchKey];
-                          const isStale = isSaved && !!pickedId && isBracketPickStale(match.phase, String(match.matchNum), pickedId, bracketCtx);
+                          const isStale = !!savedId && isInvalid && !pendingId;
                           const thirdSlot = getThirdSlotPickState(match, pickedId, bracketCtx, matchKey);
                           const pickerEntries = getThirdSlotPickerEntries(match, bracketCtx, matchKey);
                           const isLeftThird = match.leftSource.startsWith("3");
@@ -1548,9 +1555,9 @@ export default function PredictionsPage() {
                             } : null}
                             matchCompleteness={completeness}
                             pickedTeamId={pickedId}
-                            isLocked={isSaved}
+                            isLocked={isLocked}
                             isPending={isPending}
-                            isStale={isStale}
+                            isStale={isStale || (!!pendingId && isInvalid)}
                             validationError={fieldError}
                             hardcoreMode={hardcoreMode}
                             pendingBracketScore={pendingBracketScores[matchKey]}
@@ -2448,18 +2455,20 @@ function BracketMatchCard2({
   const hasError = !!validationError;
   const step = matchCompleteness?.step;
   const statusLabel = hasError
-    ? "Error"
-    : isLocked
-      ? "Guardado"
-      : isPending
-        ? "Listo para guardar"
-        : step === "pick_rival"
-          ? "Elegí el 3°"
-          : step === "pick_winner"
-            ? "Elegí ganador"
-            : step === "missing_teams"
-              ? "Faltan equipos"
-              : null;
+    ? "Tocá para corregir"
+    : isStale
+      ? "Desactualizado"
+      : isLocked
+        ? "Guardado"
+        : isPending
+          ? "Listo para guardar"
+          : step === "pick_rival"
+            ? "Elegí el 3°"
+            : step === "pick_winner"
+              ? "Elegí ganador"
+              : step === "missing_teams"
+                ? "Faltan equipos"
+                : null;
 
   const isLeftThird = match.leftSource.startsWith("3");
   const isRightThird = match.rightSource.startsWith("3");
@@ -2697,7 +2706,14 @@ function BracketMatchCard2({
         <div className="px-4 pb-2 flex justify-center">
           <p className="text-[10px] text-red-300 font-semibold text-center leading-tight flex items-start gap-1 max-w-md">
             <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-px" />
-            {validationError}
+            <span>{validationError} Tocá {leftTeam?.code ?? "—"} o {rightTeam?.code ?? "—"} para corregir.</span>
+          </p>
+        </div>
+      )}
+      {isStale && !validationError && !isLocked && (
+        <div className="px-4 pb-2 flex justify-center">
+          <p className="text-[10px] text-red-400/90 font-semibold text-center leading-tight">
+            Esta predicción ya no coincide con tu llave. Tocá quién pasa para corregirla.
           </p>
         </div>
       )}
