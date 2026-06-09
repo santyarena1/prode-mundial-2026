@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import { getUserFromCookies } from "@/lib/cookies";
+import { bracketKey, normalizeMatchSlot } from "@/lib/bracket-validation";
+import {
+  clearDownstreamBracketPredictions,
+  migrateLegacyBracketSlots,
+  validateBracketPickForUser,
+} from "@/lib/bracket-server";
 
 const bracketPredictionSchema = z.object({
   phase: z.string().min(1),
@@ -15,6 +21,8 @@ export async function GET() {
   try {
     const auth = await getUserFromCookies();
     if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    await migrateLegacyBracketSlots(auth.userId);
 
     const bracketPredictions = await prisma.bracketPrediction.findMany({
       where: { userId: auth.userId },
@@ -40,14 +48,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Validation error", details: parsed.error.issues }, { status: 400 });
     }
 
-    const { phase, matchSlot, predictedTeamId, predictedHomeScore, predictedAwayScore } = parsed.data;
+    let { phase, matchSlot, predictedTeamId, predictedHomeScore, predictedAwayScore } = parsed.data;
+    matchSlot = normalizeMatchSlot(phase, matchSlot);
 
-    // Check if locked
-    const existing = await prisma.bracketPrediction.findUnique({
-      where: { userId_phase_matchSlot: { userId: auth.userId, phase, matchSlot } },
+    const existing = await prisma.bracketPrediction.findFirst({
+      where: {
+        userId: auth.userId,
+        phase,
+        matchSlot: { in: [parsed.data.matchSlot, matchSlot] },
+      },
     });
+
     if (existing?.isLocked) {
-      // Allow adding scores to a locked bracket prediction with no scores (hardcore upgrade)
       const isScoreUpgrade =
         predictedHomeScore !== undefined &&
         predictedAwayScore !== undefined &&
@@ -55,22 +67,61 @@ export async function POST(request: NextRequest) {
         existing.predictedAwayScore === null;
 
       if (!isScoreUpgrade) {
-        return NextResponse.json({
-          error: "Tu predicción ya está bloqueada. Canjeá un cambio de predicción para modificarla.",
-          locked: true,
-        }, { status: 403 });
+        return NextResponse.json(
+          {
+            error: "Tu predicción ya está bloqueada. Canjeá un cambio de predicción para modificarla.",
+            locked: true,
+          },
+          { status: 403 }
+        );
       }
-      // Score upgrade on locked bracket prediction — fall through to upsert
+    }
+
+    if (predictedTeamId) {
+      const validation = await validateBracketPickForUser(
+        auth.userId,
+        phase,
+        matchSlot,
+        predictedTeamId
+      );
+      if (!validation.valid) {
+        return NextResponse.json({ error: validation.error || "Equipo inválido." }, { status: 400 });
+      }
+
+      if (
+        existing?.predictedTeamId &&
+        existing.predictedTeamId !== predictedTeamId &&
+        existing.isLocked
+      ) {
+        await clearDownstreamBracketPredictions(auth.userId, phase, matchSlot);
+      }
     }
 
     const now = new Date();
-    const scoreFields = predictedHomeScore !== undefined && predictedAwayScore !== undefined
-      ? { predictedHomeScore, predictedAwayScore }
-      : {};
+    const scoreFields =
+      predictedHomeScore !== undefined && predictedAwayScore !== undefined
+        ? { predictedHomeScore, predictedAwayScore }
+        : {};
+
     const prediction = await prisma.bracketPrediction.upsert({
-      where: { userId_phase_matchSlot: { userId: auth.userId, phase, matchSlot } },
-      update: { predictedTeamId, ...scoreFields, isLocked: true, lockedAt: now },
-      create: { userId: auth.userId, phase, matchSlot, predictedTeamId, ...scoreFields, isLocked: true, lockedAt: now },
+      where: {
+        userId_phase_matchSlot: { userId: auth.userId, phase, matchSlot },
+      },
+      update: {
+        predictedTeamId,
+        ...scoreFields,
+        isLocked: true,
+        lockedAt: now,
+      },
+      create: {
+        userId: auth.userId,
+        phase,
+        matchSlot,
+        predictedTeamId,
+        ...scoreFields,
+        isLocked: true,
+        lockedAt: now,
+      },
     });
 
     return NextResponse.json({ prediction });

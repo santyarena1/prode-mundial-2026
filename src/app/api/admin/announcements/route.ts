@@ -17,7 +17,7 @@ async function resolveUsers(
       select: { userId: true },
       distinct: ["userId"],
     });
-    const ids = redemptions.map((r) => r.userId);
+    const ids = redemptions.map((r: { userId: string }) => r.userId);
     return prisma.user.findMany({
       where: { ...BASE_WHERE, id: { in: ids } },
       select: { id: true, email: true, firstName: true },
@@ -30,7 +30,7 @@ async function resolveUsers(
       select: { userId: true },
       distinct: ["userId"],
     });
-    const ids = bonuses.map((b) => b.userId);
+    const ids = bonuses.map((b: { userId: string }) => b.userId);
     return prisma.user.findMany({
       where: { ...BASE_WHERE, id: { in: ids } },
       select: { id: true, email: true, firstName: true },

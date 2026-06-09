@@ -32,6 +32,21 @@ import {
   BracketMatch,
   getSourceLabel,
 } from "@/lib/bracket-structure";
+import {
+  ELIMINATORIAS_PHASES,
+  BracketContext,
+  bracketKey,
+  normalizeSavedBracket,
+  normalizeMatchSlot,
+  resolveSource as resolveBracketSource,
+  getThirdPlaceCandidates as getThirdCandidates,
+  getUsedThirdPlaceTeamIds,
+  isPhaseUnlocked as checkPhaseUnlocked,
+  getPhaseUnlockBlockReason,
+  getEligibleChampionTeams,
+  isBracketPickStale,
+  getDownstreamBracketKeys,
+} from "@/lib/bracket-validation";
 
 interface Team {
   id: string;
@@ -63,22 +78,6 @@ interface Group {
 }
 
 type Outcome = "home" | "away" | "draw";
-
-const ELIMINATORIAS_PHASES = [
-  { key: "ROUND_OF_32",    label: "16vos", fullLabel: "Ronda de 32",      slots: 16, icon: "⚽", pts: 2000,  ptsLabel: "2.000 pts c/u" },
-  { key: "ROUND_OF_16",    label: "8vos",  fullLabel: "Octavos de Final",  slots: 8,  icon: "🔥", pts: 3500,  ptsLabel: "3.500 pts c/u" },
-  { key: "QUARTER_FINALS", label: "4tos",  fullLabel: "Cuartos de Final",  slots: 4,  icon: "⚡", pts: 6000,  ptsLabel: "6.000 pts c/u" },
-  { key: "SEMI_FINALS",    label: "Semis", fullLabel: "Semifinales",        slots: 2,  icon: "🌟", pts: 10000, ptsLabel: "10.000 pts c/u" },
-  { key: "CHAMPION",       label: "Final", fullLabel: "Campeón del Mundo", slots: 1,  icon: "🏆", pts: 30000, ptsLabel: "30.000 / 15.000 pts" },
-];
-
-// Maps each non-CHAMPION phase to the match numbers it uses
-const PHASE_MATCH_NUMS: Record<string, number[]> = {
-  ROUND_OF_32:    [73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88],
-  ROUND_OF_16:    [89,90,91,92,93,94,95,96],
-  QUARTER_FINALS: [97,98,99,100],
-  SEMI_FINALS:    [101,102],
-};
 
 const formatDate = (dateStr?: string) => {
   if (!dateStr) return "A confirmar";
@@ -175,7 +174,7 @@ export default function PredictionsPage() {
         const data = await predRes.json();
         const scores: Record<string, { home: number; away: number }> = {};
         for (const p of data.predictions || []) {
-          if (p.predictedOutcome && p.status === "locked") sp[p.matchId] = p.predictedOutcome;
+          if (p.predictedOutcome) sp[p.matchId] = p.predictedOutcome;
           if (p.predictedHomeScore !== null && p.predictedHomeScore !== undefined &&
               p.predictedAwayScore !== null && p.predictedAwayScore !== undefined) {
             scores[p.matchId] = { home: p.predictedHomeScore, away: p.predictedAwayScore };
@@ -196,14 +195,15 @@ export default function PredictionsPage() {
         const data = await bracketRes.json();
         const bracketScores: Record<string, { home: number; away: number }> = {};
         for (const p of data.bracketPredictions || []) {
-          if (p.predictedTeamId && p.isLocked) sb[`${p.phase}:${p.matchSlot}`] = p.predictedTeamId;
+          if (p.predictedTeamId) {
+            sb[bracketKey(p.phase, p.matchSlot)] = p.predictedTeamId;
+          }
           if (p.predictedHomeScore !== null && p.predictedHomeScore !== undefined &&
               p.predictedAwayScore !== null && p.predictedAwayScore !== undefined) {
-            // matchSlot IS the match number (e.g. "73", "74") for non-CHAMPION phases
-            bracketScores[`${p.phase}:${p.matchSlot}`] = { home: p.predictedHomeScore, away: p.predictedAwayScore };
+            bracketScores[bracketKey(p.phase, p.matchSlot)] = { home: p.predictedHomeScore, away: p.predictedAwayScore };
           }
         }
-        setSavedBracket(sb);
+        setSavedBracket(normalizeSavedBracket(sb));
         setSavedBracketScores(bracketScores);
       }
 
@@ -238,87 +238,64 @@ export default function PredictionsPage() {
     init();
   }, [router]);
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  // ── Bracket context (confirmed picks only for downstream resolution) ────────
 
-  const isPhaseUnlocked = useCallback((phaseKey: string): boolean => {
-    const idx = ELIMINATORIAS_PHASES.findIndex(p => p.key === phaseKey);
-    if (idx === 0) {
-      // 16vos: todos los partidos de fase de grupos deben estar predichos
-      if (groups.length === 0) return false;
-      return groups.every(group => {
-        const groupMatches = group.matches.filter(m => m.phase === "GROUP_STAGE");
-        return groupMatches.length > 0 && groupMatches.every(m => !!savedPreds[m.id]);
-      });
-    }
-    const prev = ELIMINATORIAS_PHASES[idx - 1];
-    // CHAMPION phase: require all semi-final winners picked
-    if (prev.key === "SEMI_FINALS") {
-      const semiNums = PHASE_MATCH_NUMS["SEMI_FINALS"] ?? [];
-      return semiNums.every(num => !!savedBracket[`SEMI_FINALS:${num}`]);
-    }
-    // For phases with numeric match slots, check all match numbers are saved
-    const prevMatchNums = PHASE_MATCH_NUMS[prev.key];
-    if (prevMatchNums) {
-      return prevMatchNums.every(num => !!savedBracket[`${prev.key}:${num}`]);
-    }
-    // Fallback: count by slots
-    return Object.keys(savedBracket).filter(k => k.startsWith(`${prev.key}:`)).length >= prev.slots;
-  }, [savedBracket, savedPreds, groups]);
+  const bracketCtx: BracketContext = {
+    groups,
+    allTeams,
+    savedPreds: savedPreds as Record<string, string>,
+    savedGroupPreds,
+    savedBracket,
+  };
 
-  const getEligibleTeams = useCallback((phaseKey: string): Team[] => {
-    const idx = ELIMINATORIAS_PHASES.findIndex(p => p.key === phaseKey);
-    // Round of 32: any of the 48 teams can appear (includes 8 best thirds)
-    if (idx === 0) return allTeams;
-    const prev = ELIMINATORIAS_PHASES[idx - 1];
-    const prevIds = Object.entries(savedBracket)
-      .filter(([k]) => k.startsWith(`${prev.key}:`))
-      .map(([, v]) => v);
-    return allTeams.filter(t => prevIds.includes(t.id));
-  }, [savedBracket, allTeams]);
+  const isPhaseUnlocked = useCallback(
+    (phaseKey: string) => checkPhaseUnlocked(phaseKey, bracketCtx),
+    [groups, allTeams, savedPreds, savedGroupPreds, savedBracket]
+  );
 
-  // ── Bracket source resolvers ────────────────────────────────────────────────
+  const getPhaseBlockReason = useCallback(
+    (phaseKey: string) => getPhaseUnlockBlockReason(phaseKey, bracketCtx),
+    [groups, allTeams, savedPreds, savedGroupPreds, savedBracket]
+  );
 
-  const resolveSource = useCallback((source: string): Team | null => {
-    if (source.startsWith("W")) {
-      // Winner of a previous match
-      const matchNum = source.slice(1);
-      const phase = Object.keys(PHASE_MATCH_NUMS).find(ph =>
-        PHASE_MATCH_NUMS[ph].includes(parseInt(matchNum))
-      ) ?? "";
-      const teamId = savedBracket[`${phase}:${matchNum}`] || pendingBracket[`${phase}:${matchNum}`];
-      return allTeams.find(t => t.id === teamId) ?? null;
+  const getEligibleTeams = useCallback(
+    (phaseKey: string): Team[] => {
+      if (phaseKey === "CHAMPION") return getEligibleChampionTeams(bracketCtx) as Team[];
+      return [];
+    },
+    [groups, allTeams, savedPreds, savedGroupPreds, savedBracket]
+  );
+
+  const resolveSource = useCallback(
+    (source: string): Team | null =>
+      resolveBracketSource(source, bracketCtx) as Team | null,
+    [groups, allTeams, savedPreds, savedGroupPreds, savedBracket]
+  );
+
+  const getThirdPlaceCandidates = useCallback(
+    (source: string, excludeKey?: string): Team[] => {
+      const exclude = getUsedThirdPlaceTeamIds(savedBracket, excludeKey);
+      const pendingExclude = new Set(exclude);
+      for (const match of BRACKET_MATCHES.ROUND_OF_32 ?? []) {
+        const key = bracketKey("ROUND_OF_32", String(match.matchNum));
+        if (excludeKey && key === excludeKey) continue;
+        const pendingId = pendingBracket[key];
+        if (pendingId && (match.leftSource.startsWith("3") || match.rightSource.startsWith("3"))) {
+          pendingExclude.add(pendingId);
+        }
+      }
+      return getThirdCandidates(source, bracketCtx, pendingExclude) as Team[];
+    },
+    [groups, allTeams, savedPreds, savedGroupPreds, savedBracket, pendingBracket]
+  );
+
+  useEffect(() => {
+    if (loading) return;
+    if (!isPhaseUnlocked(activeElimTab)) {
+      const firstOpen = ELIMINATORIAS_PHASES.find((p) => isPhaseUnlocked(p.key));
+      if (firstOpen) setActiveElimTab(firstOpen.key);
     }
-    if (source.startsWith("3")) {
-      // 3rd-place slot — user must pick from candidates; return null
-      return null;
-    }
-    // 1st or 2nd place from a group
-    const pos = source[0]; // "1" or "2"
-    const groupLetter = source[1];
-    const group = groups.find(g => g.name === groupLetter);
-    if (!group) return null;
-    const gp = savedGroupPreds[group.id];
-    if (!gp) return null;
-    const teamId = pos === "1" ? gp.first : gp.second;
-    return allTeams.find(t => t.id === teamId) ?? null;
-  }, [groups, savedGroupPreds, savedBracket, pendingBracket, allTeams]);
-
-  const getThirdPlaceCandidates = useCallback((source: string): Team[] => {
-    if (!source.startsWith("3")) return [];
-    const groupLetters = source.slice(1).split("");
-    const teams: Team[] = [];
-    for (const letter of groupLetters) {
-      const group = groups.find(g => g.name === letter);
-      if (!group) continue;
-      const gp = savedGroupPreds[group.id];
-      if (!gp?.third) continue;
-      const team = allTeams.find(t => t.id === gp.third);
-      if (team) teams.push(team);
-    }
-    return teams;
-  }, [groups, savedGroupPreds, allTeams]);
-
-  // ── Handlers ───────────────────────────────────────────────────────────────
+  }, [loading, activeElimTab, isPhaseUnlocked]);
 
   const handlePickMatch = useCallback((matchId: string, outcome: Outcome) => {
     if (savedPreds[matchId]) return;
@@ -457,13 +434,49 @@ export default function PredictionsPage() {
   }, [savedBracket, resolveSource]);
 
   const handlePickBracket = useCallback((phase: string, slot: string, teamId: string) => {
-    const key = `${phase}:${slot}`;
+    const key = bracketKey(phase, slot);
     if (savedBracket[key]) return;
+
+    const isThirdPick =
+      phase === "ROUND_OF_32" &&
+      (() => {
+        const m = (BRACKET_MATCHES.ROUND_OF_32 ?? []).find(
+          (bm) => bm.matchNum === parseInt(normalizeMatchSlot(phase, slot), 10)
+        );
+        return m && (m.leftSource.startsWith("3") || m.rightSource.startsWith("3"));
+      })();
+
+    if (isThirdPick) {
+      const used = getUsedThirdPlaceTeamIds(savedBracket, key);
+      for (const [k, v] of Object.entries(pendingBracket)) {
+        if (!k.startsWith("ROUND_OF_32:") || k === key) continue;
+        const mn = parseInt(k.split(":")[1], 10);
+        const m = (BRACKET_MATCHES.ROUND_OF_32 ?? []).find((bm) => bm.matchNum === mn);
+        if (m && (m.leftSource.startsWith("3") || m.rightSource.startsWith("3"))) used.add(v);
+      }
+      if (used.has(teamId)) {
+        toast.error("Ese tercero ya fue elegido en otro cruce");
+        return;
+      }
+    } else if (phase !== "CHAMPION") {
+      const match = (BRACKET_MATCHES[phase] ?? []).find(
+        (m) => m.matchNum === parseInt(normalizeMatchSlot(phase, slot), 10)
+      );
+      if (match) {
+        const lt = resolveBracketSource(match.leftSource, bracketCtx) as Team | null;
+        const rt = resolveBracketSource(match.rightSource, bracketCtx) as Team | null;
+        if (lt && rt && teamId !== lt.id && teamId !== rt.id) {
+          toast.error("Solo podés elegir uno de los dos equipos del cruce");
+          return;
+        }
+      }
+    }
+
     setPendingBracket(prev => ({ ...prev, [key]: teamId }));
-  }, [savedBracket]);
+  }, [savedBracket, pendingBracket, groups, allTeams, savedPreds, savedGroupPreds]);
 
   const handlePickBracketScore = useCallback((phase: string, matchNum: number, side: "home" | "away", value: number) => {
-    const key = `${phase}:${matchNum}`;
+    const key = bracketKey(phase, String(matchNum));
     setPendingBracketScores(prev => ({ ...prev, [key]: { ...prev[key], [side]: value } }));
   }, []);
 
@@ -490,7 +503,7 @@ export default function PredictionsPage() {
       if (savedBracket[key]) continue;
       const [phase, slot] = key.split(":");
       const matchNum = parseInt(slot);
-      const score = hardcoreMode ? pendingBracketScores[`${phase}:${matchNum}`] : undefined;
+      const score = hardcoreMode ? pendingBracketScores[key] : undefined;
       const scorePayload = (score?.home !== undefined && score?.away !== undefined)
         ? { predictedHomeScore: score.home, predictedAwayScore: score.away }
         : {};
@@ -503,9 +516,8 @@ export default function PredictionsPage() {
           setSavedBracket(prev => ({ ...prev, [key]: teamId }));
           setPendingBracket(prev => { const n = { ...prev }; delete n[key]; return n; });
           if (score?.home !== undefined && score?.away !== undefined) {
-            const scoreKey = `${phase}:${matchNum}`;
-            setSavedBracketScores(prev => ({ ...prev, [scoreKey]: { home: score.home!, away: score.away! } }));
-            setPendingBracketScores(prev => { const n = { ...prev }; delete n[scoreKey]; return n; });
+            setSavedBracketScores(prev => ({ ...prev, [key]: { home: score.home!, away: score.away! } }));
+            setPendingBracketScores(prev => { const n = { ...prev }; delete n[key]; return n; });
           }
           ok++;
         } else { const d = await res.json(); toast.error(d.error || "Error"); }
@@ -609,7 +621,22 @@ export default function PredictionsPage() {
       } else if (type === "group") {
         setSavedGroupPreds(prev => { const n = { ...prev }; delete n[id]; return n; });
       } else if (type === "bracket") {
-        setSavedBracket(prev => { const n = { ...prev }; delete n[id]; return n; });
+        const [phase, ...rest] = id.split(":");
+        const slot = rest.join(":");
+        setSavedBracket(prev => {
+          const n = { ...prev };
+          delete n[id];
+          delete n[bracketKey(phase, slot)];
+          for (const k of getDownstreamBracketKeys(phase, slot)) delete n[k];
+          return n;
+        });
+        setSavedBracketScores(prev => {
+          const n = { ...prev };
+          delete n[id];
+          delete n[bracketKey(phase, slot)];
+          for (const k of getDownstreamBracketKeys(phase, slot)) delete n[k];
+          return n;
+        });
       }
       toast.success("¡Predicción desbloqueada! Podés modificarla ahora.");
     } catch { toast.error("Error de conexión"); }
@@ -1147,14 +1174,12 @@ export default function PredictionsPage() {
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <div className="text-5xl mb-4">🔒</div>
                     <p className="text-white font-black text-lg mb-2">Fase bloqueada</p>
+                    <p className="text-gray-500 text-sm max-w-sm leading-relaxed">
+                      {getPhaseBlockReason(activeElimTab)}
+                    </p>
                     {activeElimTab === "ROUND_OF_32" ? (
                       <>
-                        <p className="text-gray-500 text-sm max-w-xs leading-relaxed">
-                          Primero tenés que predecir todos los partidos de{" "}
-                          <span className="text-white font-semibold">los {groups.length} grupos</span>.
-                          La tabla se arma automáticamente.
-                        </p>
-                        <p className="text-gray-700 text-xs mt-2">
+                        <p className="text-gray-700 text-xs mt-3">
                           Grupos completos: {completedGroupsCount}/{groups.length}
                         </p>
                         <button
@@ -1165,12 +1190,15 @@ export default function PredictionsPage() {
                         </button>
                       </>
                     ) : (
-                      <p className="text-gray-500 text-sm max-w-xs leading-relaxed">
-                        Primero tenés que completar y confirmar todas las selecciones de{" "}
-                        <span className="text-white font-semibold">
-                          {ELIMINATORIAS_PHASES[ELIMINATORIAS_PHASES.findIndex(p => p.key === activeElimTab) - 1]?.fullLabel}
-                        </span>.
-                      </p>
+                      <button
+                        onClick={() => {
+                          const idx = ELIMINATORIAS_PHASES.findIndex(p => p.key === activeElimTab);
+                          if (idx > 0) setActiveElimTab(ELIMINATORIAS_PHASES[idx - 1].key);
+                        }}
+                        className="mt-4 px-4 py-2 bg-[#1a1a1a] hover:bg-[#252525] border border-[#333] text-white text-sm font-bold rounded-xl transition-colors"
+                      >
+                        Ir a fase anterior →
+                      </button>
                     )}
                   </div>
                 ) : (
@@ -1205,7 +1233,49 @@ export default function PredictionsPage() {
                       </div>
                     )}
 
-                    {/* Champion card */}
+                    {/* Third-place tracker (R32 only) */}
+                    {currentPhase.key === "ROUND_OF_32" && (() => {
+                      const used = getUsedThirdPlaceTeamIds(savedBracket);
+                      for (const [k, v] of Object.entries(pendingBracket)) {
+                        if (!k.startsWith("ROUND_OF_32:")) continue;
+                        const mn = parseInt(k.split(":")[1], 10);
+                        const m = (BRACKET_MATCHES.ROUND_OF_32 ?? []).find((bm) => bm.matchNum === mn);
+                        if (m && (m.leftSource.startsWith("3") || m.rightSource.startsWith("3"))) used.add(v);
+                      }
+                      return (
+                        <div className="mb-4 flex items-center gap-2 px-3 py-2 bg-[#111] border border-[#222] rounded-xl">
+                          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Mejores 3°</span>
+                          <div className="flex-1 h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-amber-500/70 rounded-full transition-all"
+                              style={{ width: `${Math.min(100, (used.size / 8) * 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-bold text-amber-400 tabular-nums">{used.size}/8</span>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Stale picks warning */}
+                    {(() => {
+                      const staleCount = (BRACKET_MATCHES[currentPhase.key] ?? []).filter((match) => {
+                        const key = bracketKey(match.phase, String(match.matchNum));
+                        const pick = savedBracket[key];
+                        return pick && isBracketPickStale(match.phase, String(match.matchNum), pick, bracketCtx);
+                      }).length + (savedBracket["CHAMPION:1"] && isBracketPickStale("CHAMPION", "1", savedBracket["CHAMPION:1"], bracketCtx) ? 1 : 0);
+                      if (staleCount === 0) return null;
+                      return (
+                        <div className="mb-4 flex items-start gap-2 px-3 py-2.5 bg-red-500/10 border border-red-500/25 rounded-xl">
+                          <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                          <p className="text-red-300 text-xs leading-relaxed">
+                            {staleCount} predicción{staleCount > 1 ? "es" : ""} ya no coincide con tu llave actual.
+                            Usá <strong className="text-red-200">Cambiar</strong> para corregirlas.
+                          </p>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Bracket grid — column layout on wide screens for knockout feel */}
                     {currentPhase.key === "CHAMPION" ? (
                       <ChampionCard
                         allTeams={allTeams}
@@ -1214,31 +1284,43 @@ export default function PredictionsPage() {
                         onOpenPicker={() => setSelectionModal({ phase: "CHAMPION", slot: "1" })}
                       />
                     ) : (
-                      <div className={`grid gap-3 ${currentPhase.slots <= 2 ? "grid-cols-1 max-w-sm mx-auto" : "grid-cols-1 sm:grid-cols-2"}`}>
-                        {(BRACKET_MATCHES[currentPhase.key] ?? []).map((match: BracketMatch, i: number) => (
+                      <div className={`grid gap-3 ${
+                        currentPhase.slots >= 8
+                          ? "grid-cols-1 lg:grid-cols-2"
+                          : currentPhase.slots <= 2
+                            ? "grid-cols-1 max-w-sm mx-auto"
+                            : "grid-cols-1 sm:grid-cols-2"
+                      }`}>
+                        {(BRACKET_MATCHES[currentPhase.key] ?? []).map((match: BracketMatch, i: number) => {
+                          const matchKey = bracketKey(match.phase, String(match.matchNum));
+                          const pickedId = savedBracket[matchKey] || pendingBracket[matchKey] || null;
+                          const isStale = !!savedBracket[matchKey] && isBracketPickStale(match.phase, String(match.matchNum), pickedId, bracketCtx);
+                          return (
                           <BracketMatchCard2
                             key={match.matchNum}
                             match={match}
                             leftTeam={resolveSource(match.leftSource)}
                             rightTeam={resolveSource(match.rightSource)}
-                            leftCandidates={match.leftSource.startsWith("3") ? getThirdPlaceCandidates(match.leftSource) : []}
-                            rightCandidates={match.rightSource.startsWith("3") ? getThirdPlaceCandidates(match.rightSource) : []}
-                            pickedTeamId={savedBracket[`${match.phase}:${match.matchNum}`] || pendingBracket[`${match.phase}:${match.matchNum}`] || null}
-                            isLocked={!!savedBracket[`${match.phase}:${match.matchNum}`]}
-                            isPending={!!pendingBracket[`${match.phase}:${match.matchNum}`] && !savedBracket[`${match.phase}:${match.matchNum}`]}
+                            leftCandidates={match.leftSource.startsWith("3") ? getThirdPlaceCandidates(match.leftSource, matchKey) : []}
+                            rightCandidates={match.rightSource.startsWith("3") ? getThirdPlaceCandidates(match.rightSource, matchKey) : []}
+                            pickedTeamId={pickedId}
+                            isLocked={!!savedBracket[matchKey]}
+                            isStale={isStale}
+                            isPending={!!pendingBracket[matchKey] && !savedBracket[matchKey]}
                             hardcoreMode={hardcoreMode}
-                            pendingBracketScore={pendingBracketScores[`${match.phase}:${match.matchNum}`]}
-                            savedBracketScore={savedBracketScores[`${match.phase}:${match.matchNum}`]}
+                            pendingBracketScore={pendingBracketScores[matchKey]}
+                            savedBracketScore={savedBracketScores[matchKey]}
                             onPickBracketScore={(side, value) => handlePickBracketScore(match.phase, match.matchNum, side, value)}
                             onSaveBracketScore={(home, away) => handleSaveBracketMatchScore(match.phase, String(match.matchNum), home, away)}
-                            savingBracketScore={savingBracketMatch[`${match.phase}:${match.matchNum}`]}
+                            savingBracketScore={savingBracketMatch[matchKey]}
                             delay={i * 0.06}
                             onPick={(teamId) => handlePickBracket(match.phase, String(match.matchNum), teamId)}
                             changesRemaining={changesRemaining}
                             onUseChange={handleUseChange}
                             usingChange={usingChange}
                           />
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
 
@@ -2076,7 +2158,7 @@ function MatchCard({
 
 function BracketMatchCard2({
   match, leftTeam, rightTeam, leftCandidates, rightCandidates,
-  pickedTeamId, isLocked, isPending,
+  pickedTeamId, isLocked, isPending, isStale = false,
   hardcoreMode, pendingBracketScore, savedBracketScore, onPickBracketScore,
   onSaveBracketScore, savingBracketScore,
   delay, onPick,
@@ -2090,6 +2172,7 @@ function BracketMatchCard2({
   pickedTeamId: string | null;
   isLocked: boolean;
   isPending: boolean;
+  isStale?: boolean;
   hardcoreMode: boolean;
   pendingBracketScore?: { home?: number; away?: number };
   savedBracketScore?: { home: number; away: number };
@@ -2122,7 +2205,7 @@ function BracketMatchCard2({
   const rightClickable = !isLocked && !!rightTeam && (!isLeftThird  || !!leftTeam);
   const hasPendingScore = pendingBracketScore?.home !== undefined && pendingBracketScore?.away !== undefined;
 
-  const bracketKey = `${match.phase}:${match.matchNum}`;
+  const matchKey = bracketKey(match.phase, String(match.matchNum));
 
   function handleSideClick(team: Team | null) {
     if (isLocked || !team) return;
@@ -2133,6 +2216,7 @@ function BracketMatchCard2({
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.25, ease: "easeOut" }}
       className={`relative overflow-hidden rounded-2xl border transition-all ${
+        isStale ? "border-red-500/40 bg-red-950/20" :
         isLocked && savedBracketScore ? "border-green-500/20 bg-gradient-to-br from-[#0d110d] to-[#0a0a0a]" :
         isLocked && hardcoreMode && !savedBracketScore && hasPendingScore ? "border-orange-500/30 bg-orange-500/5" :
         isLocked && hardcoreMode && !savedBracketScore ? "border-orange-500/15 bg-[#0f0d0a]" :
@@ -2143,8 +2227,12 @@ function BracketMatchCard2({
 
       {/* Match number badge */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10">
-        <div className="px-3 py-0.5 bg-[#111] border border-[#252525] border-t-0 rounded-b-lg">
-          <span className="text-gray-700 text-[9px] font-bold uppercase tracking-widest">P{match.matchNum}</span>
+        <div className={`px-3 py-0.5 border border-t-0 rounded-b-lg ${
+          isStale ? "bg-red-950/80 border-red-500/30" : "bg-[#111] border-[#252525]"
+        }`}>
+          <span className={`text-[9px] font-bold uppercase tracking-widest ${isStale ? "text-red-400" : "text-gray-700"}`}>
+            P{match.matchNum}{isStale ? " · revisar" : ""}
+          </span>
         </div>
       </div>
 
@@ -2205,7 +2293,7 @@ function BracketMatchCard2({
             </motion.button>
           )}
           {isLocked && leftPicked && (changesRemaining ?? 0) > 0 && onUseChange && (
-            <button onClick={() => onUseChange("bracket", bracketKey)} disabled={usingChange}
+            <button onClick={() => onUseChange("bracket", matchKey)} disabled={usingChange}
               className="flex items-center gap-1 px-2 py-0.5 rounded border border-amber-500/30 text-amber-400 text-[9px] font-semibold hover:bg-amber-500/10 transition-colors disabled:opacity-50">
               <Gift className="w-2.5 h-2.5" /> Cambiar
             </button>
@@ -2275,7 +2363,7 @@ function BracketMatchCard2({
             </motion.button>
           )}
           {isLocked && rightPicked && (changesRemaining ?? 0) > 0 && onUseChange && (
-            <button onClick={() => onUseChange("bracket", bracketKey)} disabled={usingChange}
+            <button onClick={() => onUseChange("bracket", matchKey)} disabled={usingChange}
               className="flex items-center gap-1 px-2 py-0.5 rounded border border-amber-500/30 text-amber-400 text-[9px] font-semibold hover:bg-amber-500/10 transition-colors disabled:opacity-50">
               <Gift className="w-2.5 h-2.5" /> Cambiar
             </button>
