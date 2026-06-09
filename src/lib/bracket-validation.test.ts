@@ -101,7 +101,6 @@ const slotCtx: BracketContext = {
   ...thirdCtx,
   savedBracket: {},
 };
-const top8 = getQualifyingThirdTeamIds(slotCtx);
 const slotEntries = getThirdPlaceCandidateEntries("3DEIJL", slotCtx);
 assert(slotEntries.length === 5, "P87 slot lists all 5 projected thirds from D/E/I/J/L");
 assert(
