@@ -40,10 +40,9 @@ import {
   normalizeSavedBracket,
   normalizeMatchSlot,
   resolveSource as resolveBracketSource,
-  getThirdPlaceCandidateEntries as getThirdCandidateEntries,
+  getThirdSlotPickState,
   getAssignedThirdTeamIds,
   computeThirdPlaceRankings,
-  resolveBracketSideTeam,
   validateBracketPick,
   validatePendingBracketPicks,
   isPhaseUnlocked as checkPhaseUnlocked,
@@ -288,15 +287,6 @@ export default function PredictionsPage() {
     (source: string): Team | null =>
       resolveBracketSource(source, bracketCtx) as Team | null,
     [groups, allTeams, savedPreds, savedGroupPreds, savedBracket]
-  );
-
-  const getThirdPlaceCandidateEntries = useCallback(
-    (source: string, excludeKey?: string) => {
-      const bracketForAssignment = { ...savedBracket, ...pendingBracket };
-      const exclude = getAssignedThirdTeamIds(bracketCtx, bracketForAssignment, excludeKey);
-      return getThirdCandidateEntries(source, bracketCtx, exclude);
-    },
-    [groups, allTeams, savedPreds, savedGroupPreds, savedBracket, pendingBracket, savedScores]
   );
 
   useEffect(() => {
@@ -1397,11 +1387,14 @@ export default function PredictionsPage() {
                           const isPending = !!pendingBracket[matchKey] && !isSaved;
                           const fieldError = bracketFieldErrors[matchKey];
                           const isStale = isSaved && !!pickedId && isBracketPickStale(match.phase, String(match.matchNum), pickedId, bracketCtx);
-                          const leftTeam = match.leftSource.startsWith("3")
-                            ? (resolveBracketSideTeam(match.leftSource, pickedId, bracketCtx) as Team | null)
+                          const thirdSlot = getThirdSlotPickState(match, pickedId, bracketCtx, matchKey);
+                          const isLeftThird = match.leftSource.startsWith("3");
+                          const isRightThird = match.rightSource.startsWith("3");
+                          const leftTeam = thirdSlot
+                            ? (isLeftThird ? thirdSlot.thirdPickedTeam : thirdSlot.fixedTeam) as Team | null
                             : resolveSource(match.leftSource);
-                          const rightTeam = match.rightSource.startsWith("3")
-                            ? (resolveBracketSideTeam(match.rightSource, pickedId, bracketCtx) as Team | null)
+                          const rightTeam = thirdSlot
+                            ? (isRightThird ? thirdSlot.thirdPickedTeam : thirdSlot.fixedTeam) as Team | null
                             : resolveSource(match.rightSource);
                           return (
                           <BracketMatchCard2
@@ -1409,9 +1402,17 @@ export default function PredictionsPage() {
                             match={match}
                             leftTeam={leftTeam}
                             rightTeam={rightTeam}
-                            leftCandidateEntries={match.leftSource.startsWith("3") ? getThirdPlaceCandidateEntries(match.leftSource, matchKey) as { team: Team; groupLetter: string; qualifies: boolean }[] : []}
-                            rightCandidateEntries={match.rightSource.startsWith("3") ? getThirdPlaceCandidateEntries(match.rightSource, matchKey) as { team: Team; groupLetter: string; qualifies: boolean }[] : []}
-                            allTeams={allTeams}
+                            thirdSlot={thirdSlot ? {
+                              fixedTeam: thirdSlot.fixedTeam as Team | null,
+                              thirdPickedTeam: thirdSlot.thirdPickedTeam as Team | null,
+                              entries: thirdSlot.entries.map((e) => ({
+                                team: e.team as Team,
+                                groupLetter: e.groupLetter,
+                                qualifies: e.qualifies,
+                              })),
+                              fixedPicked: thirdSlot.fixedPicked,
+                              thirdSource: thirdSlot.thirdSource,
+                            } : null}
                             pickedTeamId={pickedId}
                             isLocked={isSaved}
                             isPending={isPending}
@@ -2267,8 +2268,7 @@ function MatchCard({
 // ─── Bracket Match Card 2 (connected to group predictions / bracket winners) ──
 
 function BracketMatchCard2({
-  match, leftTeam, rightTeam, leftCandidateEntries, rightCandidateEntries,
-  allTeams, pickedTeamId, isLocked, isPending, isStale = false, validationError,
+  match, leftTeam, rightTeam, thirdSlot, pickedTeamId, isLocked, isPending, isStale = false, validationError,
   hardcoreMode, pendingBracketScore, savedBracketScore, onPickBracketScore,
   onSaveBracketScore, savingBracketScore,
   delay, onPick,
@@ -2277,9 +2277,13 @@ function BracketMatchCard2({
   match: BracketMatch;
   leftTeam: Team | null;
   rightTeam: Team | null;
-  leftCandidateEntries: { team: Team; groupLetter: string; qualifies: boolean }[];
-  rightCandidateEntries: { team: Team; groupLetter: string; qualifies: boolean }[];
-  allTeams: Team[];
+  thirdSlot: {
+    fixedTeam: Team | null;
+    thirdPickedTeam: Team | null;
+    entries: { team: Team; groupLetter: string; qualifies: boolean }[];
+    fixedPicked: boolean;
+    thirdSource: string;
+  } | null;
   pickedTeamId: string | null;
   isLocked: boolean;
   isPending: boolean;
@@ -2300,7 +2304,9 @@ function BracketMatchCard2({
   const [thirdPickMode, setThirdPickMode] = useState<"left" | "right" | null>(null);
 
   const pickedTeam = pickedTeamId
-    ? allTeams.find((t) => t.id === pickedTeamId) ?? null
+    ? (thirdSlot?.fixedPicked
+        ? thirdSlot.fixedTeam
+        : thirdSlot?.thirdPickedTeam) ?? null
     : null;
 
   const hasError = !!validationError;
@@ -2317,15 +2323,21 @@ function BracketMatchCard2({
   const isLeftThird = match.leftSource.startsWith("3");
   const isRightThird = match.rightSource.startsWith("3");
 
-  const leftPicked  = pickedTeamId === leftTeam?.id;
-  const rightPicked = pickedTeamId === rightTeam?.id;
+  const thirdSidePicked = !!(thirdSlot?.thirdPickedTeam && pickedTeamId === thirdSlot.thirdPickedTeam.id);
+  const fixedSidePicked = !!thirdSlot?.fixedPicked;
 
-  // A side is "ready to click" if the team is known on that side.
-  // For 3rd-place slots the ThirdPickerSide handles its own onPick call.
-  // The non-3rd side can still be clicked even if the other side is a 3rd pick.
-  const teamsKnown = !!(leftTeam && rightTeam);
-  const leftClickable  = !isLocked && !!leftTeam  && (!isRightThird || !!rightTeam);
-  const rightClickable = !isLocked && !!rightTeam && (!isLeftThird  || !!leftTeam);
+  const leftPicked = isLeftThird ? thirdSidePicked : fixedSidePicked;
+  const rightPicked = isRightThird ? thirdSidePicked : fixedSidePicked;
+
+  const leftThirdEntries = isLeftThird ? (thirdSlot?.entries ?? []) : [];
+  const rightThirdEntries = isRightThird ? (thirdSlot?.entries ?? []) : [];
+  const leftThirdSource = isLeftThird ? thirdSlot?.thirdSource ?? match.leftSource : match.leftSource;
+  const rightThirdSource = isRightThird ? thirdSlot?.thirdSource ?? match.rightSource : match.rightSource;
+
+  // Fixed side is always known in third-slot matches; third side uses picker until a 3° is chosen.
+  const teamsKnown = thirdSlot ? !!thirdSlot.fixedTeam : !!(leftTeam && rightTeam);
+  const leftClickable = !isLocked && !isLeftThird && !!leftTeam;
+  const rightClickable = !isLocked && !isRightThird && !!rightTeam;
   const hasPendingScore = pendingBracketScore?.home !== undefined && pendingBracketScore?.away !== undefined;
 
   const matchKey = bracketKey(match.phase, String(match.matchNum));
@@ -2384,12 +2396,11 @@ function BracketMatchCard2({
       <div className="flex items-stretch min-h-[130px] pt-4">
         {/* Left side */}
         <div className="flex-1 flex flex-col items-center justify-center gap-2 py-5 px-3 relative">
-          {isLeftThird && !leftTeam ? (
+          {isLeftThird ? (
             <ThirdPickerSide
-              source={match.leftSource}
-              candidateEntries={leftCandidateEntries}
-              allTeams={allTeams}
-              pickedTeamId={pickedTeamId}
+              source={leftThirdSource}
+              candidateEntries={leftThirdEntries}
+              pickedTeamId={thirdSidePicked ? pickedTeamId : null}
               isOpen={thirdPickMode === "left"}
               isLocked={isLocked}
               onToggle={() => setThirdPickMode(p => p === "left" ? null : "left")}
@@ -2455,12 +2466,11 @@ function BracketMatchCard2({
 
         {/* Right side */}
         <div className="flex-1 flex flex-col items-center justify-center gap-2 py-5 px-3 relative">
-          {isRightThird && !rightTeam ? (
+          {isRightThird ? (
             <ThirdPickerSide
-              source={match.rightSource}
-              candidateEntries={rightCandidateEntries}
-              allTeams={allTeams}
-              pickedTeamId={pickedTeamId}
+              source={rightThirdSource}
+              candidateEntries={rightThirdEntries}
+              pickedTeamId={thirdSidePicked ? pickedTeamId : null}
               isOpen={thirdPickMode === "right"}
               isLocked={isLocked}
               onToggle={() => setThirdPickMode(p => p === "right" ? null : "right")}
@@ -2693,24 +2703,21 @@ function ThirdPickerOption({
 }
 
 function ThirdPickerSide({
-  source, candidateEntries, allTeams, pickedTeamId, isOpen, isLocked, onToggle, onPick,
+  source, candidateEntries, pickedTeamId, isOpen, isLocked, onToggle, onPick,
 }: {
   source: string;
   candidateEntries: { team: Team; groupLetter: string; qualifies: boolean }[];
-  allTeams: Team[];
   pickedTeamId: string | null;
   isOpen: boolean;
   isLocked: boolean;
   onToggle: () => void;
   onPick: (teamId: string) => void;
 }) {
-  const picked =
-    candidateEntries.find((e) => e.team.id === pickedTeamId)?.team
-    ?? allTeams.find((t) => t.id === pickedTeamId)
-    ?? null;
+  const picked = candidateEntries.find((e) => e.team.id === pickedTeamId)?.team ?? null;
   const label = getSourceLabel(source);
   const qualifyingEntries = candidateEntries.filter((e) => e.qualifies);
   const fallbackEntries = candidateEntries.filter((e) => !e.qualifies);
+  const groupHint = source.slice(1).split("").join(", ");
 
   return (
     <div className="flex flex-col items-center gap-2 w-full">
@@ -2749,6 +2756,9 @@ function ThirdPickerSide({
       {/* Inline candidate picker */}
       {isOpen && !isLocked && candidateEntries.length > 0 && (
         <div className="w-full bg-[#141414] border border-[#2a2a2a] rounded-xl overflow-hidden">
+          <p className="px-3 pt-2 pb-1 text-[9px] text-gray-600 leading-tight">
+            3° de grupos {groupHint} — cada partido admite grupos distintos según el sorteo FIFA.
+          </p>
           {qualifyingEntries.length > 0 && (
             <>
               {qualifyingEntries.length > 0 && fallbackEntries.length > 0 && (

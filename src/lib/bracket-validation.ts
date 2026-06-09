@@ -393,6 +393,61 @@ export function getThirdPlaceCandidateEntries(
   return entries;
 }
 
+export interface ThirdSlotPickState {
+  fixedTeam: BracketTeam | null;
+  thirdSource: string;
+  entries: ThirdPlaceCandidateEntry[];
+  thirdPickedTeam: BracketTeam | null;
+  fixedPicked: boolean;
+  allowedTeamIds: Set<string>;
+}
+
+/** Single source of truth for third-slot picks: UI options === validation */
+export function getThirdSlotPickState(
+  match: BracketMatch,
+  pickedTeamId: string | null | undefined,
+  ctx: BracketContext,
+  excludeKey?: string
+): ThirdSlotPickState | null {
+  if (!match.leftSource.startsWith("3") && !match.rightSource.startsWith("3")) return null;
+
+  const thirdSource = getThirdSideSource(match);
+  if (!thirdSource) return null;
+
+  const fixedTeam = getFixedSideTeam(match, ctx);
+  const bracketForAssignment = { ...ctx.savedBracket, ...(ctx.pendingBracket ?? {}) };
+  const exclude = getAssignedThirdTeamIds(ctx, bracketForAssignment, excludeKey);
+  const entries = getThirdPlaceCandidateEntries(thirdSource, ctx, exclude);
+  const thirdPickedTeam =
+    pickedTeamId && entries.some((e) => e.team.id === pickedTeamId)
+      ? (ctx.allTeams.find((t) => t.id === pickedTeamId) ?? null)
+      : null;
+  const fixedPicked = !!(pickedTeamId && fixedTeam?.id === pickedTeamId);
+  const allowedTeamIds = new Set<string>([
+    ...(fixedTeam ? [fixedTeam.id] : []),
+    ...entries.map((e) => e.team.id),
+  ]);
+
+  return {
+    fixedTeam,
+    thirdSource,
+    entries,
+    thirdPickedTeam,
+    fixedPicked,
+    allowedTeamIds,
+  };
+}
+
+export function isAllowedThirdSlotPick(
+  match: BracketMatch,
+  teamId: string,
+  ctx: BracketContext,
+  excludeKey?: string
+): boolean {
+  const state = getThirdSlotPickState(match, null, ctx, excludeKey);
+  return state?.allowedTeamIds.has(teamId) ?? false;
+}
+
 export function getThirdPlaceCandidates(
   source: string,
   ctx: BracketContext,
@@ -510,17 +565,17 @@ export function validateBracketPick(
   const { left, right } = resolveMatchTeams(match, ctx);
 
   if (isThirdSlot) {
-    const fixedTeam = getFixedSideTeam(match, ctx);
-    if (fixedTeam?.id === teamId) return { valid: true };
+    const pickState = getThirdSlotPickState(match, null, ctx, key);
+    if (!pickState) {
+      return {
+        valid: false,
+        error: formatBracketMatchError(match.matchNum, "No se pudo resolver el cruce de terceros."),
+      };
+    }
 
-    const sideSource = getThirdSideSource(match)!;
-    const bracketForAssignment = { ...ctx.savedBracket, ...(ctx.pendingBracket ?? {}) };
-    const exclude = getAssignedThirdTeamIds(ctx, bracketForAssignment, key);
-    const candidates = getThirdPlaceCandidates(sideSource, ctx, exclude);
+    if (pickState.allowedTeamIds.has(teamId)) return { valid: true };
 
-    if (candidates.some((t) => t.id === teamId)) return { valid: true };
-
-    if (exclude.has(teamId)) {
+    if (getAssignedThirdTeamIds(ctx, { ...ctx.savedBracket, ...(ctx.pendingBracket ?? {}) }, key).has(teamId)) {
       return {
         valid: false,
         error: formatBracketMatchError(
@@ -530,21 +585,11 @@ export function validateBracketPick(
       };
     }
 
-    if (!getAllProjectedThirdTeamIds(ctx).has(teamId)) {
-      return {
-        valid: false,
-        error: formatBracketMatchError(
-          match.matchNum,
-          "Elegí el rival directo del cruce o un 3° de los grupos indicados."
-        ),
-      };
-    }
-
     return {
       valid: false,
       error: formatBracketMatchError(
         match.matchNum,
-        "Ese 3° no puede ir en este cruce."
+        "Elegí el rival directo del cruce o un 3° de la lista ofrecida."
       ),
     };
   }
@@ -619,12 +664,10 @@ export function isBracketPickStale(
   const { left, right } = resolveMatchTeams(match, ctx, isThird ? pickedTeamId : undefined);
 
   if (isThird) {
-    const fixed = getFixedSideTeam(match, ctx);
-    if (fixed && pickedTeamId === fixed.id) return false;
-
-    const sideSource = getThirdSideSource(match)!;
-    const exclude = getAssignedThirdTeamIds(ctx, ctx.savedBracket, bracketKey(phase, slot));
-    return !getThirdPlaceCandidates(sideSource, ctx, exclude).some((t) => t.id === pickedTeamId);
+    const pickState = getThirdSlotPickState(match, pickedTeamId, ctx, bracketKey(phase, slot));
+    if (pickState?.fixedPicked) return false;
+    if (pickState?.thirdPickedTeam) return false;
+    return true;
   }
 
   if (!left || !right) return true;

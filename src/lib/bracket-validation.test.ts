@@ -4,6 +4,9 @@
  */
 
 import {
+  BRACKET_MATCHES,
+} from "./bracket-structure";
+import {
   bracketKey,
   normalizeMatchSlot,
   normalizeSavedBracket,
@@ -14,6 +17,7 @@ import {
   deriveProjectedGroupStandings,
   getThirdPlaceCandidateEntries,
   getThirdPlaceCandidates,
+  getThirdSlotPickState,
   type BracketContext,
 } from "./bracket-validation";
 
@@ -113,6 +117,19 @@ assert(
   ),
   "getThirdPlaceCandidates mirrors entries"
 );
+
+// Fixed-side pick must not appear as third-side selection
+const p87 = BRACKET_MATCHES.ROUND_OF_32!.find((m) => m.matchNum === 87)!;
+const colCtx: BracketContext = {
+  ...thirdCtx,
+  savedGroupPreds: {
+    ...thirdCtx.savedGroupPreds,
+    gK: { first: "tK1", second: "tK2", third: "tK3" },
+  },
+};
+const colPick = getThirdSlotPickState(p87, "tK1", colCtx, "ROUND_OF_32:87");
+assert(colPick?.fixedPicked === true, "Colombia/1K pick is fixed side");
+assert(colPick?.thirdPickedTeam === null, "fixed pick must not populate third side");
 
 // Downstream invalidation
 const downstream = getDownstreamBracketKeys("ROUND_OF_32", "73");
