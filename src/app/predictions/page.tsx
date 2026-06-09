@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
@@ -41,6 +41,9 @@ import {
   normalizeMatchSlot,
   resolveSource as resolveBracketSource,
   getThirdSlotPickState,
+  validateThirdSlotRival,
+  getThirdSlotMatches,
+  isProjectedThirdTeamId,
   getAssignedThirdTeamIds,
   computeThirdPlaceRankings,
   validateBracketPick,
@@ -102,6 +105,7 @@ export default function PredictionsPage() {
 
   const [pendingPreds, setPendingPreds] = useState<Record<string, Outcome>>({});
   const [pendingBracket, setPendingBracket] = useState<Record<string, string>>({});
+  const [pendingThirdSlotAssignments, setPendingThirdSlotAssignments] = useState<Record<string, string>>({});
   const [bracketFieldErrors, setBracketFieldErrors] = useState<Record<string, string>>({});
 
   const [savingGroup, setSavingGroup] = useState<Record<string, boolean>>({});
@@ -245,6 +249,48 @@ export default function PredictionsPage() {
 
   // ── Bracket context (confirmed picks only for downstream resolution) ────────
 
+  const thirdSlotAssignments = useMemo(() => {
+    const merged: Record<string, string> = { ...pendingThirdSlotAssignments };
+    if (allTeams.length === 0 || groups.length === 0) return merged;
+
+    const baseCtx: BracketContext = {
+      groups: groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        teams: g.teams,
+        matches: g.matches.map((m) => ({
+          id: m.id,
+          phase: m.phase,
+          homeTeamId: m.homeTeam?.id ?? null,
+          awayTeamId: m.awayTeam?.id ?? null,
+        })),
+      })),
+      allTeams,
+      savedPreds: savedPreds as Record<string, string>,
+      savedGroupPreds,
+      savedBracket,
+      savedScores,
+    };
+
+    for (const match of getThirdSlotMatches()) {
+      const key = bracketKey("ROUND_OF_32", String(match.matchNum));
+      if (merged[key]) continue;
+      const winnerId = savedBracket[key];
+      if (winnerId && isProjectedThirdTeamId(baseCtx, winnerId)) {
+        merged[key] = winnerId;
+      }
+    }
+    return merged;
+  }, [
+    allTeams,
+    groups,
+    savedPreds,
+    savedGroupPreds,
+    savedBracket,
+    savedScores,
+    pendingThirdSlotAssignments,
+  ]);
+
   const bracketCtx: BracketContext = {
     groups: groups.map((g) => ({
       id: g.id,
@@ -262,7 +308,13 @@ export default function PredictionsPage() {
     savedGroupPreds,
     savedBracket,
     pendingBracket,
+    thirdSlotAssignments,
     savedScores,
+  };
+
+  const displayBracketCtx: BracketContext = {
+    ...bracketCtx,
+    savedBracket: { ...savedBracket, ...pendingBracket },
   };
 
   const isPhaseUnlocked = useCallback(
@@ -433,26 +485,69 @@ export default function PredictionsPage() {
     setSavingBracketMatch(prev => ({ ...prev, [key]: false }));
   }, [savedBracket, resolveSource]);
 
+  const handleAssignThirdRival = useCallback((phase: string, slot: string, teamId: string) => {
+    const key = bracketKey(phase, slot);
+    if (savedBracket[key]) return;
+
+    const match = (BRACKET_MATCHES[phase] ?? []).find((m) => m.matchNum === parseInt(slot, 10));
+    if (!match) return;
+
+    const validation = validateThirdSlotRival(match, teamId, {
+      ...bracketCtx,
+      pendingBracket,
+      thirdSlotAssignments,
+    }, key);
+    if (!validation.valid) {
+      toast.error(validation.error || "Tercero inválido", { duration: 6000 });
+      return;
+    }
+
+    setPendingThirdSlotAssignments(prev => ({ ...prev, [key]: teamId }));
+    setPendingBracket(prev => {
+      const next = { ...prev };
+      const oldWinner = next[key];
+      if (oldWinner && oldWinner !== teamId && isProjectedThirdTeamId(bracketCtx, oldWinner)) {
+        delete next[key];
+      }
+      return next;
+    });
+    setBracketFieldErrors(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, [savedBracket, bracketCtx, pendingBracket, thirdSlotAssignments]);
+
   const handlePickBracket = useCallback((phase: string, slot: string, teamId: string) => {
     const key = bracketKey(phase, slot);
     if (savedBracket[key]) return;
 
+    const match = (BRACKET_MATCHES[phase] ?? []).find((m) => m.matchNum === parseInt(slot, 10));
+    const isThirdSlot = match && (match.leftSource.startsWith("3") || match.rightSource.startsWith("3"));
+    const nextAssignments = isThirdSlot && isProjectedThirdTeamId(bracketCtx, teamId)
+      ? { ...thirdSlotAssignments, [key]: teamId }
+      : thirdSlotAssignments;
+
     const validation = validateBracketPick(phase, slot, teamId, {
       ...bracketCtx,
-      savedBracket: { ...savedBracket, ...pendingBracket },
+      pendingBracket: { ...pendingBracket, [key]: teamId },
+      thirdSlotAssignments: nextAssignments,
     });
     if (!validation.valid) {
-      toast.error(validation.error || "Selección inválida");
+      toast.error(validation.error || "Selección inválida", { duration: 6000 });
       return;
     }
 
+    if (isThirdSlot && isProjectedThirdTeamId(bracketCtx, teamId)) {
+      setPendingThirdSlotAssignments(prev => ({ ...prev, [key]: teamId }));
+    }
     setPendingBracket(prev => ({ ...prev, [key]: teamId }));
     setBracketFieldErrors(prev => {
       const next = { ...prev };
       delete next[key];
       return next;
     });
-  }, [savedBracket, pendingBracket, bracketCtx]);
+  }, [savedBracket, pendingBracket, bracketCtx, thirdSlotAssignments]);
 
   const handlePickBracketScore = useCallback((phase: string, matchNum: number, side: "home" | "away", value: number) => {
     const key = bracketKey(phase, String(matchNum));
@@ -514,6 +609,7 @@ export default function PredictionsPage() {
         if (res.ok) {
           setSavedBracket(prev => ({ ...prev, [key]: teamId }));
           setPendingBracket(prev => { const n = { ...prev }; delete n[key]; return n; });
+          setPendingThirdSlotAssignments(prev => { const n = { ...prev }; delete n[key]; return n; });
           if (score?.home !== undefined && score?.away !== undefined) {
             setSavedBracketScores(prev => ({ ...prev, [key]: { home: score.home!, away: score.away! } }));
             setPendingBracketScores(prev => { const n = { ...prev }; delete n[key]; return n; });
@@ -1253,6 +1349,15 @@ export default function PredictionsPage() {
                       </div>
                     </div>
 
+                    {/* How to pick winners */}
+                    {currentPhase.key !== "CHAMPION" && (
+                      <div className="mb-4 px-3 py-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs text-blue-200/90 leading-relaxed">
+                        <strong className="text-blue-200">¿Cómo funciona?</strong> Tocá el equipo que creés que{" "}
+                        <strong className="text-blue-100">pasa a la siguiente ronda</strong>.
+                        En cruces con terceros: primero elegí qué 3° juega (lista del otro lado) y después tocá quién gana el partido.
+                      </div>
+                    )}
+
                     {/* Phase status legend */}
                     {currentPhase.key !== "CHAMPION" && (
                       <div className="mb-4 flex flex-wrap items-center gap-2 text-[10px]">
@@ -1390,12 +1495,15 @@ export default function PredictionsPage() {
                           const thirdSlot = getThirdSlotPickState(match, pickedId, bracketCtx, matchKey);
                           const isLeftThird = match.leftSource.startsWith("3");
                           const isRightThird = match.rightSource.startsWith("3");
+                          const rivalId = thirdSlotAssignments[matchKey] ?? null;
+                          const rivalTeam = rivalId ? allTeams.find((t) => t.id === rivalId) ?? null : null;
+                          const fixedTeam = thirdSlot?.fixedTeam ?? null;
                           const leftTeam = thirdSlot
-                            ? (isLeftThird ? thirdSlot.thirdPickedTeam : thirdSlot.fixedTeam) as Team | null
-                            : resolveSource(match.leftSource);
+                            ? (isLeftThird ? rivalTeam : fixedTeam) as Team | null
+                            : resolveBracketSource(match.leftSource, displayBracketCtx) as Team | null;
                           const rightTeam = thirdSlot
-                            ? (isRightThird ? thirdSlot.thirdPickedTeam : thirdSlot.fixedTeam) as Team | null
-                            : resolveSource(match.rightSource);
+                            ? (isRightThird ? rivalTeam : fixedTeam) as Team | null
+                            : resolveBracketSource(match.rightSource, displayBracketCtx) as Team | null;
                           return (
                           <BracketMatchCard2
                             key={match.matchNum}
@@ -1404,13 +1512,13 @@ export default function PredictionsPage() {
                             rightTeam={rightTeam}
                             thirdSlot={thirdSlot ? {
                               fixedTeam: thirdSlot.fixedTeam as Team | null,
-                              thirdPickedTeam: thirdSlot.thirdPickedTeam as Team | null,
+                              thirdPickedTeam: rivalTeam,
                               entries: thirdSlot.entries.map((e) => ({
                                 team: e.team as Team,
                                 groupLetter: e.groupLetter,
                                 qualifies: e.qualifies,
                               })),
-                              fixedPicked: thirdSlot.fixedPicked,
+                              fixedPicked: !!(pickedId && fixedTeam && pickedId === fixedTeam.id),
                               thirdSource: thirdSlot.thirdSource,
                             } : null}
                             pickedTeamId={pickedId}
@@ -1426,6 +1534,7 @@ export default function PredictionsPage() {
                             savingBracketScore={savingBracketMatch[matchKey]}
                             delay={i * 0.06}
                             onPick={(teamId) => handlePickBracket(match.phase, String(match.matchNum), teamId)}
+                            onAssignThird={(teamId) => handleAssignThirdRival(match.phase, String(match.matchNum), teamId)}
                             changesRemaining={changesRemaining}
                             onUseChange={handleUseChange}
                             usingChange={usingChange}
@@ -2271,7 +2380,7 @@ function BracketMatchCard2({
   match, leftTeam, rightTeam, thirdSlot, pickedTeamId, isLocked, isPending, isStale = false, validationError,
   hardcoreMode, pendingBracketScore, savedBracketScore, onPickBracketScore,
   onSaveBracketScore, savingBracketScore,
-  delay, onPick,
+  delay, onPick, onAssignThird,
   changesRemaining, onUseChange, usingChange,
 }: {
   match: BracketMatch;
@@ -2297,16 +2406,15 @@ function BracketMatchCard2({
   savingBracketScore?: boolean;
   delay?: number;
   onPick: (teamId: string) => void;
+  onAssignThird?: (teamId: string) => void;
   changesRemaining?: number;
   onUseChange?: (type: "match" | "group" | "bracket", id: string) => void;
   usingChange?: boolean;
 }) {
   const [thirdPickMode, setThirdPickMode] = useState<"left" | "right" | null>(null);
 
-  const pickedTeam = pickedTeamId
-    ? (thirdSlot?.fixedPicked
-        ? thirdSlot.fixedTeam
-        : thirdSlot?.thirdPickedTeam) ?? null
+  const winnerTeam = pickedTeamId
+    ? (leftTeam?.id === pickedTeamId ? leftTeam : rightTeam?.id === pickedTeamId ? rightTeam : null)
     : null;
 
   const hasError = !!validationError;
@@ -2318,23 +2426,21 @@ function BracketMatchCard2({
         ? "Pendiente"
         : pickedTeamId
           ? "Pendiente"
-          : null;
+          : thirdSlot && !thirdSlot.thirdPickedTeam
+            ? "Elegí el 3°"
+            : null;
 
   const isLeftThird = match.leftSource.startsWith("3");
   const isRightThird = match.rightSource.startsWith("3");
 
-  const thirdSidePicked = !!(thirdSlot?.thirdPickedTeam && pickedTeamId === thirdSlot.thirdPickedTeam.id);
-  const fixedSidePicked = !!thirdSlot?.fixedPicked;
-
-  const leftPicked = isLeftThird ? thirdSidePicked : fixedSidePicked;
-  const rightPicked = isRightThird ? thirdSidePicked : fixedSidePicked;
+  const leftPicked = !!(pickedTeamId && leftTeam && pickedTeamId === leftTeam.id);
+  const rightPicked = !!(pickedTeamId && rightTeam && pickedTeamId === rightTeam.id);
 
   const leftThirdEntries = isLeftThird ? (thirdSlot?.entries ?? []) : [];
   const rightThirdEntries = isRightThird ? (thirdSlot?.entries ?? []) : [];
   const leftThirdSource = isLeftThird ? thirdSlot?.thirdSource ?? match.leftSource : match.leftSource;
   const rightThirdSource = isRightThird ? thirdSlot?.thirdSource ?? match.rightSource : match.rightSource;
 
-  // Fixed side is always known in third-slot matches; third side uses picker until a 3° is chosen.
   const teamsKnown = thirdSlot ? !!thirdSlot.fixedTeam : !!(leftTeam && rightTeam);
   const leftClickable = !isLocked && !isLeftThird && !!leftTeam;
   const rightClickable = !isLocked && !isRightThird && !!rightTeam;
@@ -2345,6 +2451,15 @@ function BracketMatchCard2({
   function handleSideClick(team: Team | null) {
     if (isLocked || !team) return;
     onPick(team.id);
+  }
+
+  function renderWinnerHint(sidePicked: boolean, clickable: boolean) {
+    if (isLocked || sidePicked || !clickable) return null;
+    return (
+      <span className="text-[9px] text-blue-400/80 font-bold uppercase tracking-wider">
+        Tocá para que pase
+      </span>
+    );
   }
 
   return (
@@ -2400,11 +2515,13 @@ function BracketMatchCard2({
             <ThirdPickerSide
               source={leftThirdSource}
               candidateEntries={leftThirdEntries}
-              pickedTeamId={thirdSidePicked ? pickedTeamId : null}
+              pickedTeamId={thirdSlot?.thirdPickedTeam?.id ?? null}
+              winnerTeamId={pickedTeamId}
               isOpen={thirdPickMode === "left"}
               isLocked={isLocked}
               onToggle={() => setThirdPickMode(p => p === "left" ? null : "left")}
-              onPick={(teamId) => { onPick(teamId); setThirdPickMode(null); }}
+              onAssignThird={(teamId) => { onAssignThird?.(teamId); setThirdPickMode(null); }}
+              onPickWinner={(teamId) => { onPick(teamId); setThirdPickMode(null); }}
             />
           ) : (
             <motion.button
@@ -2418,7 +2535,8 @@ function BracketMatchCard2({
                 <>
                   <div className={`relative rounded-lg transition-all ${
                     leftPicked && isPending ? "ring-2 ring-amber-500/60 ring-offset-2 ring-offset-[#0d0d0d]" :
-                    leftPicked && isLocked  ? "ring-2 ring-green-500/40 ring-offset-2 ring-offset-[#0d0d0d]" : ""
+                    leftPicked && isLocked  ? "ring-2 ring-green-500/40 ring-offset-2 ring-offset-[#0d0d0d]" :
+                    leftClickable ? "ring-1 ring-blue-500/20" : ""
                   }`}>
                     {leftTeam.flagUrl
                       // eslint-disable-next-line @next/next/no-img-element
@@ -2437,6 +2555,7 @@ function BracketMatchCard2({
                       leftPicked && isLocked ? "text-green-300" : leftPicked && isPending ? "text-amber-300" : "text-white"
                     }`}>{leftTeam.name}</p>
                     <p className="text-[9px] text-gray-700 mt-0.5">{getSourceLabel(match.leftSource)}</p>
+                    {renderWinnerHint(leftPicked, leftClickable)}
                   </div>
                 </>
               ) : (
@@ -2444,7 +2563,12 @@ function BracketMatchCard2({
                   <div className="w-14 h-10 rounded-lg border-2 border-dashed border-[#222] flex items-center justify-center">
                     <ChevronDown className="w-4 h-4 text-[#282828]" />
                   </div>
-                  <p className="text-[10px] text-gray-700 font-medium text-center px-1 leading-tight">{getSourceLabel(match.leftSource)}</p>
+                  <p className="text-[10px] text-gray-700 font-medium text-center px-1 leading-tight">
+                    {match.leftSource.startsWith("W")
+                      ? `Ganador de P${match.leftSource.slice(1)}`
+                      : getSourceLabel(match.leftSource)}
+                  </p>
+                  <p className="text-[9px] text-amber-700/70 text-center px-1">Confirmá ese partido antes</p>
                 </>
               )}
             </motion.button>
@@ -2470,11 +2594,13 @@ function BracketMatchCard2({
             <ThirdPickerSide
               source={rightThirdSource}
               candidateEntries={rightThirdEntries}
-              pickedTeamId={thirdSidePicked ? pickedTeamId : null}
+              pickedTeamId={thirdSlot?.thirdPickedTeam?.id ?? null}
+              winnerTeamId={pickedTeamId}
               isOpen={thirdPickMode === "right"}
               isLocked={isLocked}
               onToggle={() => setThirdPickMode(p => p === "right" ? null : "right")}
-              onPick={(teamId) => { onPick(teamId); setThirdPickMode(null); }}
+              onAssignThird={(teamId) => { onAssignThird?.(teamId); setThirdPickMode(null); }}
+              onPickWinner={(teamId) => { onPick(teamId); setThirdPickMode(null); }}
             />
           ) : (
             <motion.button
@@ -2488,7 +2614,8 @@ function BracketMatchCard2({
                 <>
                   <div className={`relative rounded-lg transition-all ${
                     rightPicked && isPending ? "ring-2 ring-amber-500/60 ring-offset-2 ring-offset-[#0d0d0d]" :
-                    rightPicked && isLocked  ? "ring-2 ring-green-500/40 ring-offset-2 ring-offset-[#0d0d0d]" : ""
+                    rightPicked && isLocked  ? "ring-2 ring-green-500/40 ring-offset-2 ring-offset-[#0d0d0d]" :
+                    rightClickable ? "ring-1 ring-blue-500/20" : ""
                   }`}>
                     {rightTeam.flagUrl
                       // eslint-disable-next-line @next/next/no-img-element
@@ -2507,6 +2634,7 @@ function BracketMatchCard2({
                       rightPicked && isLocked ? "text-green-300" : rightPicked && isPending ? "text-amber-300" : "text-white"
                     }`}>{rightTeam.name}</p>
                     <p className="text-[9px] text-gray-700 mt-0.5">{getSourceLabel(match.rightSource)}</p>
+                    {renderWinnerHint(rightPicked, rightClickable)}
                   </div>
                 </>
               ) : (
@@ -2514,7 +2642,12 @@ function BracketMatchCard2({
                   <div className="w-14 h-10 rounded-lg border-2 border-dashed border-[#222] flex items-center justify-center">
                     <ChevronDown className="w-4 h-4 text-[#282828]" />
                   </div>
-                  <p className="text-[10px] text-gray-700 font-medium text-center px-1 leading-tight">{getSourceLabel(match.rightSource)}</p>
+                  <p className="text-[10px] text-gray-700 font-medium text-center px-1 leading-tight">
+                    {match.rightSource.startsWith("W")
+                      ? `Ganador de P${match.rightSource.slice(1)}`
+                      : getSourceLabel(match.rightSource)}
+                  </p>
+                  <p className="text-[9px] text-amber-700/70 text-center px-1">Confirmá ese partido antes</p>
                 </>
               )}
             </motion.button>
@@ -2531,23 +2664,30 @@ function BracketMatchCard2({
       {/* Winner indicator / validation */}
       {validationError && (
         <div className="px-4 pb-2 flex justify-center">
-          <p className="text-[10px] text-red-300 font-semibold text-center leading-tight flex items-start gap-1">
+          <p className="text-[10px] text-red-300 font-semibold text-center leading-tight flex items-start gap-1 max-w-md">
             <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-px" />
-            {validationError.replace(/^P\d+:\s*/, "")}
+            {validationError}
           </p>
         </div>
       )}
-      {pickedTeam && !isLocked && !validationError && (
+      {winnerTeam && !isLocked && !validationError && (
         <div className="px-4 pb-2 flex justify-center">
           <span className="text-[10px] text-amber-500/80 font-bold">
-            Pendiente de guardar: {pickedTeam.name}
+            Pasa a la siguiente ronda: {winnerTeam.name} · pendiente de guardar
           </span>
         </div>
       )}
-      {pickedTeam && isLocked && !validationError && (
+      {winnerTeam && isLocked && !validationError && (
         <div className="px-4 pb-2 flex justify-center">
           <span className="text-[10px] text-green-500/70 font-bold flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3" /> Guardado: {pickedTeam.name}
+            <CheckCircle2 className="w-3 h-3" /> Pasa: {winnerTeam.name}
+          </span>
+        </div>
+      )}
+      {thirdSlot && !thirdSlot.thirdPickedTeam && !isLocked && !validationError && (
+        <div className="px-4 pb-2 flex justify-center">
+          <span className="text-[10px] text-gray-500 text-center">
+            Paso 1: elegí el tercero rival · Paso 2: tocá quién gana
           </span>
         </div>
       )}
@@ -2703,61 +2843,85 @@ function ThirdPickerOption({
 }
 
 function ThirdPickerSide({
-  source, candidateEntries, pickedTeamId, isOpen, isLocked, onToggle, onPick,
+  source, candidateEntries, pickedTeamId, winnerTeamId, isOpen, isLocked, onToggle, onAssignThird, onPickWinner,
 }: {
   source: string;
   candidateEntries: { team: Team; groupLetter: string; qualifies: boolean }[];
   pickedTeamId: string | null;
+  winnerTeamId: string | null;
   isOpen: boolean;
   isLocked: boolean;
   onToggle: () => void;
-  onPick: (teamId: string) => void;
+  onAssignThird: (teamId: string) => void;
+  onPickWinner: (teamId: string) => void;
 }) {
   const picked = candidateEntries.find((e) => e.team.id === pickedTeamId)?.team ?? null;
   const label = getSourceLabel(source);
   const qualifyingEntries = candidateEntries.filter((e) => e.qualifies);
   const fallbackEntries = candidateEntries.filter((e) => !e.qualifies);
   const groupHint = source.slice(1).split("").join(", ");
+  const rivalIsWinner = !!(picked && winnerTeamId === picked.id);
 
   return (
     <div className="flex flex-col items-center gap-2 w-full">
-      <motion.button
-        whileTap={!isLocked ? { scale: 0.96 } : {}}
-        onClick={() => !isLocked && onToggle()}
-        className={`flex flex-col items-center gap-2 w-full ${
-          isLocked ? "cursor-default" : "cursor-pointer hover:bg-white/[0.03] active:bg-white/[0.05] rounded-xl p-1"
-        }`}
-      >
-        {picked ? (
-          <>
-            <div className={`relative rounded-lg ${
-              pickedTeamId === picked.id && !isLocked ? "ring-2 ring-amber-500/60 ring-offset-2 ring-offset-[#0d0d0d]" :
-              pickedTeamId === picked.id && isLocked  ? "ring-2 ring-green-500/40 ring-offset-2 ring-offset-[#0d0d0d]" : ""
-            }`}>
-              {picked.flagUrl
-                // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={picked.flagUrl} alt="" className="w-14 h-10 object-cover rounded-lg shadow-xl" />
-                : <div className="w-14 h-10 bg-[#1a1a1a] rounded-lg flex items-center justify-center text-xs font-bold text-gray-500 border border-[#2a2a2a]">{picked.code}</div>
-              }
-            </div>
-            <p className="text-[11px] font-bold text-white leading-tight text-center">{picked.name}</p>
-            <p className="text-[9px] text-gray-700 leading-tight text-center">{label}</p>
-          </>
-        ) : (
-          <>
-            <div className="w-14 h-10 rounded-lg border-2 border-dashed border-[#333] flex items-center justify-center">
-              <ChevronDown className="w-4 h-4 text-[#333]" />
-            </div>
-            <p className="text-[10px] text-gray-600 font-medium text-center px-1 leading-tight">{label}</p>
-          </>
-        )}
-      </motion.button>
+      {picked ? (
+        <motion.button
+          whileTap={!isLocked ? { scale: 0.96 } : {}}
+          onClick={() => !isLocked && onPickWinner(picked.id)}
+          className={`flex flex-col items-center gap-2 w-full ${
+            isLocked ? "cursor-default" : "cursor-pointer hover:bg-white/[0.03] active:bg-white/[0.05] rounded-xl p-1"
+          }`}
+        >
+          <div className={`relative rounded-lg ${
+            rivalIsWinner && !isLocked ? "ring-2 ring-amber-500/60 ring-offset-2 ring-offset-[#0d0d0d]" :
+            rivalIsWinner && isLocked  ? "ring-2 ring-green-500/40 ring-offset-2 ring-offset-[#0d0d0d]" :
+            !isLocked ? "ring-1 ring-blue-500/20" : ""
+          }`}>
+            {picked.flagUrl
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={picked.flagUrl} alt="" className="w-14 h-10 object-cover rounded-lg shadow-xl" />
+              : <div className="w-14 h-10 bg-[#1a1a1a] rounded-lg flex items-center justify-center text-xs font-bold text-gray-500 border border-[#2a2a2a]">{picked.code}</div>
+            }
+          </div>
+          <p className="text-[11px] font-bold text-white leading-tight text-center">{picked.name}</p>
+          <p className="text-[9px] text-gray-700 leading-tight text-center">{label}</p>
+          {!isLocked && !rivalIsWinner && (
+            <span className="text-[9px] text-blue-400/80 font-bold uppercase tracking-wider">Tocá si pasa</span>
+          )}
+        </motion.button>
+      ) : (
+        <motion.button
+          whileTap={!isLocked ? { scale: 0.96 } : {}}
+          onClick={() => !isLocked && onToggle()}
+          className={`flex flex-col items-center gap-2 w-full ${
+            isLocked ? "cursor-default" : "cursor-pointer hover:bg-white/[0.03] active:bg-white/[0.05] rounded-xl p-1"
+          }`}
+        >
+          <div className="w-14 h-10 rounded-lg border-2 border-dashed border-[#333] flex items-center justify-center">
+            <ChevronDown className="w-4 h-4 text-[#333]" />
+          </div>
+          <p className="text-[10px] text-gray-600 font-medium text-center px-1 leading-tight">{label}</p>
+          {!isLocked && (
+            <span className="text-[9px] text-amber-500/80 font-bold uppercase tracking-wider">Elegir tercero</span>
+          )}
+        </motion.button>
+      )}
+
+      {!isLocked && picked && (
+        <button
+          type="button"
+          onClick={onToggle}
+          className="text-[9px] text-gray-600 hover:text-gray-400 underline"
+        >
+          Cambiar tercero
+        </button>
+      )}
 
       {/* Inline candidate picker */}
       {isOpen && !isLocked && candidateEntries.length > 0 && (
         <div className="w-full bg-[#141414] border border-[#2a2a2a] rounded-xl overflow-hidden">
-          <p className="px-3 pt-2 pb-1 text-[9px] text-gray-600 leading-tight">
-            3° de grupos {groupHint} — cada partido admite grupos distintos según el sorteo FIFA.
+          <p className="px-3 pt-2 pb-1 text-[9px] text-gray-500 leading-tight">
+            Paso 1 — ¿Qué tercero juega este cruce? (grupos {groupHint})
           </p>
           {qualifyingEntries.length > 0 && (
             <>
@@ -2772,7 +2936,7 @@ function ThirdPickerSide({
                   team={team}
                   subtitle={`3° Grupo ${groupLetter}`}
                   pickedTeamId={pickedTeamId}
-                  onPick={onPick}
+                  onPick={onAssignThird}
                 />
               ))}
             </>
@@ -2791,12 +2955,15 @@ function ThirdPickerSide({
                   team={team}
                   subtitle={`3° Grupo ${groupLetter} · fuera del top 8`}
                   pickedTeamId={pickedTeamId}
-                  onPick={onPick}
+                  onPick={onAssignThird}
                   muted
                 />
               ))}
             </>
           )}
+          <p className="px-3 py-2 text-[9px] text-gray-600 border-t border-[#222]">
+            Paso 2 — Después tocá ese tercero o el rival directo para marcar quién pasa.
+          </p>
         </div>
       )}
       {isOpen && !isLocked && candidateEntries.length === 0 && (

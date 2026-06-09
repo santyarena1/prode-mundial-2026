@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, UserX, UserCheck, RefreshCcw, KeyRound, X, Eye, EyeOff, ExternalLink, ChevronUp, ChevronDown } from "lucide-react";
+import { Search, UserX, UserCheck, RefreshCcw, KeyRound, X, Eye, EyeOff, ExternalLink, ChevronUp, ChevronDown, Users, UserPlus, CalendarDays, TrendingUp, Target, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -11,6 +11,15 @@ import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingScreen } from "@/components/ui/LoadingSpinner";
 import { apiFetch } from "@/lib/api";
+
+interface ParticipantStats {
+  total: number;
+  joinedToday: number;
+  joinedWeek: number;
+  joinedMonth: number;
+  withPredictions: number;
+  missingPredictions: number;
+}
 
 interface Participant {
   id: string;
@@ -60,6 +69,7 @@ const RESET_OPTIONS: {
 
 export default function AdminParticipantsPage() {
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [stats, setStats] = useState<ParticipantStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [toggling, setToggling] = useState<Record<string, boolean>>({});
@@ -85,6 +95,7 @@ export default function AdminParticipantsPage() {
           return;
         }
         setParticipants(data.users || []);
+        setStats(data.stats ?? null);
       })
       .catch(() => toast.error("Error de conexión"))
       .finally(() => setLoading(false));
@@ -279,12 +290,40 @@ export default function AdminParticipantsPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
         <div>
           <h1 className="text-2xl font-black uppercase text-white">Participantes</h1>
-          <p className="text-gray-500 text-sm">{participants.length} registrados</p>
+          <p className="text-gray-500 text-sm">
+            {stats ? `${stats.total.toLocaleString("es-AR")} registrados en total` : `${participants.length} registrados`}
+          </p>
         </div>
       </div>
+
+      {stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-5">
+          {[
+            { label: "Total", value: stats.total, icon: Users, color: "text-blue-400", sub: "registrados" },
+            { label: "Hoy", value: stats.joinedToday, icon: UserPlus, color: "text-emerald-400", sub: "nuevos hoy" },
+            { label: "7 días", value: stats.joinedWeek, icon: TrendingUp, color: "text-cyan-400", sub: "última semana" },
+            { label: "Este mes", value: stats.joinedMonth, icon: CalendarDays, color: "text-violet-400", sub: "registros del mes" },
+            { label: "Con predicciones", value: stats.withPredictions, icon: Target, color: "text-amber-400", sub: "ya predijeron algo" },
+            { label: "Faltan predicciones", value: stats.missingPredictions, icon: ClipboardList, color: "text-orange-400", sub: "sin ninguna predicción" },
+          ].map((item) => (
+            <Card key={item.label} className="p-3.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-600 truncate">{item.label}</p>
+                  <p className={`text-2xl font-black tabular-nums mt-0.5 ${item.color}`}>
+                    {item.value.toLocaleString("es-AR")}
+                  </p>
+                  <p className="text-[10px] text-gray-600 mt-0.5 truncate">{item.sub}</p>
+                </div>
+                <item.icon className={`w-4 h-4 flex-shrink-0 mt-0.5 ${item.color} opacity-70`} />
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <div className="mb-4">
         <Input
