@@ -34,9 +34,16 @@ export async function PUT(
   // Accept
   await prisma.$transaction(async (tx) => {
     await tx.squadInvite.update({ where: { id: inviteId }, data: { status: "accepted" } });
-    await tx.squadMember.create({
-      data: { squadId: invite.squadId, userId: auth.userId, role: "member" },
+
+    const alreadyMember = await tx.squadMember.findUnique({
+      where: { squadId_userId: { squadId: invite.squadId, userId: auth.userId } },
     });
+    if (!alreadyMember) {
+      await tx.squadMember.create({
+        data: { squadId: invite.squadId, userId: auth.userId, role: "member" },
+      });
+    }
+
     // Notify inviter
     await tx.notification.create({
       data: {
