@@ -335,135 +335,134 @@ export default function AdminParticipantsPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[#222]">
-                {([
-                  { label: "Nombre", field: "name" as SortField },
-                  { label: "Email", field: null },
-                  { label: "Teléfono", field: null },
-                  { label: "Instagram", field: null },
-                  { label: "Puntos", field: "points" as SortField },
-                  { label: "Predicciones", field: "predictions" as SortField },
-                  { label: "Grupos", field: null },
-                  { label: "Estado", field: "status" as SortField },
-                  { label: "Creado", field: "createdAt" as SortField },
-                  { label: "Acciones", field: null },
-                ]).map(({ label, field }) => (
-                  <th
-                    key={label}
-                    onClick={field ? () => handleSort(field) : undefined}
-                    className={`px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 select-none ${field ? "cursor-pointer hover:text-gray-300 transition-colors" : ""}`}
-                  >
-                    {label}
-                    {field && <SortIcon field={field} />}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((p, i) => (
-                <motion.tr
-                  key={p.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.03 }}
-                  className="border-b border-[#1a1a1a] hover:bg-[#151515] transition-colors"
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-[#222]">
+              {([
+                { label: "Participante", field: "name" as SortField },
+                { label: "Puntaje / Preds.", field: "points" as SortField },
+                { label: "Grupos", field: null },
+                { label: "Estado", field: "status" as SortField },
+                { label: "Acciones", field: null },
+              ]).map(({ label, field }) => (
+                <th
+                  key={label}
+                  onClick={field ? () => handleSort(field) : undefined}
+                  className={`px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500 select-none ${field ? "cursor-pointer hover:text-gray-300 transition-colors" : ""}`}
                 >
-                  <td className="px-4 py-3">
-                    <div className="text-white font-medium text-sm">
-                      {p.firstName} {p.lastName}
-                    </div>
-                    {!p.hasPassword && (
-                      <span className="text-amber-500/80 text-[10px]">Sin contraseña</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-400 text-sm">{p.email}</td>
-                  <td className="px-4 py-3 text-gray-400 text-sm">{p.phone}</td>
-                  <td className="px-4 py-3 text-gray-500 text-sm">
-                    {p.instagram || "-"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-yellow-400 font-bold">{p.totalPoints}</span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-400 text-sm">
-                    {p._count?.predictions ?? "-"}
-                  </td>
-                  <td className="px-4 py-3">
-                    {p.squadMemberships && p.squadMemberships.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {p.squadMemberships.map((sm) => (
-                          <span
-                            key={sm.squad.id}
-                            className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                              sm.role === "admin"
-                                ? "bg-yellow-500/20 text-yellow-400"
-                                : "bg-[#2a2a2a] text-gray-400"
-                            }`}
-                            title={sm.role === "admin" ? "Admin del grupo" : "Miembro"}
-                          >
-                            {sm.squad.name}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-gray-700 text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge variant={p.isBlocked ? "error" : "success"}>
-                      {p.isBlocked ? "Bloqueado" : "Activo"}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">
-                    {new Date(p.createdAt).toLocaleDateString("es-AR")}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-2">
-                      <Link href={`/admin/participants/${p.id}`}>
-                        <Button variant="secondary" size="sm" title="Ver perfil completo">
-                          <ExternalLink className="w-3 h-3" />
-                        </Button>
-                      </Link>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => openPasswordModal(p)}
-                        title="Cambiar contraseña"
-                      >
-                        <KeyRound className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant={p.isBlocked ? "secondary" : "danger"}
-                        size="sm"
-                        loading={toggling[p.id]}
-                        onClick={() => toggleBlock(p.id, p.isBlocked)}
-                      >
-                        {p.isBlocked ? (
-                          <><UserCheck className="w-3 h-3" /> Desbloquear</>
-                        ) : (
-                          <><UserX className="w-3 h-3" /> Bloquear</>
-                        )}
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => openResetModal(p)}
-                        title="Desbloquear predicciones seleccionadas"
-                      >
-                        <RefreshCcw className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </td>
-                </motion.tr>
+                  {label}
+                  {field && <SortIcon field={field} />}
+                </th>
               ))}
-            </tbody>
-          </table>
-          {filtered.length === 0 && (
-            <div className="py-12 text-center text-gray-600">No hay participantes que coincidan</div>
-          )}
-        </div>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((p, i) => (
+              <motion.tr
+                key={p.id}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: i * 0.03 }}
+                className="border-b border-[#1a1a1a] hover:bg-[#151515] transition-colors"
+              >
+                {/* Participante */}
+                <td className="px-4 py-3 min-w-0">
+                  <div className="text-white font-medium text-sm leading-tight">
+                    {p.firstName} {p.lastName}
+                  </div>
+                  <div className="text-gray-500 text-xs mt-0.5">{p.email}</div>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-gray-600 text-xs">{p.phone}</span>
+                    {p.instagram && (
+                      <span className="text-gray-700 text-xs">· @{p.instagram}</span>
+                    )}
+                    {!p.hasPassword && (
+                      <span className="text-amber-500/80 text-[10px] font-semibold">· Sin contraseña</span>
+                    )}
+                  </div>
+                </td>
+
+                {/* Puntaje / Predicciones */}
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <div className="text-yellow-400 font-bold text-sm">{p.totalPoints} pts</div>
+                  <div className="text-gray-600 text-xs mt-0.5">{p._count?.predictions ?? 0} preds.</div>
+                </td>
+
+                {/* Grupos */}
+                <td className="px-4 py-3">
+                  {p.squadMemberships && p.squadMemberships.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {p.squadMemberships.map((sm) => (
+                        <span
+                          key={sm.squad.id}
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                            sm.role === "admin"
+                              ? "bg-yellow-500/20 text-yellow-400"
+                              : "bg-[#2a2a2a] text-gray-400"
+                          }`}
+                          title={sm.role === "admin" ? "Admin del grupo" : "Miembro"}
+                        >
+                          {sm.squad.name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-gray-700 text-xs">—</span>
+                  )}
+                </td>
+
+                {/* Estado + fecha */}
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <Badge variant={p.isBlocked ? "error" : "success"}>
+                    {p.isBlocked ? "Bloqueado" : "Activo"}
+                  </Badge>
+                  <div className="text-gray-700 text-[10px] mt-1">
+                    {new Date(p.createdAt).toLocaleDateString("es-AR")}
+                  </div>
+                </td>
+
+                {/* Acciones */}
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1.5">
+                    <Link href={`/admin/participants/${p.id}`}>
+                      <Button variant="secondary" size="sm" title="Ver perfil completo">
+                        <ExternalLink className="w-3 h-3" />
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => openPasswordModal(p)}
+                      title="Cambiar contraseña"
+                    >
+                      <KeyRound className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => openResetModal(p)}
+                      title="Desbloquear predicciones"
+                    >
+                      <RefreshCcw className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      variant={p.isBlocked ? "secondary" : "danger"}
+                      size="sm"
+                      loading={toggling[p.id]}
+                      onClick={() => toggleBlock(p.id, p.isBlocked)}
+                      title={p.isBlocked ? "Desbloquear usuario" : "Bloquear usuario"}
+                    >
+                      {p.isBlocked ? <UserCheck className="w-3 h-3" /> : <UserX className="w-3 h-3" />}
+                    </Button>
+                  </div>
+                </td>
+              </motion.tr>
+            ))}
+          </tbody>
+        </table>
+        {filtered.length === 0 && (
+          <div className="py-12 text-center text-gray-600">No hay participantes que coincidan</div>
+        )}
       </Card>
 
       <AnimatePresence>
