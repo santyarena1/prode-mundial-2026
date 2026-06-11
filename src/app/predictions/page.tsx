@@ -2218,15 +2218,18 @@ function MatchCard({
 
   const needsHardcoreScore = isLocked && hardcoreMode && !savedScore && windowOpen && !matchStarted;
 
+  const cardBorder =
+    isFinished && saved && gotItRight === true  ? "border-green-500/40 bg-[#0b110b]" :
+    isFinished && saved && gotItRight === false ? "border-red-500/30 bg-[#110b0b]" :
+    isLocked && savedScore                      ? "border-green-500/20 bg-[#0d110d]" :
+    needsHardcoreScore && hasPendingScore       ? "border-orange-500/30 bg-orange-500/5" :
+    needsHardcoreScore                          ? "border-orange-500/15 bg-[#0f0d0a]" :
+    isLocked                                    ? "border-green-500/20 bg-[#0d110d]" :
+    (pending || hasPendingScore)                ? "border-amber-500/20 bg-amber-500/5" :
+    "border-[#1d1d1d] bg-[#141414]";
+
   return (
-    <div className={`rounded-xl border overflow-hidden transition-all ${
-      isLocked && savedScore ? "border-green-500/20 bg-[#0d110d]" :
-      needsHardcoreScore && hasPendingScore ? "border-orange-500/30 bg-orange-500/5" :
-      needsHardcoreScore ? "border-orange-500/15 bg-[#0f0d0a]" :
-      isLocked ? "border-green-500/20 bg-[#0d110d]" :
-      (pending || hasPendingScore) ? "border-amber-500/20 bg-amber-500/5" :
-      "border-[#1d1d1d] bg-[#141414]"
-    }`}>
+    <div className={`rounded-xl border overflow-hidden transition-all ${cardBorder}`}>
       {/* Teams row */}
       <div className="flex items-center gap-2 px-4 py-3">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -2235,11 +2238,13 @@ function MatchCard({
             ? <img src={match.homeTeam.flagUrl} alt="" className="w-7 h-5 object-cover rounded shadow-md flex-shrink-0" />
             : <div className="w-7 h-5 bg-[#2a2a2a] rounded flex-shrink-0" />
           }
-          <span className="text-white text-xs font-bold leading-tight line-clamp-2 break-words">{homeName}</span>
+          <span className={`text-xs font-bold leading-tight line-clamp-2 break-words ${
+            isFinished && saved && realOutcome === "home" ? "text-white" : "text-white"
+          }`}>{homeName}</span>
         </div>
         <div className="flex flex-col items-center flex-shrink-0 min-w-[72px]">
           {matchStarted && match.homeScore !== undefined
-            ? <span className="text-white font-black text-base">{match.homeScore} – {match.awayScore}</span>
+            ? <span className="text-white font-black text-lg tabular-nums">{match.homeScore} – {match.awayScore}</span>
             : <>
                 <span className="text-gray-700 text-[9px] uppercase font-bold">vs</span>
                 <span className="text-gray-600 text-[9px] text-center leading-tight">{formatDate(match.startDate)}</span>
@@ -2266,28 +2271,7 @@ function MatchCard({
         <p className="px-4 pb-2 text-[10px] text-red-400/80 text-center">{closedReason}</p>
       )}
 
-      {/* ── Result strip for finished matches ── */}
-      {isFinished && saved && gotItRight !== null && (
-        <div className={`mx-4 mb-2.5 rounded-md px-2.5 py-1 flex items-center gap-2 ${
-          gotItRight ? "bg-green-600/15 border border-green-500/30" : "bg-red-600/10 border border-red-500/25"
-        }`}>
-          <span className={`text-[11px] font-black uppercase tracking-wide ${gotItRight ? "text-green-400" : "text-red-400"}`}>
-            {gotItRight ? "✓ Acertaste" : "✗ Fallaste"}
-          </span>
-          {gotScoreRight && (
-            <span className="text-[9px] font-bold text-yellow-400 bg-yellow-500/15 px-1.5 py-0.5 rounded-full ml-auto">
-              Marcador exacto ✓
-            </span>
-          )}
-          {hardcoreMode && gotItRight && !gotScoreRight && savedScore && (
-            <span className="text-[9px] text-gray-600 ml-auto">
-              Predijiste {savedScore.home}-{savedScore.away}
-            </span>
-          )}
-        </div>
-      )}
-
-      {isLocked && (changesRemaining ?? 0) > 0 && onUseChange && (
+      {isLocked && (changesRemaining ?? 0) > 0 && onUseChange && !isFinished && (
         <div className="px-4 pb-2 flex justify-end">
           <button
             onClick={() => onUseChange("match", match.id)}
@@ -2299,8 +2283,46 @@ function MatchCard({
         </div>
       )}
 
+      {/* ── FINISHED: result block replaces buttons ── */}
+      {isFinished && saved && gotItRight !== null && (
+        <div className={`mx-3 mb-3 rounded-xl overflow-hidden border ${
+          gotItRight ? "border-green-500/30" : "border-red-500/25"
+        }`}>
+          {/* Header bar */}
+          <div className={`px-3 py-2 flex items-center justify-between ${
+            gotItRight ? "bg-green-600/25" : "bg-red-600/20"
+          }`}>
+            <span className={`text-sm font-black uppercase tracking-wider ${gotItRight ? "text-green-300" : "text-red-300"}`}>
+              {gotItRight ? "✓ Acertaste" : "✗ Fallaste"}
+            </span>
+            {gotScoreRight && (
+              <span className="text-[10px] font-black text-yellow-300 bg-yellow-500/20 px-2 py-0.5 rounded-full tracking-wide uppercase">
+                ⭐ Marcador exacto
+              </span>
+            )}
+          </div>
+          {/* Detail row */}
+          <div className={`px-3 py-2 flex items-center justify-between gap-3 text-xs ${
+            gotItRight ? "bg-green-900/15" : "bg-red-900/10"
+          }`}>
+            <span className="text-gray-500">Tu predicción:</span>
+            <span className={`font-bold ${gotItRight ? "text-green-400" : "text-gray-400"}`}>
+              {saved === "home" ? `Gana ${homeCode}` : saved === "away" ? `Gana ${awayCode}` : "Empate"}
+            </span>
+            {hardcoreMode && savedScore && (
+              <>
+                <span className="text-gray-700">·</span>
+                <span className={`font-bold tabular-nums ${gotScoreRight ? "text-yellow-400" : "text-gray-500"}`}>
+                  {savedScore.home}-{savedScore.away}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── HARDCORE: score inputs ── */}
-      {hardcoreMode ? (
+      {hardcoreMode && !(isFinished && saved) ? (
         <div className="px-4 pb-3">
           {isLocked && savedScore ? (
             <div className="flex items-center justify-center gap-3">
@@ -2414,7 +2436,7 @@ function MatchCard({
             </>
           )}
         </div>
-      ) : (
+      ) : !(isFinished && saved) ? (
         /* ── NORMAL: outcome buttons ── */
         <div className="px-4 pb-3 flex gap-1.5">
           {(["home", "draw", "away"] as Outcome[]).map(key => {
@@ -2447,7 +2469,7 @@ function MatchCard({
             );
           })}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
