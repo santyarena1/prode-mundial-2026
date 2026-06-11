@@ -16,25 +16,29 @@ export async function GET(req: NextRequest) {
   // 1. Sync results from provider
   const syncResult = await syncResults();
 
-  // 2. For each newly finished match: lock predictions + recalculate affected users
-  let recalculatedUsers = 0;
+  // 2. Lock predictions for newly finished matches
   for (const matchId of syncResult.finishedMatchIds) {
     await prisma.prediction.updateMany({
       where: { matchId },
       data: { status: "locked", lockedAt: new Date() },
     });
+  }
 
-    const predictions = await prisma.prediction.findMany({
-      where: { matchId },
-      select: { userId: true },
-    });
-    const uniqueUserIds = [...new Set(predictions.map((p) => p.userId))];
+  // 3. Recalculate ALL users with at least one prediction on a finished match.
+  //    Running every cycle ensures retroactive fixes (e.g. point rule corrections)
+  //    propagate automatically without any manual intervention.
+  const affectedUserIds = await prisma.prediction.findMany({
+    where: { match: { status: "finished" } },
+    select: { userId: true },
+    distinct: ["userId"],
+  });
+  const uniqueUserIds = affectedUserIds.map((p) => p.userId);
 
-    for (let i = 0; i < uniqueUserIds.length; i += BATCH_SIZE) {
-      const batch = uniqueUserIds.slice(i, i + BATCH_SIZE);
-      await Promise.allSettled(batch.map((userId) => calculateUserPoints(userId)));
-    }
-    recalculatedUsers += uniqueUserIds.length;
+  let recalculatedUsers = 0;
+  for (let i = 0; i < uniqueUserIds.length; i += BATCH_SIZE) {
+    const batch = uniqueUserIds.slice(i, i + BATCH_SIZE);
+    await Promise.allSettled(batch.map((userId) => calculateUserPoints(userId)));
+    recalculatedUsers += batch.length;
   }
 
   return NextResponse.json({
