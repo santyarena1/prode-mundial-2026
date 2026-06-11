@@ -2113,7 +2113,8 @@ function PointsAndAchievementsModal({
                 {LOGROS.map(logro => {
                   const progress = getProgress(logro);
                   const current = getCurrent(logro);
-                  const done = progress >= 1;
+                  // Groups logro: cannot determine client-side if positions are exact — never show as "done"
+                  const done = logro.type !== "groups" && progress >= 1;
                   return (
                     <div key={logro.name} className={`p-4 rounded-xl border transition-colors ${done ? "bg-yellow-500/5 border-yellow-500/20" : "bg-[#141414] border-[#1e1e1e]"}`}>
                       <div className="flex items-start gap-3 mb-3">
@@ -2127,22 +2128,21 @@ function PointsAndAchievementsModal({
                         </div>
                         <span className="text-yellow-400 font-black text-sm tabular-nums flex-shrink-0">{logro.pts}</span>
                       </div>
-                      {logro.type !== "champion" && (
+                      {logro.type === "groups" && (
                         <div>
                           <div className="flex justify-between text-[10px] mb-1">
-                            <span className="text-gray-600">Progreso</span>
-                            <span className={done ? "text-yellow-400 font-bold" : "text-gray-600"}>
-                              {current}/{logro.target}
-                            </span>
+                            <span className="text-gray-600">Grupos guardados</span>
+                            <span className="text-gray-600">{current}/{logro.target} grupos</span>
                           </div>
                           <div className="h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
                             <motion.div
-                              className={`h-full rounded-full ${done ? "bg-yellow-400" : "bg-red-500"}`}
+                              className="h-full rounded-full bg-red-500"
                               initial={{ width: 0 }}
                               animate={{ width: `${Math.min(progress * 100, 100)}%` }}
                               transition={{ duration: 0.6, ease: "easeOut" }}
                             />
                           </div>
+                          <p className="text-gray-700 text-[10px] mt-1">El resultado exacto se calcula al cierre de la fase de grupos</p>
                         </div>
                       )}
                     </div>

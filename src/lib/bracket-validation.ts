@@ -587,6 +587,14 @@ export function countSaveableBracketPicks(
   pending: Record<string, string>,
   ctx: BracketContext
 ): number {
+  // CHAMPION has no entry in BRACKET_MATCHES — handle separately
+  if (phase === "CHAMPION") {
+    const key = "CHAMPION:1";
+    const teamId = pending[key];
+    if (!teamId) return 0;
+    return getEligibleChampionTeams(ctx).some((t) => t.id === teamId) ? 1 : 0;
+  }
+
   let count = 0;
   for (const [key, teamId] of Object.entries(pending)) {
     if (!key.startsWith(`${phase}:`)) continue;

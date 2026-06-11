@@ -244,39 +244,71 @@ export async function syncResults(): Promise<{ success: boolean; message: string
 
 // ─── Live matches ─────────────────────────────────────────────────────────────
 
-export async function syncLive(): Promise<{ success: boolean; message: string; count: number }> {
+export async function syncLive(): Promise<{ success: boolean; message: string; count: number; finishedMatchIds: string[] }> {
   const providerName = process.env.FOOTBALL_PROVIDER || "manual";
-  if (providerName === "manual") return { success: false, message: "Manual mode", count: 0 };
+  if (providerName === "manual") return { success: false, message: "Manual mode", count: 0, finishedMatchIds: [] };
 
   try {
     const raw = getProvider();
-    if (!(raw instanceof ApiFootballProvider)) return { success: false, message: "Provider not supported", count: 0 };
+    if (!(raw instanceof ApiFootballProvider)) return { success: false, message: "Provider not supported", count: 0, finishedMatchIds: [] };
+
+    // Skip API call if no match is live or starting within the next 30 min or started within last 3 hours.
+    // This avoids burning quota on hours with no activity.
+    const now = new Date();
+    const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+    const thirtyMinAhead = new Date(now.getTime() + 30 * 60 * 1000);
+    const activeMatch = await prisma.match.findFirst({
+      where: {
+        externalId: { not: null },
+        OR: [
+          { status: "live" },
+          { status: { not: "finished" }, startDate: { gte: threeHoursAgo, lte: thirtyMinAhead } },
+        ],
+      },
+    });
+    if (!activeMatch) {
+      return { success: true, message: "No active matches — skipped API call", count: 0, finishedMatchIds: [] };
+    }
 
     const liveMatches = await raw.getLiveMatches();
     if (liveMatches.length === 0) {
-      return { success: true, message: "No live matches", count: 0 };
+      return { success: true, message: "No live matches", count: 0, finishedMatchIds: [] };
     }
 
     let count = 0;
+    const finishedMatchIds: string[] = [];
+
     for (const result of liveMatches) {
       const match = await prisma.match.findFirst({ where: { externalId: result.externalId } });
       if (!match) continue;
 
       const homeScore = result.homeScore ?? null;
       const awayScore = result.awayScore ?? null;
-      await prisma.match.update({
-        where: { id: match.id },
-        data: { homeScore, awayScore, status: result.status, lastSyncedAt: new Date() },
-      });
+
+      const updateData: Record<string, unknown> = { homeScore, awayScore, status: result.status, lastSyncedAt: new Date() };
+
+      // When a match finishes via live sync, also persist realOutcome and winnerTeamId.
+      // Without this, syncResults (which filters status != "finished") would skip these matches
+      // and users would never see their points updated.
+      if (result.status === "finished" && homeScore !== null && awayScore !== null) {
+        updateData.realOutcome = homeScore > awayScore ? "home" : awayScore > homeScore ? "away" : "draw";
+        if (result.winnerTeamExternalId) {
+          const winner = await prisma.team.findFirst({ where: { externalId: result.winnerTeamExternalId } });
+          if (winner) updateData.winnerTeamId = winner.id;
+        }
+        if (match.status !== "finished") finishedMatchIds.push(match.id);
+      }
+
+      await prisma.match.update({ where: { id: match.id }, data: updateData });
       count++;
     }
 
-    await log(providerName, "live", "ok", `Updated ${count} live matches`, { requestCount: 1, updatedMatches: count });
-    return { success: true, message: `Updated ${count} live matches`, count };
+    await log(providerName, "live", "ok", `Updated ${count} live matches, ${finishedMatchIds.length} just finished`, { requestCount: 1, updatedMatches: count });
+    return { success: true, message: `Updated ${count} live matches`, count, finishedMatchIds };
   } catch (err: any) {
     const msg = err?.message || "Unknown error";
     await log(providerName, "live", "error", msg);
-    return { success: false, message: msg, count: 0 };
+    return { success: false, message: msg, count: 0, finishedMatchIds: [] };
   }
 }
 

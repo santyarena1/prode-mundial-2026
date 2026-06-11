@@ -49,7 +49,7 @@ export async function GET() {
           createdAt: true,
           _count: {
             select: {
-              predictions: { where: { status: "locked" } },
+              predictions: true,
               groupPredictions: true,
               bracketPredictions: true,
               specialPredictions: true,
