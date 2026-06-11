@@ -200,7 +200,7 @@ export default function DashboardPage() {
         setTotalMatches(104);
         if (predRes.ok) {
           const preds = (await predRes.json()).predictions || [];
-          setPredictedMatches(preds.filter((p: { status: string }) => p.status === "locked").length);
+          setPredictedMatches(preds.length);
         }
 
         if (redRes.ok) {
