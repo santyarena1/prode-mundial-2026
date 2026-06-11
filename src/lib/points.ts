@@ -115,11 +115,7 @@ async function applyAchievements(userId: string, stats: AchievementStats): Promi
 // ── Main calculation ──────────────────────────────────────────────────────────
 
 export async function calculateUserPoints(userId: string): Promise<number> {
-  const dbRules = await prisma.pointRule.findMany({ where: { active: true } });
-  const rm: Record<string, number> = {};
-  for (const r of dbRules) rm[r.key] = r.points;
-  const pts = (key: keyof typeof DEFAULT_POINT_RULES) =>
-    rm[key] ?? DEFAULT_POINT_RULES[key].points;
+  const pts = (key: keyof typeof DEFAULT_POINT_RULES) => DEFAULT_POINT_RULES[key].points;
 
   let predictionPoints = 0;
   const achievementStats: AchievementStats = {

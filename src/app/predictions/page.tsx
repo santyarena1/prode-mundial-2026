@@ -173,9 +173,10 @@ export default function PredictionsPage() {
       const sg: Record<string, { first?: string; second?: string; third?: string }> = {};
       const sb: Record<string, string> = {};
 
+      let g: Group[] = [];
       if (groupsRes.ok) {
         const data = await groupsRes.json();
-        const g: Group[] = data.groups || [];
+        g = data.groups || [];
         setGroups(g);
         const teams: Team[] = [];
         const seen = new Set<string>();
@@ -183,7 +184,6 @@ export default function PredictionsPage() {
           if (!seen.has(t.id)) { teams.push(t); seen.add(t.id); }
         }
         setAllTeams(teams.sort((a, b) => a.name.localeCompare(b.name)));
-        if (g.length > 0) setExpandedGroups({ [g[0].id]: true });
       }
 
       if (predRes.ok) {
@@ -234,6 +234,33 @@ export default function PredictionsPage() {
         const bannerData = await bannerRes.json();
         if (bannerData.predictions?.visible && (bannerData.predictions.text || bannerData.predictions.buttonLabel)) {
           setPredictionsCta(bannerData.predictions);
+        }
+      }
+
+      // ── Auto-navigate to first section with pending predictions ────────────
+      const allGroupMatchIds = g.flatMap(gr =>
+        gr.matches.filter(m => m.phase === "GROUP_STAGE").map(m => m.id)
+      );
+      const allGroupsDone = allGroupMatchIds.length > 0 && allGroupMatchIds.every(id => !!sp[id]);
+
+      if (allGroupsDone) {
+        setActiveTab("eliminatorias");
+        // Go to the first bracket phase that still has missing saves
+        const firstIncomplete = ELIMINATORIAS_PHASES.find(phase => {
+          const saved = Object.keys(sb).filter(k => k.startsWith(`${phase.key}:`)).length;
+          return saved < phase.slots;
+        });
+        if (firstIncomplete) setActiveElimTab(firstIncomplete.key);
+      } else {
+        setActiveTab("matches");
+        // Expand only the first group with pending predictions (collapse the rest)
+        const firstPending = g.find(gr =>
+          gr.matches.some(m => m.phase === "GROUP_STAGE" && !sp[m.id])
+        );
+        if (firstPending) {
+          setExpandedGroups({ [firstPending.id]: true });
+        } else if (g.length > 0) {
+          setExpandedGroups({ [g[0].id]: true });
         }
       }
 
