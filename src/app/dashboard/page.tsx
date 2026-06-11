@@ -34,6 +34,7 @@ interface UserData {
 
 interface RankingUser {
   position: number;
+  id: string;
   firstName: string;
   lastName: string;
   totalPoints: number;
@@ -225,10 +226,8 @@ export default function DashboardPage() {
 
         if (rankRes.ok) {
           const rankData = await rankRes.json();
-          const pos = (rankData.ranking as RankingUser[]).findIndex(
-            (r) => r.firstName === meData.user.firstName && r.lastName === meData.user.lastName
-          );
-          if (pos !== -1) setUserPosition(pos + 1);
+          const me = (rankData.ranking as RankingUser[]).find((r) => r.id === meData.user.id);
+          if (me) setUserPosition(me.position);
         }
 
         // 104 total matches in the 2026 World Cup (72 group + 32 knockout)

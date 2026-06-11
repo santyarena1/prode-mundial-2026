@@ -6,7 +6,6 @@ export async function GET() {
     const users = await prisma.user.findMany({
       where: { isBlocked: false },
       orderBy: { totalPoints: "desc" },
-      take: 50,
       select: {
         id: true,
         firstName: true,
@@ -17,6 +16,7 @@ export async function GET() {
 
     const ranking = users.map((u, idx) => ({
       position: idx + 1,
+      id: u.id,
       firstName: u.firstName,
       lastName: u.lastName,
       totalPoints: u.totalPoints,
