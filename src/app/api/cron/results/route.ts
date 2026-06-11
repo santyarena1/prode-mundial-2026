@@ -27,12 +27,18 @@ export async function GET(req: NextRequest) {
   // 3. Recalculate ALL users with at least one prediction on a finished match.
   //    Running every cycle ensures retroactive fixes (e.g. point rule corrections)
   //    propagate automatically without any manual intervention.
-  const affectedUserIds = await prisma.prediction.findMany({
-    where: { match: { status: "finished" } },
-    select: { userId: true },
-    distinct: ["userId"],
+  const finishedMatchIds = await prisma.match.findMany({
+    where: { status: "finished" },
+    select: { id: true },
   });
-  const uniqueUserIds = affectedUserIds.map((p) => p.userId);
+  const finishedIds = finishedMatchIds.map((m) => m.id);
+  const rawUserIds = finishedIds.length > 0
+    ? await prisma.prediction.findMany({
+        where: { matchId: { in: finishedIds } },
+        select: { userId: true },
+      })
+    : [];
+  const uniqueUserIds = [...new Set(rawUserIds.map((p) => p.userId))];
 
   let recalculatedUsers = 0;
   for (let i = 0; i < uniqueUserIds.length; i += BATCH_SIZE) {
