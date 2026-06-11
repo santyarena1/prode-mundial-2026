@@ -432,116 +432,50 @@ export default function DashboardPage() {
           </Card>
         </motion.div>
 
-        {/* Próximo partido countdown */}
+        {/* Próximo partido countdown — compact single row */}
         {nextMatch && (
-          <motion.div className="mb-8" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
-            <div
-              className={`bg-[#0d0d0d] border rounded-xl p-5 ${
-                nextMatch.status === "live" || countdown === "live"
-                  ? "border-red-600/50"
-                  : "border-[#1e1e1e]"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                  Próximo partido
-                </span>
-                {(nextMatch.status === "live" || countdown === "live") && (
-                  <span className="text-red-500 text-xs font-bold flex items-center gap-1">
-                    🔴 EN JUEGO
-                  </span>
-                )}
-              </div>
+          <motion.div className="mb-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
+            <div className={`bg-[#0d0d0d] border rounded-xl px-4 py-2.5 flex items-center gap-3 ${
+              nextMatch.status === "live" || countdown === "live" ? "border-red-600/40" : "border-[#1e1e1e]"
+            }`}>
+              {/* Label */}
+              <span className="text-[9px] font-bold uppercase tracking-widest text-gray-600 flex-shrink-0 hidden sm:block">
+                Próximo
+              </span>
+              <Clock className="w-3 h-3 text-gray-600 flex-shrink-0 sm:hidden" />
 
               {/* Teams */}
-              <div className="flex items-center justify-center gap-4 mb-3">
-                {/* Home */}
-                <div className="flex flex-col items-center gap-1.5 min-w-0">
-                  {nextMatch.homeTeam?.flagUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={nextMatch.homeTeam.flagUrl} alt={nextMatch.homeTeam.name} className="w-6 h-4 object-cover rounded-sm flex-shrink-0" />
-                  ) : (
-                    <span className="text-xs font-bold text-gray-300 bg-[#1e1e1e] rounded px-1.5 py-0.5">
-                      {nextMatch.homeTeam?.code ?? nextMatch.homePlaceholder ?? "?"}
-                    </span>
-                  )}
-                  <span className="text-white text-sm font-bold truncate max-w-[80px] text-center">
-                    {nextMatch.homeTeam?.name ?? nextMatch.homePlaceholder ?? "Por definir"}
-                  </span>
-                </div>
-
-                <span className="text-gray-600 font-black text-lg">vs</span>
-
-                {/* Away */}
-                <div className="flex flex-col items-center gap-1.5 min-w-0">
-                  {nextMatch.awayTeam?.flagUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={nextMatch.awayTeam.flagUrl} alt={nextMatch.awayTeam.name} className="w-6 h-4 object-cover rounded-sm flex-shrink-0" />
-                  ) : (
-                    <span className="text-xs font-bold text-gray-300 bg-[#1e1e1e] rounded px-1.5 py-0.5">
-                      {nextMatch.awayTeam?.code ?? nextMatch.awayPlaceholder ?? "?"}
-                    </span>
-                  )}
-                  <span className="text-white text-sm font-bold truncate max-w-[80px] text-center">
-                    {nextMatch.awayTeam?.name ?? nextMatch.awayPlaceholder ?? "Por definir"}
-                  </span>
-                </div>
+              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                {nextMatch.homeTeam?.flagUrl
+                  ? <img src={nextMatch.homeTeam.flagUrl} alt="" className="w-5 h-3.5 object-cover rounded-sm flex-shrink-0" />
+                  : <span className="text-[10px] font-bold text-gray-400">{nextMatch.homeTeam?.code ?? nextMatch.homePlaceholder ?? "?"}</span>
+                }
+                <span className="text-white text-xs font-bold truncate max-w-[60px]">
+                  {nextMatch.homeTeam?.name ?? nextMatch.homePlaceholder ?? "TBD"}
+                </span>
+                <span className="text-gray-600 text-[10px] font-black flex-shrink-0">vs</span>
+                <span className="text-white text-xs font-bold truncate max-w-[60px]">
+                  {nextMatch.awayTeam?.name ?? nextMatch.awayPlaceholder ?? "TBD"}
+                </span>
+                {nextMatch.awayTeam?.flagUrl
+                  ? <img src={nextMatch.awayTeam.flagUrl} alt="" className="w-5 h-3.5 object-cover rounded-sm flex-shrink-0" />
+                  : <span className="text-[10px] font-bold text-gray-400">{nextMatch.awayTeam?.code ?? nextMatch.awayPlaceholder ?? "?"}</span>
+                }
               </div>
 
-              {/* Phase / group / date */}
-              <p className="text-center text-gray-500 text-xs mb-4">
-                {nextMatch.group ? `${nextMatch.group.name} · ` : ""}{nextMatch.phase}
-                {" · "}
-                {new Date(nextMatch.startDate).toLocaleDateString("es-AR", {
-                  weekday: "short",
-                  day: "2-digit",
-                  month: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
-
-              {/* Countdown */}
-              {countdown === "live" ? (
-                <div className="flex justify-center">
-                  <span className="text-red-500 font-black text-lg tracking-widest">🔴 EN JUEGO</span>
-                </div>
-              ) : countdown ? (
-                <div className="flex flex-col items-center gap-1">
-                  <div className="flex items-center gap-1 text-gray-500 text-xs font-semibold">
-                    <Clock className="w-3 h-3" />
-                    <span>Faltan</span>
-                  </div>
-                  {countdown.split(":").length === 4 ? (
-                    <div className="flex items-end gap-3">
-                      {[
-                        { val: countdown.split(":")[0], label: "días" },
-                        { val: countdown.split(":")[1], label: "hs" },
-                        { val: countdown.split(":")[2], label: "min" },
-                        { val: countdown.split(":")[3], label: "seg" },
-                      ].map(({ val, label }) => (
-                        <div key={label} className="flex flex-col items-center">
-                          <span className="text-white font-black text-2xl tabular-nums leading-none">{val}</span>
-                          <span className="text-gray-600 text-[10px] uppercase tracking-wider mt-0.5">{label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex items-end gap-3">
-                      {[
-                        { val: countdown.split(":")[0], label: "hs" },
-                        { val: countdown.split(":")[1], label: "min" },
-                        { val: countdown.split(":")[2], label: "seg" },
-                      ].map(({ val, label }) => (
-                        <div key={label} className="flex flex-col items-center">
-                          <span className="text-white font-black text-2xl tabular-nums leading-none">{val}</span>
-                          <span className="text-gray-600 text-[10px] uppercase tracking-wider mt-0.5">{label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : null}
+              {/* Countdown / LIVE */}
+              <div className="flex-shrink-0">
+                {countdown === "live" ? (
+                  <span className="text-red-500 text-[10px] font-black tracking-widest">🔴 LIVE</span>
+                ) : countdown ? (
+                  <span className="text-white font-black text-xs tabular-nums tracking-tight">
+                    {countdown.split(":").length === 4
+                      ? `${countdown.split(":")[0]}d ${countdown.split(":")[1]}h ${countdown.split(":")[2]}m`
+                      : `${countdown.split(":")[0]}h ${countdown.split(":")[1]}m ${countdown.split(":")[2]}s`
+                    }
+                  </span>
+                ) : null}
+              </div>
             </div>
           </motion.div>
         )}

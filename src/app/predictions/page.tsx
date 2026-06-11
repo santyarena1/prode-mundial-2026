@@ -2266,21 +2266,21 @@ function MatchCard({
         <p className="px-4 pb-2 text-[10px] text-red-400/80 text-center">{closedReason}</p>
       )}
 
-      {/* ── Result banner for finished matches ── */}
+      {/* ── Result strip for finished matches ── */}
       {isFinished && saved && gotItRight !== null && (
-        <div className={`mx-4 mb-3 rounded-lg px-3 py-2 flex items-center justify-between gap-2 ${
-          gotItRight ? "bg-green-600/20 border border-green-500/40" : "bg-red-600/15 border border-red-500/30"
+        <div className={`mx-4 mb-2.5 rounded-md px-2.5 py-1 flex items-center gap-2 ${
+          gotItRight ? "bg-green-600/15 border border-green-500/30" : "bg-red-600/10 border border-red-500/25"
         }`}>
-          <span className={`text-sm font-black uppercase tracking-wider ${gotItRight ? "text-green-400" : "text-red-400"}`}>
+          <span className={`text-[11px] font-black uppercase tracking-wide ${gotItRight ? "text-green-400" : "text-red-400"}`}>
             {gotItRight ? "✓ Acertaste" : "✗ Fallaste"}
           </span>
           {gotScoreRight && (
-            <span className="text-[10px] font-bold text-yellow-400 bg-yellow-500/15 px-2 py-0.5 rounded-full">
+            <span className="text-[9px] font-bold text-yellow-400 bg-yellow-500/15 px-1.5 py-0.5 rounded-full ml-auto">
               Marcador exacto ✓
             </span>
           )}
           {hardcoreMode && gotItRight && !gotScoreRight && savedScore && (
-            <span className="text-[10px] text-gray-600">
+            <span className="text-[9px] text-gray-600 ml-auto">
               Predijiste {savedScore.home}-{savedScore.away}
             </span>
           )}
