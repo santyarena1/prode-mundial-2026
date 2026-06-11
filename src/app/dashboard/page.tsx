@@ -39,6 +39,35 @@ interface RankingUser {
   totalPoints: number;
 }
 
+interface NextMatch {
+  id: string;
+  phase: string;
+  status: string;
+  startDate: string;
+  homeTeam?: { name: string; code: string; flagUrl?: string };
+  awayTeam?: { name: string; code: string; flagUrl?: string };
+  homePlaceholder?: string;
+  awayPlaceholder?: string;
+  group?: { name: string };
+}
+
+interface DashboardPrediction {
+  id: string;
+  predictedOutcome?: string;
+  pointsEarned: number;
+  match: {
+    status: string;
+    realOutcome?: string;
+    homeScore?: number;
+    awayScore?: number;
+    homeTeam?: { name: string; code: string; flagUrl?: string };
+    awayTeam?: { name: string; code: string; flagUrl?: string };
+    homePlaceholder?: string;
+    awayPlaceholder?: string;
+    startDate?: string;
+    phase: string;
+  };
+}
 
 interface Redemption {
   id: string;
@@ -154,6 +183,11 @@ export default function DashboardPage() {
   const [selectedRaffle, setSelectedRaffle] = useState<WeeklyRaffle | null>(null);
   const [dashboardBanners, setDashboardBanners] = useState<SponsorBannerItem[]>([]);
   const [bannerIndex, setBannerIndex] = useState(0);
+  const [nextMatch, setNextMatch] = useState<NextMatch | null>(null);
+  const [countdown, setCountdown] = useState("");
+  const [correctCount, setCorrectCount] = useState(0);
+  const [wrongCount, setWrongCount] = useState(0);
+  const [recentResults, setRecentResults] = useState<DashboardPrediction[]>([]);
 
   useEffect(() => {
     const init = async () => {
@@ -180,12 +214,13 @@ export default function DashboardPage() {
           }
         }
 
-        const [rankRes, predRes, redRes, raffleRes, bannerRes] = await Promise.all([
+        const [rankRes, predRes, redRes, raffleRes, bannerRes, fixtureRes] = await Promise.all([
           fetch("/api/public/ranking"),
           apiFetch("/api/participant/predictions"),
           apiFetch("/api/participant/redemptions"),
           fetch("/api/public/raffles"),
           fetch("/api/public/sponsor-banners"),
+          fetch("/api/public/fixture"),
         ]);
 
         if (rankRes.ok) {
@@ -199,8 +234,25 @@ export default function DashboardPage() {
         // 104 total matches in the 2026 World Cup (72 group + 32 knockout)
         setTotalMatches(104);
         if (predRes.ok) {
-          const preds = (await predRes.json()).predictions || [];
+          const preds: DashboardPrediction[] = (await predRes.json()).predictions || [];
           setPredictedMatches(preds.length);
+          const finishedPreds = preds.filter((p) => p.match.status === "finished" && p.predictedOutcome);
+          const correctPreds = finishedPreds.filter((p) => p.predictedOutcome === p.match.realOutcome);
+          const wrongPreds = finishedPreds.filter((p) => p.predictedOutcome !== p.match.realOutcome);
+          setCorrectCount(correctPreds.length);
+          setWrongCount(wrongPreds.length);
+          setRecentResults(finishedPreds.slice(-3).reverse());
+        }
+
+        if (fixtureRes.ok) {
+          const { fixture } = await fixtureRes.json();
+          const nowTime = new Date();
+          const allMatches = (fixture as any[]).flatMap((p: any) => p.matches);
+          const upcoming = allMatches
+            .filter((m: any) => m.status !== "finished" && m.startDate)
+            .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+          const next = upcoming.find((m: any) => new Date(m.startDate).getTime() > nowTime.getTime() - 2 * 60 * 60 * 1000);
+          if (next) setNextMatch(next);
         }
 
         if (redRes.ok) {
@@ -232,6 +284,34 @@ export default function DashboardPage() {
     const id = setInterval(() => setBannerIndex(i => (i + 1) % dashboardBanners.length), 5000);
     return () => clearInterval(id);
   }, [dashboardBanners.length]);
+
+  useEffect(() => {
+    if (!nextMatch) return;
+    const tick = () => {
+      if (nextMatch.status === "live") {
+        setCountdown("live");
+        return;
+      }
+      const diff = new Date(nextMatch.startDate).getTime() - Date.now();
+      if (diff <= 0) {
+        setCountdown("live");
+        return;
+      }
+      const totalSeconds = Math.floor(diff / 1000);
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      if (days > 0) {
+        setCountdown(`${String(days).padStart(2, "0")}:${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`);
+      } else {
+        setCountdown(`${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`);
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [nextMatch]);
 
   if (loading) return <LoadingScreen text="Cargando tu dashboard..." />;
   if (!user) return null;
@@ -351,6 +431,211 @@ export default function DashboardPage() {
             <div className="text-right mt-1 text-xs text-gray-600">{progressPct}%</div>
           </Card>
         </motion.div>
+
+        {/* Próximo partido countdown */}
+        {nextMatch && (
+          <motion.div className="mb-8" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
+            <div
+              className={`bg-[#0d0d0d] border rounded-xl p-5 ${
+                nextMatch.status === "live" || countdown === "live"
+                  ? "border-red-600/50"
+                  : "border-[#1e1e1e]"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                  Próximo partido
+                </span>
+                {(nextMatch.status === "live" || countdown === "live") && (
+                  <span className="text-red-500 text-xs font-bold flex items-center gap-1">
+                    🔴 EN JUEGO
+                  </span>
+                )}
+              </div>
+
+              {/* Teams */}
+              <div className="flex items-center justify-center gap-4 mb-3">
+                {/* Home */}
+                <div className="flex flex-col items-center gap-1.5 min-w-0">
+                  {nextMatch.homeTeam?.flagUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={nextMatch.homeTeam.flagUrl} alt={nextMatch.homeTeam.name} className="w-6 h-4 object-cover rounded-sm flex-shrink-0" />
+                  ) : (
+                    <span className="text-xs font-bold text-gray-300 bg-[#1e1e1e] rounded px-1.5 py-0.5">
+                      {nextMatch.homeTeam?.code ?? nextMatch.homePlaceholder ?? "?"}
+                    </span>
+                  )}
+                  <span className="text-white text-sm font-bold truncate max-w-[80px] text-center">
+                    {nextMatch.homeTeam?.name ?? nextMatch.homePlaceholder ?? "Por definir"}
+                  </span>
+                </div>
+
+                <span className="text-gray-600 font-black text-lg">vs</span>
+
+                {/* Away */}
+                <div className="flex flex-col items-center gap-1.5 min-w-0">
+                  {nextMatch.awayTeam?.flagUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={nextMatch.awayTeam.flagUrl} alt={nextMatch.awayTeam.name} className="w-6 h-4 object-cover rounded-sm flex-shrink-0" />
+                  ) : (
+                    <span className="text-xs font-bold text-gray-300 bg-[#1e1e1e] rounded px-1.5 py-0.5">
+                      {nextMatch.awayTeam?.code ?? nextMatch.awayPlaceholder ?? "?"}
+                    </span>
+                  )}
+                  <span className="text-white text-sm font-bold truncate max-w-[80px] text-center">
+                    {nextMatch.awayTeam?.name ?? nextMatch.awayPlaceholder ?? "Por definir"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Phase / group / date */}
+              <p className="text-center text-gray-500 text-xs mb-4">
+                {nextMatch.group ? `${nextMatch.group.name} · ` : ""}{nextMatch.phase}
+                {" · "}
+                {new Date(nextMatch.startDate).toLocaleDateString("es-AR", {
+                  weekday: "short",
+                  day: "2-digit",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+
+              {/* Countdown */}
+              {countdown === "live" ? (
+                <div className="flex justify-center">
+                  <span className="text-red-500 font-black text-lg tracking-widest">🔴 EN JUEGO</span>
+                </div>
+              ) : countdown ? (
+                <div className="flex flex-col items-center gap-1">
+                  <div className="flex items-center gap-1 text-gray-500 text-xs font-semibold">
+                    <Clock className="w-3 h-3" />
+                    <span>Faltan</span>
+                  </div>
+                  {countdown.split(":").length === 4 ? (
+                    <div className="flex items-end gap-3">
+                      {[
+                        { val: countdown.split(":")[0], label: "días" },
+                        { val: countdown.split(":")[1], label: "hs" },
+                        { val: countdown.split(":")[2], label: "min" },
+                        { val: countdown.split(":")[3], label: "seg" },
+                      ].map(({ val, label }) => (
+                        <div key={label} className="flex flex-col items-center">
+                          <span className="text-white font-black text-2xl tabular-nums leading-none">{val}</span>
+                          <span className="text-gray-600 text-[10px] uppercase tracking-wider mt-0.5">{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-end gap-3">
+                      {[
+                        { val: countdown.split(":")[0], label: "hs" },
+                        { val: countdown.split(":")[1], label: "min" },
+                        { val: countdown.split(":")[2], label: "seg" },
+                      ].map(({ val, label }) => (
+                        <div key={label} className="flex flex-col items-center">
+                          <span className="text-white font-black text-2xl tabular-nums leading-none">{val}</span>
+                          <span className="text-gray-600 text-[10px] uppercase tracking-wider mt-0.5">{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Mis últimos resultados */}
+        {correctCount + wrongCount > 0 && (
+          <motion.div className="mb-8" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.38 }}>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-gray-600 mb-3">Mis resultados</h2>
+            <Card className="p-5">
+              {/* Summary pills */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                <div className="flex items-center gap-1.5 bg-green-600/10 border border-green-600/20 rounded-lg px-3 py-1.5">
+                  <span className="text-green-400 font-black text-base">{correctCount}</span>
+                  <span className="text-green-400/70 text-xs font-semibold uppercase tracking-wider">Acertadas</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-red-600/10 border border-red-600/20 rounded-lg px-3 py-1.5">
+                  <span className="text-red-400 font-black text-base">{wrongCount}</span>
+                  <span className="text-red-400/70 text-xs font-semibold uppercase tracking-wider">Fallidas</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-gray-600/10 border border-gray-600/20 rounded-lg px-3 py-1.5">
+                  <span className="text-gray-400 font-black text-base">{predictedMatches - correctCount - wrongCount}</span>
+                  <span className="text-gray-500 text-xs font-semibold uppercase tracking-wider">Pendientes</span>
+                </div>
+              </div>
+
+              {/* Last 3 results */}
+              {recentResults.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700 mb-2">Últimas 3</p>
+                  <div className="space-y-2">
+                    {recentResults.map((pred) => {
+                      const isCorrect = pred.predictedOutcome === pred.match.realOutcome;
+                      const home = pred.match.homeTeam?.name ?? pred.match.homePlaceholder ?? "?";
+                      const away = pred.match.awayTeam?.name ?? pred.match.awayPlaceholder ?? "?";
+                      const homeFlagUrl = pred.match.homeTeam?.flagUrl;
+                      const awayFlagUrl = pred.match.awayTeam?.flagUrl;
+                      const homeCode = pred.match.homeTeam?.code;
+                      const awayCode = pred.match.awayTeam?.code;
+                      const score =
+                        pred.match.homeScore != null && pred.match.awayScore != null
+                          ? `${pred.match.homeScore}-${pred.match.awayScore}`
+                          : null;
+                      return (
+                        <div
+                          key={pred.id}
+                          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 border-l-4 bg-[#111] ${
+                            isCorrect ? "border-green-500" : "border-red-500"
+                          }`}
+                        >
+                          {/* Flags */}
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {homeFlagUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={homeFlagUrl} alt={home} className="w-6 h-4 object-cover rounded-sm" />
+                            ) : (
+                              <span className="text-[10px] font-bold text-gray-500">{homeCode ?? "?"}</span>
+                            )}
+                            <span className="text-gray-600 text-[10px] mx-0.5">vs</span>
+                            {awayFlagUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={awayFlagUrl} alt={away} className="w-6 h-4 object-cover rounded-sm" />
+                            ) : (
+                              <span className="text-[10px] font-bold text-gray-500">{awayCode ?? "?"}</span>
+                            )}
+                          </div>
+                          {/* Names */}
+                          <div className="flex-1 min-w-0">
+                            <span className="text-white text-xs font-semibold truncate">
+                              {home} vs {away}
+                            </span>
+                            {score && <span className="text-gray-500 text-[10px] ml-1.5">{score}</span>}
+                          </div>
+                          {/* Result */}
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {isCorrect ? (
+                              <>
+                                <span className="text-green-400 font-black text-sm">✓</span>
+                                {pred.pointsEarned > 0 && (
+                                  <span className="text-green-400 text-[10px] font-bold">+{pred.pointsEarned} pts</span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-red-400 font-black text-sm">✗</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </Card>
+          </motion.div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           {/* Left col: action cards + album */}
