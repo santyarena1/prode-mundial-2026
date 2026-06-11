@@ -2307,7 +2307,7 @@ function MatchCard({
           }`}>
             <span className="text-gray-500">Tu predicción:</span>
             <span className={`font-bold ${gotItRight ? "text-green-400" : "text-gray-400"}`}>
-              {saved === "home" ? `Gana ${homeCode}` : saved === "away" ? `Gana ${awayCode}` : "Empate"}
+              {saved === "home" ? `Gana ${homeName}` : saved === "away" ? `Gana ${awayName}` : "Empate"}
             </span>
             {hardcoreMode && savedScore && (
               <>

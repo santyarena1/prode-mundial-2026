@@ -445,21 +445,21 @@ export default function DashboardPage() {
               <Clock className="w-3 h-3 text-gray-600 flex-shrink-0 sm:hidden" />
 
               {/* Teams */}
-              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-hidden">
                 {nextMatch.homeTeam?.flagUrl
                   ? <img src={nextMatch.homeTeam.flagUrl} alt="" className="w-5 h-3.5 object-cover rounded-sm flex-shrink-0" />
-                  : <span className="text-[10px] font-bold text-gray-400">{nextMatch.homeTeam?.code ?? nextMatch.homePlaceholder ?? "?"}</span>
+                  : <span className="text-[10px] font-bold text-gray-400 flex-shrink-0">{nextMatch.homeTeam?.code ?? nextMatch.homePlaceholder ?? "?"}</span>
                 }
-                <span className="text-white text-xs font-bold truncate max-w-[60px]">
+                <span className="text-white text-xs font-bold shrink min-w-0">
                   {nextMatch.homeTeam?.name ?? nextMatch.homePlaceholder ?? "TBD"}
                 </span>
                 <span className="text-gray-600 text-[10px] font-black flex-shrink-0">vs</span>
-                <span className="text-white text-xs font-bold truncate max-w-[60px]">
+                <span className="text-white text-xs font-bold shrink min-w-0">
                   {nextMatch.awayTeam?.name ?? nextMatch.awayPlaceholder ?? "TBD"}
                 </span>
                 {nextMatch.awayTeam?.flagUrl
                   ? <img src={nextMatch.awayTeam.flagUrl} alt="" className="w-5 h-3.5 object-cover rounded-sm flex-shrink-0" />
-                  : <span className="text-[10px] font-bold text-gray-400">{nextMatch.awayTeam?.code ?? nextMatch.awayPlaceholder ?? "?"}</span>
+                  : <span className="text-[10px] font-bold text-gray-400 flex-shrink-0">{nextMatch.awayTeam?.code ?? nextMatch.awayPlaceholder ?? "?"}</span>
                 }
               </div>
 
