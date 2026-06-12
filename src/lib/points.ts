@@ -137,8 +137,16 @@ export async function calculateUserPoints(userId: string): Promise<number> {
       continue;
     }
 
+    // When scores are stored, derive effective outcome from them (handles stale predictedOutcome)
+    const effectiveOutcome =
+      p.predictedHomeScore !== null && p.predictedAwayScore !== null
+        ? p.predictedHomeScore > p.predictedAwayScore ? "home"
+          : p.predictedAwayScore > p.predictedHomeScore ? "away"
+          : "draw"
+        : p.predictedOutcome;
+
     let earned = 0;
-    if (p.predictedOutcome && p.predictedOutcome === m.realOutcome) {
+    if (effectiveOutcome && effectiveOutcome === m.realOutcome) {
       earned += pts("GROUP_SIGN");
       if (m.realOutcome === "draw") earned += pts("GROUP_DRAW_BONUS");
 

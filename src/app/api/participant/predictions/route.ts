@@ -108,9 +108,9 @@ export async function POST(request: NextRequest) {
 
     const { matchId, predictedHomeScore, predictedAwayScore, ...rest } = parsed.data;
 
-    // Infer outcome from scores when in hardcore mode
+    // Scores always override outcome — derive from score when both are present
     let predictedOutcome = rest.predictedOutcome;
-    if (predictedHomeScore !== undefined && predictedAwayScore !== undefined && !predictedOutcome) {
+    if (predictedHomeScore !== undefined && predictedAwayScore !== undefined) {
       if (predictedHomeScore > predictedAwayScore) predictedOutcome = "home";
       else if (predictedAwayScore > predictedHomeScore) predictedOutcome = "away";
       else predictedOutcome = "draw";

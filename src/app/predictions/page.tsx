@@ -2217,7 +2217,11 @@ function MatchCard({
     isFinished && match.homeScore !== undefined && match.awayScore !== undefined
       ? match.homeScore > match.awayScore ? "home" : match.awayScore > match.homeScore ? "away" : "draw"
       : null;
-  const gotItRight = saved && realOutcome ? saved === realOutcome : null;
+  // When a score was saved, derive the effective outcome from it (score always wins over stored outcome)
+  const effectiveSaved = savedScore
+    ? (savedScore.home > savedScore.away ? "home" : savedScore.away > savedScore.home ? "away" : "draw")
+    : saved;
+  const gotItRight = effectiveSaved && realOutcome ? effectiveSaved === realOutcome : null;
   const gotScoreRight =
     gotItRight && hardcoreMode && savedScore && match.homeScore !== undefined && match.awayScore !== undefined
       ? savedScore.home === match.homeScore && savedScore.away === match.awayScore
@@ -2334,7 +2338,7 @@ function MatchCard({
           }`}>
             <span className="text-gray-500">Tu predicción:</span>
             <span className={`font-bold ${gotItRight ? "text-green-400" : "text-gray-400"}`}>
-              {saved === "home" ? `Gana ${homeName}` : saved === "away" ? `Gana ${awayName}` : "Empate"}
+              {effectiveSaved === "home" ? `Gana ${homeName}` : effectiveSaved === "away" ? `Gana ${awayName}` : "Empate"}
             </span>
             {hardcoreMode && savedScore && (
               <>
