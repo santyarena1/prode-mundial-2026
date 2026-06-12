@@ -85,6 +85,7 @@ export default function AdminParticipantsPage() {
   const [savingPassword, setSavingPassword] = useState(false);
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [predFilter, setPredFilter] = useState<"all" | "none" | "incomplete">("all");
 
   useEffect(() => {
     apiFetch("/api/admin/participants")
@@ -103,7 +104,7 @@ export default function AdminParticipantsPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const list = q
+    let list = q
       ? participants.filter(
           (p) =>
             `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) ||
@@ -111,6 +112,9 @@ export default function AdminParticipantsPage() {
             p.phone.includes(q)
         )
       : [...participants];
+
+    if (predFilter === "none") list = list.filter((p) => (p._count?.predictions ?? 0) === 0);
+    else if (predFilter === "incomplete") list = list.filter((p) => (p._count?.predictions ?? 0) < 72);
 
     list.sort((a, b) => {
       let cmp = 0;
@@ -125,7 +129,7 @@ export default function AdminParticipantsPage() {
     });
 
     return list;
-  }, [participants, search, sortField, sortDir]);
+  }, [participants, search, sortField, sortDir, predFilter]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -325,13 +329,31 @@ export default function AdminParticipantsPage() {
         </div>
       )}
 
-      <div className="mb-4">
-        <Input
-          placeholder="Buscar por nombre, email, teléfono..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          icon={<Search className="w-4 h-4" />}
-        />
+      <div className="mb-4 flex flex-col sm:flex-row gap-2">
+        <div className="flex-1">
+          <Input
+            placeholder="Buscar por nombre, email, teléfono..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            icon={<Search className="w-4 h-4" />}
+          />
+        </div>
+        <div className="flex gap-1.5 items-center flex-wrap">
+          {(["all", "incomplete", "none"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setPredFilter(f)}
+              className={`px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border transition-colors whitespace-nowrap ${
+                predFilter === f
+                  ? "bg-red-600 border-red-500 text-white"
+                  : "bg-[#141414] border-[#2a2a2a] text-gray-400 hover:border-[#444] hover:text-gray-200"
+              }`}
+            >
+              {f === "all" ? "Todos" : f === "incomplete" ? "Incompletas" : "Sin ninguna"}
+            </button>
+          ))}
+        </div>
       </div>
 
       <Card className="overflow-hidden">
