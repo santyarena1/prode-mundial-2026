@@ -190,6 +190,7 @@ export default function DashboardPage() {
   const [countdown, setCountdown] = useState("");
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
+  const [pendingGroupCount, setPendingGroupCount] = useState(0);
   const [recentResults, setRecentResults] = useState<DashboardPrediction[]>([]);
 
   useEffect(() => {
@@ -217,9 +218,10 @@ export default function DashboardPage() {
           }
         }
 
-        const [rankRes, predRes, redRes, raffleRes, bannerRes, fixtureRes] = await Promise.all([
+        const [rankRes, predRes, bracketPredRes, redRes, raffleRes, bannerRes, fixtureRes] = await Promise.all([
           fetch("/api/public/ranking"),
           apiFetch("/api/participant/predictions"),
+          apiFetch("/api/participant/bracket-predictions"),
           apiFetch("/api/participant/redemptions"),
           fetch("/api/public/raffles"),
           fetch("/api/public/sponsor-banners"),
@@ -232,13 +234,14 @@ export default function DashboardPage() {
           if (me) setUserPosition(me.position);
         }
 
-        // Group stage only for now (72 matches); bracket opens later
-        setTotalMatches(72);
+        // 72 group + 31 bracket slots (16+8+4+2+1)
+        setTotalMatches(103);
         if (predRes.ok) {
           const preds: DashboardPrediction[] = (await predRes.json()).predictions || [];
-          // Show group stage predictions count only (bracket is separate)
-          const groupPreds = preds.filter((p) => p.match.phase === "GROUP_STAGE");
-          setPredictedMatches(groupPreds.length);
+          const bracketCount = bracketPredRes.ok
+            ? ((await bracketPredRes.json()).bracketPredictions || []).length
+            : 0;
+          setPredictedMatches(preds.length + bracketCount);
 
           const effectiveOutcome = (p: DashboardPrediction) => {
             if (p.predictedHomeScore != null && p.predictedAwayScore != null) {
@@ -247,7 +250,6 @@ export default function DashboardPage() {
             }
             return p.predictedOutcome ?? null;
           };
-          // Derive match outcome from scores if realOutcome not yet set
           const matchOutcome = (p: DashboardPrediction) => {
             if (p.match.realOutcome) return p.match.realOutcome;
             if (p.match.homeScore != null && p.match.awayScore != null) {
@@ -260,10 +262,22 @@ export default function DashboardPage() {
           const finishedPreds = preds.filter(
             (p) => p.match.status === "finished" && matchOutcome(p) !== null
           );
-          const correctPreds = finishedPreds.filter((p) => effectiveOutcome(p) === matchOutcome(p));
-          const wrongPreds   = finishedPreds.filter((p) => effectiveOutcome(p) !== matchOutcome(p));
+          // Require both outcomes to be non-null before classifying
+          const correctPreds = finishedPreds.filter((p) => {
+            const eo = effectiveOutcome(p); const mo = matchOutcome(p);
+            return eo !== null && mo !== null && eo === mo;
+          });
+          const wrongPreds = finishedPreds.filter((p) => {
+            const eo = effectiveOutcome(p); const mo = matchOutcome(p);
+            return eo !== null && mo !== null && eo !== mo;
+          });
           setCorrectCount(correctPreds.length);
           setWrongCount(wrongPreds.length);
+          // pendientes = group predictions for matches not yet finished
+          const pendingGroup = preds.filter(
+            (p) => p.match.phase === "GROUP_STAGE" && p.match.status !== "finished"
+          ).length;
+          setPendingGroupCount(pendingGroup);
           setRecentResults(finishedPreds.slice(-3).reverse());
         }
 
@@ -519,7 +533,7 @@ export default function DashboardPage() {
                   <span className="text-red-400/70 text-xs font-semibold uppercase tracking-wider">Fallidas</span>
                 </div>
                 <div className="flex items-center gap-1.5 bg-gray-600/10 border border-gray-600/20 rounded-lg px-3 py-1.5">
-                  <span className="text-gray-400 font-black text-base">{predictedMatches - correctCount - wrongCount}</span>
+                  <span className="text-gray-400 font-black text-base">{pendingGroupCount}</span>
                   <span className="text-gray-500 text-xs font-semibold uppercase tracking-wider">Pendientes</span>
                 </div>
               </div>
@@ -530,7 +544,14 @@ export default function DashboardPage() {
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-700 mb-2">Últimas 3</p>
                   <div className="space-y-2">
                     {recentResults.map((pred) => {
-                      const isCorrect = pred.predictedOutcome === pred.match.realOutcome;
+                      const predEff = pred.predictedHomeScore != null && pred.predictedAwayScore != null
+                        ? (pred.predictedHomeScore > pred.predictedAwayScore ? "home" : pred.predictedAwayScore > pred.predictedHomeScore ? "away" : "draw")
+                        : (pred.predictedOutcome ?? null);
+                      const matchEff = pred.match.realOutcome
+                        ?? (pred.match.homeScore != null && pred.match.awayScore != null
+                          ? (pred.match.homeScore > pred.match.awayScore ? "home" : pred.match.awayScore > pred.match.homeScore ? "away" : "draw")
+                          : null);
+                      const isCorrect = predEff !== null && matchEff !== null && predEff === matchEff;
                       const home = pred.match.homeTeam?.name ?? pred.match.homePlaceholder ?? "?";
                       const away = pred.match.awayTeam?.name ?? pred.match.awayPlaceholder ?? "?";
                       const homeFlagUrl = pred.match.homeTeam?.flagUrl;

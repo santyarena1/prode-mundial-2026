@@ -139,9 +139,10 @@ function EventsPanel({ events, homeTeam, awayTeam }: {
   return (
     <div className="space-y-1">
       {relevant.map(e => {
-        const isHome = e.teamId === homeId || (!e.teamId && false);
-        const isAway = e.teamId === awayId;
-        const side = isHome ? "home" : isAway ? "away" : "home";
+        const isHome = !!homeId && e.teamId === homeId;
+        const isAway = !!awayId && e.teamId === awayId;
+        const side = isHome ? "home" : isAway ? "away" : null;
+        if (side === null) return null; // skip unattributed events
         const min = e.minute != null
           ? e.extraTime ? `${e.minute}+${e.extraTime}'` : `${e.minute}'`
           : null;

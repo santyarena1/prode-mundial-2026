@@ -265,7 +265,6 @@ export async function calculateUserPoints(userId: string): Promise<number> {
       if (bp.predictedTeamId === match.winnerTeamId) {
         earned = pts("CHAMPION");
         finalChampionCorrect = true;
-        achievementStats.specialChampionCorrect = true;
       } else if (
         bp.predictedTeamId === match.homeTeamId ||
         bp.predictedTeamId === match.awayTeamId
