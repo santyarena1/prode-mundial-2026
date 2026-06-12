@@ -10,7 +10,11 @@ export async function GET() {
           orderBy: { name: "asc" },
         },
         matches: {
-          include: { homeTeam: true, awayTeam: true },
+          include: {
+            homeTeam: true,
+            awayTeam: true,
+            events: { orderBy: { minute: "asc" } },
+          },
           orderBy: { startDate: "asc" },
           where: { phase: "GROUP_STAGE" },
         },

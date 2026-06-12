@@ -1,6 +1,7 @@
 "use client";
 
-import { Radio } from "lucide-react";
+import { useState } from "react";
+import { Radio, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { formatMatchDate, matchStatusLabel, matchStatusVariant } from "@/lib/match-utils";
 
@@ -9,6 +10,18 @@ export interface FixtureTeam {
   name: string;
   code: string;
   flagUrl?: string | null;
+}
+
+export interface MatchEvent {
+  id: string;
+  minute?: number | null;
+  extraTime?: number | null;
+  teamId?: string | null;
+  teamName?: string | null;
+  playerName?: string | null;
+  assistName?: string | null;
+  eventType: string;
+  detail?: string | null;
 }
 
 export interface FixtureMatch {
@@ -23,6 +36,7 @@ export interface FixtureMatch {
   awayPlaceholder?: string | null;
   homeScore?: number | null;
   awayScore?: number | null;
+  events?: MatchEvent[];
 }
 
 interface FixtureMatchRowProps {
@@ -89,6 +103,65 @@ function AwayTeam({
   );
 }
 
+function eventIcon(eventType: string, detail?: string | null) {
+  const t = eventType.toLowerCase();
+  const d = (detail ?? "").toLowerCase();
+  if (t === "goal") {
+    if (d.includes("own goal")) return "⚽🔴";
+    if (d.includes("penalty")) return "⚽🎯";
+    return "⚽";
+  }
+  if (t === "card") {
+    if (d.includes("red")) return "🟥";
+    if (d.includes("yellow card - second yellow")) return "🟨🟥";
+    return "🟨";
+  }
+  if (t === "subst") return "🔄";
+  return "•";
+}
+
+function EventsPanel({ events, homeTeam, awayTeam }: {
+  events: MatchEvent[];
+  homeTeam?: FixtureTeam | null;
+  awayTeam?: FixtureTeam | null;
+}) {
+  const relevant = events.filter(e => {
+    const t = e.eventType.toLowerCase();
+    return t === "goal" || t === "card";
+  });
+  if (relevant.length === 0) return (
+    <p className="text-center text-gray-600 text-xs py-2">Sin eventos registrados</p>
+  );
+
+  const homeId = homeTeam?.id;
+  const awayId = awayTeam?.id;
+
+  return (
+    <div className="space-y-1">
+      {relevant.map(e => {
+        const isHome = e.teamId === homeId || (!e.teamId && false);
+        const isAway = e.teamId === awayId;
+        const side = isHome ? "home" : isAway ? "away" : "home";
+        const min = e.minute != null
+          ? e.extraTime ? `${e.minute}+${e.extraTime}'` : `${e.minute}'`
+          : null;
+
+        return (
+          <div
+            key={e.id}
+            className={`flex items-center gap-2 text-xs ${side === "away" ? "flex-row-reverse" : ""}`}
+          >
+            <span className="text-gray-500 tabular-nums w-10 shrink-0 text-center">{min ?? "—"}</span>
+            <span className="text-base leading-none">{eventIcon(e.eventType, e.detail)}</span>
+            <span className="text-gray-300 truncate">{e.playerName ?? e.teamName ?? "—"}</span>
+            {e.assistName && <span className="text-gray-600 truncate">({e.assistName})</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function FixtureMatchRow({ match }: FixtureMatchRowProps) {
   const isLive = match.status === "live";
   const isFinished = match.status === "finished";
@@ -96,10 +169,15 @@ export function FixtureMatchRow({ match }: FixtureMatchRowProps) {
     isFinished || isLive
       ? match.homeScore != null && match.awayScore != null
       : false;
+  const hasEvents = (match.events ?? []).filter(e => {
+    const t = e.eventType.toLowerCase();
+    return t === "goal" || t === "card";
+  }).length > 0;
+  const [expanded, setExpanded] = useState(isLive);
 
   return (
     <article
-      className={`relative rounded-xl border bg-[#121212] px-3 py-3 sm:px-4 sm:py-4 transition-colors ${
+      className={`relative rounded-xl border bg-[#121212] transition-colors ${
         isLive
           ? "border-red-500/50 shadow-[0_0_24px_-8px_rgba(239,68,68,0.45)]"
           : "border-[#222] hover:border-[#333]"
@@ -114,7 +192,7 @@ export function FixtureMatchRow({ match }: FixtureMatchRowProps) {
         </span>
       )}
 
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-3 sm:gap-x-4 gap-y-2">
+      <div className="px-3 py-3 sm:px-4 sm:py-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-3 sm:gap-x-4 gap-y-2">
         <HomeTeam team={match.homeTeam} placeholder={match.homePlaceholder} />
 
         <div className="flex flex-col items-center justify-center px-1 sm:px-2 justify-self-center">
@@ -147,7 +225,28 @@ export function FixtureMatchRow({ match }: FixtureMatchRowProps) {
       </div>
 
       {match.venue && (
-        <p className="text-center text-gray-600 text-[10px] mt-2 truncate">{match.venue}</p>
+        <p className="text-center text-gray-600 text-[10px] pb-2 px-4 truncate">{match.venue}</p>
+      )}
+
+      {/* Events toggle */}
+      {(isFinished || isLive) && hasEvents && (
+        <button
+          type="button"
+          onClick={() => setExpanded(v => !v)}
+          className="w-full flex items-center justify-center gap-1 py-2 border-t border-[#1e1e1e] text-gray-500 hover:text-gray-300 text-[11px] uppercase tracking-wider transition-colors"
+        >
+          {expanded ? "Ocultar" : "Goles y tarjetas"}
+          <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
+        </button>
+      )}
+      {(isFinished || isLive) && expanded && (
+        <div className="px-4 py-3 border-t border-[#1a1a1a]">
+          <EventsPanel
+            events={match.events ?? []}
+            homeTeam={match.homeTeam}
+            awayTeam={match.awayTeam}
+          />
+        </div>
       )}
     </article>
   );
