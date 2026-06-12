@@ -217,10 +217,9 @@ export default function DashboardPage() {
           }
         }
 
-        const [rankRes, predRes, bracketPredRes, redRes, raffleRes, bannerRes, fixtureRes] = await Promise.all([
+        const [rankRes, predRes, redRes, raffleRes, bannerRes, fixtureRes] = await Promise.all([
           fetch("/api/public/ranking"),
           apiFetch("/api/participant/predictions"),
-          apiFetch("/api/participant/bracket-predictions"),
           apiFetch("/api/participant/redemptions"),
           fetch("/api/public/raffles"),
           fetch("/api/public/sponsor-banners"),
@@ -233,30 +232,36 @@ export default function DashboardPage() {
           if (me) setUserPosition(me.position);
         }
 
-        // 72 group stage + 31 bracket slots (16+8+4+2+1)
-        setTotalMatches(103);
+        // Group stage only for now (72 matches); bracket opens later
+        setTotalMatches(72);
         if (predRes.ok) {
           const preds: DashboardPrediction[] = (await predRes.json()).predictions || [];
-          const bracketCount = bracketPredRes.ok
-            ? ((await bracketPredRes.json()).bracketPredictions || []).length
-            : 0;
-          setPredictedMatches(preds.length + bracketCount);
-          const finishedPreds = preds.filter((p) => p.match.status === "finished");
+          // Show group stage predictions count only (bracket is separate)
+          const groupPreds = preds.filter((p) => p.match.phase === "GROUP_STAGE");
+          setPredictedMatches(groupPreds.length);
+
           const effectiveOutcome = (p: DashboardPrediction) => {
             if (p.predictedHomeScore != null && p.predictedAwayScore != null) {
               return p.predictedHomeScore > p.predictedAwayScore ? "home"
                 : p.predictedAwayScore > p.predictedHomeScore ? "away" : "draw";
             }
-            return p.predictedOutcome;
+            return p.predictedOutcome ?? null;
           };
-          const correctPreds = finishedPreds.filter((p) => {
-            const eff = effectiveOutcome(p);
-            return eff && eff === p.match.realOutcome;
-          });
-          const wrongPreds = finishedPreds.filter((p) => {
-            const eff = effectiveOutcome(p);
-            return eff && eff !== p.match.realOutcome;
-          });
+          // Derive match outcome from scores if realOutcome not yet set
+          const matchOutcome = (p: DashboardPrediction) => {
+            if (p.match.realOutcome) return p.match.realOutcome;
+            if (p.match.homeScore != null && p.match.awayScore != null) {
+              return p.match.homeScore > p.match.awayScore ? "home"
+                : p.match.awayScore > p.match.homeScore ? "away" : "draw";
+            }
+            return null;
+          };
+
+          const finishedPreds = preds.filter(
+            (p) => p.match.status === "finished" && matchOutcome(p) !== null
+          );
+          const correctPreds = finishedPreds.filter((p) => effectiveOutcome(p) === matchOutcome(p));
+          const wrongPreds   = finishedPreds.filter((p) => effectiveOutcome(p) !== matchOutcome(p));
           setCorrectCount(correctPreds.length);
           setWrongCount(wrongPreds.length);
           setRecentResults(finishedPreds.slice(-3).reverse());
