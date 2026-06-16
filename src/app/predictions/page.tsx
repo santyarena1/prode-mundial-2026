@@ -554,7 +554,8 @@ export default function PredictionsPage() {
 
   const handlePickBracket = useCallback((phase: string, slot: string, teamId: string) => {
     const key = bracketKey(phase, slot);
-    if (!canReplaceBracketPick(phase, slot, savedBracket[key], bracketCtx)) return;
+    // CHAMPION can always be changed (picked again puts it in pending for re-confirmation)
+    if (phase !== "CHAMPION" && !canReplaceBracketPick(phase, slot, savedBracket[key], bracketCtx)) return;
 
     const match = (BRACKET_MATCHES[phase] ?? []).find((m) => m.matchNum === parseInt(slot, 10));
     const isThirdSlot = match && (match.leftSource.startsWith("3") || match.rightSource.startsWith("3"));
@@ -1537,6 +1538,8 @@ export default function PredictionsPage() {
                         savedBracket={savedBracket}
                         pendingBracket={pendingBracket}
                         onOpenPicker={() => setSelectionModal({ phase: "CHAMPION", slot: "1" })}
+                        onSave={handleSaveCurrentPhase}
+                        saving={savingBracket}
                       />
                     ) : (
                       <div className={`grid gap-3 ${
@@ -3352,16 +3355,18 @@ function BracketTeamSide({ team, isLocked, isPending, onOpen, changesRemaining, 
 
 // ─── Champion Card ────────────────────────────────────────────────────────────
 
-function ChampionCard({ allTeams, savedBracket, pendingBracket, onOpenPicker }: {
+function ChampionCard({ allTeams, savedBracket, pendingBracket, onOpenPicker, onSave, saving }: {
   allTeams: Team[];
   savedBracket: Record<string, string>;
   pendingBracket: Record<string, string>;
   onOpenPicker: () => void;
+  onSave: () => void;
+  saving: boolean;
 }) {
   const savedId   = savedBracket["CHAMPION:1"];
   const pendingId = pendingBracket["CHAMPION:1"];
-  const isLocked  = !!savedId;
-  const champion  = allTeams.find(t => t.id === (savedId || pendingId));
+  const isLocked  = !!savedId && !pendingId;
+  const champion  = allTeams.find(t => t.id === (pendingId || savedId));
 
   return (
     <div className="relative overflow-hidden bg-[#0d0d00] border border-yellow-600/25 rounded-3xl p-8 text-center min-h-[300px] flex flex-col items-center justify-center">
@@ -3395,11 +3400,23 @@ function ChampionCard({ allTeams, savedBracket, pendingBracket, onOpenPicker }: 
             <div>
               <p className={`font-black text-2xl ${isLocked ? "text-yellow-300" : "text-amber-300"}`}>{champion.name}</p>
               {isLocked
-                ? <p className="text-green-500 text-xs font-semibold flex items-center justify-center gap-1 mt-1.5"><Lock className="w-3 h-3" /> Confirmado</p>
-                : <>
-                    <p className="text-amber-600 text-xs mt-1">Sin confirmar</p>
+                ? <>
+                    <p className="text-green-500 text-xs font-semibold flex items-center justify-center gap-1 mt-1.5"><Lock className="w-3 h-3" /> Confirmado</p>
                     <button onClick={onOpenPicker} className="text-xs text-gray-600 hover:text-gray-400 underline transition-colors mt-2">Cambiar selección</button>
                   </>
+                : pendingId
+                  ? <div className="mt-3 flex flex-col items-center gap-2">
+                      <button
+                        onClick={onSave}
+                        disabled={saving}
+                        className="px-6 py-2.5 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black font-black text-sm rounded-xl transition-colors flex items-center gap-2"
+                      >
+                        <Save className="w-4 h-4" />
+                        {saving ? "Guardando..." : "Confirmar campeón"}
+                      </button>
+                      <button onClick={onOpenPicker} className="text-xs text-gray-600 hover:text-gray-400 underline transition-colors">Cambiar selección</button>
+                    </div>
+                  : null
               }
             </div>
           </motion.div>

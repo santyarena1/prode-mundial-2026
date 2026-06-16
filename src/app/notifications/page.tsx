@@ -72,7 +72,11 @@ export default function NotificationsPage() {
     if (!notif.data) return null;
     try {
       const d = JSON.parse(notif.data);
-      if (d.squadId) return `/squads/${d.squadId}`;
+      if (d.squadId) {
+        // squad_invite: go to /squads so the user sees the accept/decline UI
+        if (notif.type === "squad_invite") return "/squads";
+        return `/squads/${d.squadId}`;
+      }
     } catch {
       // ignore
     }
