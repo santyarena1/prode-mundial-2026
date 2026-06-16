@@ -218,8 +218,8 @@ export default function AdminPrizesPage() {
       toast.error("Nombre, descripción y puntos son requeridos");
       return;
     }
-    if (newPrize.featured && featuredCount >= 3) {
-      toast.error("Ya hay 3 premios destacados en el home. Quitá uno antes.");
+    if (newPrize.featured && featuredCount >= 4) {
+      toast.error("Ya hay 4 premios destacados en el home. Quitá uno antes.");
       return;
     }
     setCreating(true);
@@ -264,8 +264,8 @@ export default function AdminPrizesPage() {
 
   const toggleFeatured = async (prize: Prize) => {
     const newFeatured = !prize.featured;
-    if (newFeatured && featuredCount >= 3) {
-      toast.error("Máximo 3 premios destacados en home. Quitá uno primero.");
+    if (newFeatured && featuredCount >= 4) {
+      toast.error("Máximo 4 premios destacados en home. Quitá uno primero.");
       return;
     }
     setSaving(prev => ({ ...prev, [prize.id]: true }));
@@ -284,8 +284,8 @@ export default function AdminPrizesPage() {
   };
 
   const saveEdit = async (id: string) => {
-    if (editForm.featured && !prizes.find(p => p.id === id)?.featured && featuredCount >= 3) {
-      toast.error("Máximo 3 premios destacados en home.");
+    if (editForm.featured && !prizes.find(p => p.id === id)?.featured && featuredCount >= 4) {
+      toast.error("Máximo 4 premios destacados en home.");
       return;
     }
     setSaving(prev => ({ ...prev, [id]: true }));
@@ -345,7 +345,7 @@ export default function AdminPrizesPage() {
         <div>
           <h1 className="text-2xl font-black uppercase text-white">Premios</h1>
           <p className="text-gray-500 text-sm">
-            {prizes.length} premios · {featuredCount}/3 en home · {pending.length} canjes pendientes
+            {prizes.length} premios · {featuredCount}/4 en home · {pending.length} canjes pendientes
           </p>
         </div>
       </div>
@@ -410,7 +410,7 @@ export default function AdminPrizesPage() {
                 />
                 <span className="text-gray-300 text-sm flex items-center gap-1">
                   <Star className="w-3 h-3 text-yellow-400" /> Destacado en home
-                  {featuredCount >= 3 && <span className="text-red-400 text-xs">(máx. 3)</span>}
+                  {featuredCount >= 4 && <span className="text-red-400 text-xs">(máx. 4)</span>}
                 </span>
               </label>
             </div>
