@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import { getUserFromCookies } from "@/lib/cookies";
+import { sendSquadInviteEmail } from "@/lib/email";
 
 const schema = z.object({ email: z.string().email() });
 
@@ -44,6 +45,7 @@ export async function POST(
 
   const squad = await prisma.squad.findUnique({ where: { id }, select: { name: true } });
   const inviter = await prisma.user.findUnique({ where: { id: auth.userId }, select: { firstName: true, lastName: true } });
+  const inviterName = `${inviter?.firstName ?? ""} ${inviter?.lastName ?? ""}`.trim();
 
   await prisma.$transaction(async (tx) => {
     if (existing) {
@@ -59,11 +61,18 @@ export async function POST(
         userId: target.id,
         type: "squad_invite",
         title: "¡Te invitaron a un grupo!",
-        body: `${inviter?.firstName} ${inviter?.lastName} te invitó al grupo "${squad?.name}". Aceptá o rechazá desde la sección Grupos.`,
+        body: `${inviterName} te invitó al grupo "${squad?.name}". Aceptá o rechazá desde la sección Grupos.`,
         data: JSON.stringify({ squadId: id }),
       },
     });
   });
+
+  // Send email outside transaction (non-critical)
+  sendSquadInviteEmail({
+    invitee: { firstName: target.firstName, email: target.email },
+    inviterName,
+    squadName: squad?.name ?? "",
+  }).catch((err) => console.error("[invite] email failed:", err));
 
   return NextResponse.json({ invited: true });
 }

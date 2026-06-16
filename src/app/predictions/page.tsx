@@ -554,8 +554,7 @@ export default function PredictionsPage() {
 
   const handlePickBracket = useCallback((phase: string, slot: string, teamId: string) => {
     const key = bracketKey(phase, slot);
-    // CHAMPION can always be changed (picked again puts it in pending for re-confirmation)
-    if (phase !== "CHAMPION" && !canReplaceBracketPick(phase, slot, savedBracket[key], bracketCtx)) return;
+    if (!canReplaceBracketPick(phase, slot, savedBracket[key], bracketCtx)) return;
 
     const match = (BRACKET_MATCHES[phase] ?? []).find((m) => m.matchNum === parseInt(slot, 10));
     const isThirdSlot = match && (match.leftSource.startsWith("3") || match.rightSource.startsWith("3"));
@@ -3400,10 +3399,7 @@ function ChampionCard({ allTeams, savedBracket, pendingBracket, onOpenPicker, on
             <div>
               <p className={`font-black text-2xl ${isLocked ? "text-yellow-300" : "text-amber-300"}`}>{champion.name}</p>
               {isLocked
-                ? <>
-                    <p className="text-green-500 text-xs font-semibold flex items-center justify-center gap-1 mt-1.5"><Lock className="w-3 h-3" /> Confirmado</p>
-                    <button onClick={onOpenPicker} className="text-xs text-gray-600 hover:text-gray-400 underline transition-colors mt-2">Cambiar selección</button>
-                  </>
+                ? <p className="text-green-500 text-xs font-semibold flex items-center justify-center gap-1 mt-1.5"><Lock className="w-3 h-3" /> Confirmado</p>
                 : pendingId
                   ? <div className="mt-3 flex flex-col items-center gap-2">
                       <button

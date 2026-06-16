@@ -409,6 +409,69 @@ export async function sendPasswordResetEmail(params: {
   if (error) console.error("[email] Failed to send password reset email:", error);
 }
 
+// ─── Squad Invite Email ────────────────────────────────────────────────────────
+
+export async function sendSquadInviteEmail(params: {
+  invitee: { firstName: string; email: string };
+  inviterName: string;
+  squadName: string;
+}): Promise<void> {
+  if (!process.env.RESEND_API_KEY) return;
+  const { invitee, inviterName, squadName } = params;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://thegamershop-premios.com";
+  const from = process.env.RESEND_FROM || "Prode Mundial Gamer <no-reply@thegamershop-premios.com>";
+  const r = new Resend(process.env.RESEND_API_KEY.replace(/^﻿/, "").trim());
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Invitación a grupo</title></head>
+<body style="margin:0;padding:32px 16px;background:#0a0a0a;font-family:'Segoe UI',Arial,sans-serif;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#0a0a0a;">
+  <tr><td align="center" style="padding:32px 16px;">
+    <table role="presentation" width="560" cellspacing="0" cellpadding="0" border="0"
+      style="max-width:560px;width:100%;background:#111111;border-radius:16px;border:1px solid #2a2a2a;overflow:hidden;">
+      <tr>
+        <td style="background:#0a0a0a;padding:24px 32px;text-align:center;border-bottom:1px solid #1a1a1a;">
+          <div style="font-size:20px;font-weight:900;color:#fff;letter-spacing:-0.5px;">⚽ Prode Mundial Gamer 2026</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:32px;">
+          <p style="margin:0 0 8px;color:#9ca3af;font-size:14px;">Hola, <strong style="color:#fff;">${invitee.firstName}</strong></p>
+          <h1 style="margin:0 0 16px;font-size:22px;font-weight:800;color:#fff;">¡Te invitaron a un grupo! ⚔️</h1>
+          <p style="color:#9ca3af;font-size:15px;line-height:1.6;margin:0 0 24px;">
+            <strong style="color:#fff;">${inviterName}</strong> te invitó a unirte al grupo
+            <strong style="color:#ef4444;">${squadName}</strong> en el Prode Mundial Gamer 2026.
+          </p>
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto 24px;">
+            <tr>
+              <td style="border-radius:10px;background:#dc2626;">
+                <a href="${appUrl}/squads"
+                  style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:800;
+                         color:#fff;text-decoration:none;letter-spacing:0.5px;">
+                  VER INVITACIÓN →
+                </a>
+              </td>
+            </tr>
+          </table>
+          <hr style="border:none;border-top:1px solid #1f1f1f;margin:0 0 20px;" />
+          <p style="color:#4b5563;font-size:12px;line-height:1.5;margin:0;">
+            Si no querés unirte, podés ignorar este email o rechazar la invitación desde la app.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
+
+  const { error } = await r.emails.send({
+    from,
+    to: invitee.email,
+    subject: `${inviterName} te invitó al grupo "${squadName}" — Prode Mundial Gamer 2026`,
+    html,
+  });
+  if (error) console.error("[email] Failed to send squad invite email:", error);
+}
+
 // ─── Announcements via Resend ──────────────────────────────────────────────────
 
 const resend = new Resend(process.env.RESEND_API_KEY?.replace(/^﻿/, "").trim());
