@@ -6,7 +6,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Trophy, Target, Star, Gift, Zap, ChevronRight, User, TrendingUp, CheckCircle2, BookOpen,
-  Clock, Shuffle, Package, XCircle, Users, X, Ticket,
+  Clock, Shuffle, Package, XCircle, Users, X, Ticket, MessageCircle, Copy,
 } from "lucide-react";
 import { VirtualAlbumModal } from "@/components/dashboard/VirtualAlbumModal";
 import { SponsorCTA } from "@/components/home/SponsorCTA";
@@ -192,6 +192,8 @@ export default function DashboardPage() {
   const [wrongCount, setWrongCount] = useState(0);
   const [pendingGroupCount, setPendingGroupCount] = useState(0);
   const [recentResults, setRecentResults] = useState<DashboardPrediction[]>([]);
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -218,7 +220,7 @@ export default function DashboardPage() {
           }
         }
 
-        const [rankRes, predRes, bracketPredRes, redRes, raffleRes, bannerRes, fixtureRes] = await Promise.all([
+        const [rankRes, predRes, bracketPredRes, redRes, raffleRes, bannerRes, fixtureRes, refRes] = await Promise.all([
           fetch("/api/public/ranking"),
           apiFetch("/api/participant/predictions"),
           apiFetch("/api/participant/bracket-predictions"),
@@ -226,12 +228,18 @@ export default function DashboardPage() {
           fetch("/api/public/raffles"),
           fetch("/api/public/sponsor-banners"),
           fetch("/api/public/fixture"),
+          apiFetch("/api/participant/referral"),
         ]);
 
         if (rankRes.ok) {
           const rankData = await rankRes.json();
           const me = (rankData.ranking as RankingUser[]).find((r) => r.id === meData.user.id);
           if (me) setUserPosition(me.position);
+        }
+
+        if (refRes.ok) {
+          const refData = await refRes.json();
+          setReferralCode(refData.referralCode ?? null);
         }
 
         // 72 group + 31 bracket slots (16+8+4+2+1)
@@ -797,6 +805,47 @@ export default function DashboardPage() {
         <div className="mb-6">
           <SponsorCTA compact />
         </div>
+
+        {/* Share with friends */}
+        {referralCode && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }} className="mb-4">
+            <Card className="p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="w-4 h-4 text-green-400" />
+                <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400">Invitá amigos</h3>
+              </div>
+              <p className="text-gray-500 text-xs mb-3">Compartí tu código y los dos ganan puntos extra.</p>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="bg-[#1a1a1a] border border-[#333] rounded-lg px-4 py-2 font-mono text-white font-black tracking-widest text-base flex-1 text-center">
+                  {referralCode}
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(referralCode);
+                    setCodeCopied(true);
+                    setTimeout(() => setCodeCopied(false), 2000);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-600/20 border border-green-600/30 text-green-400 hover:bg-green-600/30 transition-colors font-semibold text-xs flex-shrink-0"
+                >
+                  {codeCopied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {codeCopied ? "¡Copiado!" : "Copiar"}
+                </button>
+              </div>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(
+                  `¡Unite al Prode Mundial Gamer 2026! 🏆⚽\n\nRegistrate gratis y competí por premios reales.\n\n👉 https://thegamershop-premios.com/register\n\nUsa mi código al registrarte y los dos ganamos puntos extra:\n🎟️ Código: *${referralCode}*`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-bold text-sm transition-colors"
+                style={{ background: "#25D366", color: "#fff" }}
+              >
+                <MessageCircle className="w-4 h-4" />
+                Compartir por WhatsApp
+              </a>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Points summary */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
