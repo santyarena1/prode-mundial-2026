@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Trophy, Star, ChevronRight, Users, Target, Zap, Gift, Medal, Radio } from "lucide-react";
+import { Trophy, Star, ChevronRight, Users, Target, Zap, Gift, Medal, Radio, MessageCircle, Copy, CheckCircle2 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/Button";
@@ -98,6 +98,8 @@ export default function HomePage() {
   const [loadingStats, setLoadingStats] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -122,7 +124,15 @@ export default function HomePage() {
           const data = await prizesRes.json();
           setFeaturedPrizes(data.prizes || []);
         }
-        if (meRes.ok) setIsLoggedIn(true);
+        if (meRes.ok) {
+          setIsLoggedIn(true);
+          // Fetch referral code for logged-in users
+          const refRes = await fetch("/api/participant/referral");
+          if (refRes.ok) {
+            const refData = await refRes.json();
+            setReferralCode(refData.referralCode ?? null);
+          }
+        }
       } catch {
         // ignore
       } finally {
@@ -131,6 +141,13 @@ export default function HomePage() {
     };
     fetchData();
   }, []);
+
+  const copyReferralCode = () => {
+    if (!referralCode) return;
+    navigator.clipboard.writeText(referralCode);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 2000);
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-[#0a0a0a]">
@@ -451,6 +468,79 @@ export default function HomePage() {
               </Link>
             </div>
           )}
+        </div>
+      </section>
+
+      {/* SHARE WITH FRIENDS */}
+      <section className="py-20 px-4 bg-[#0d0d0d]">
+        <div className="max-w-2xl mx-auto">
+          <motion.div
+            className="text-center mb-10"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <span className="text-green-500 text-sm font-bold uppercase tracking-widest">Invitá amigos</span>
+            <h2 className="text-3xl sm:text-4xl font-black uppercase text-white mt-2">JUGÁ EN EQUIPO</h2>
+            <p className="text-gray-500 mt-2">Cuantos más amigos, más divertido. Y los dos ganan puntos extra.</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <Card className="p-6">
+              {isLoggedIn && referralCode ? (
+                <>
+                  <p className="text-gray-400 text-sm mb-4 leading-relaxed">
+                    Compartí tu código. Cuando un amigo se registra usándolo, <span className="text-green-400 font-bold">los dos ganan puntos extra</span> automáticamente.
+                  </p>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="bg-[#1a1a1a] border border-[#333] rounded-xl px-5 py-3 font-mono text-white font-black tracking-widest text-xl flex-1 text-center">
+                      {referralCode}
+                    </div>
+                    <button
+                      onClick={copyReferralCode}
+                      className="flex items-center gap-2 px-4 py-3 rounded-xl bg-green-600/20 border border-green-600/30 text-green-400 hover:bg-green-600/30 transition-colors font-semibold text-sm flex-shrink-0"
+                    >
+                      {codeCopied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      {codeCopied ? "¡Copiado!" : "Copiar"}
+                    </button>
+                  </div>
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(
+                      `¡Unite al Prode Mundial Gamer 2026! 🏆⚽\n\nRegistrate gratis y competí por premios reales.\n\n👉 https://thegamershop-premios.com/register\n\nUsa mi código al registrarte y los dos ganamos puntos extra:\n🎟️ Código: *${referralCode}*`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-colors"
+                    style={{ background: "#25D366", color: "#fff" }}
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Compartir por WhatsApp
+                  </a>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 rounded-full bg-green-600/20 border border-green-600/30 flex items-center justify-center flex-shrink-0">
+                      <Users className="w-6 h-6 text-green-400" />
+                    </div>
+                    <div>
+                      <p className="text-white font-bold">Invitá amigos y ganá más</p>
+                      <p className="text-gray-500 text-sm">Registrate para obtener tu código único de referido</p>
+                    </div>
+                  </div>
+                  <Link href="/register">
+                    <Button variant="primary" size="md" className="w-full">
+                      Registrate y compartí <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                </>
+              )}
+            </Card>
+          </motion.div>
         </div>
       </section>
 

@@ -74,6 +74,7 @@ interface Match {
   matchCode: string;
   phase: string;
   status: string;
+  realOutcome?: string | null;
   startDate?: string;
   homeTeam?: Team;
   awayTeam?: Team;
@@ -238,10 +239,19 @@ export default function PredictionsPage() {
       }
 
       // ── Auto-navigate to first section with pending predictions ────────────
+      // Treat finished matches as "done" even if the user never predicted them (late joiners)
+      const effectiveSp = { ...sp };
+      for (const gr of g) {
+        for (const m of gr.matches) {
+          if (m.phase === "GROUP_STAGE" && m.status === "finished" && !effectiveSp[m.id] && m.realOutcome) {
+            effectiveSp[m.id] = m.realOutcome as Outcome;
+          }
+        }
+      }
       const allGroupMatchIds = g.flatMap(gr =>
         gr.matches.filter(m => m.phase === "GROUP_STAGE").map(m => m.id)
       );
-      const allGroupsDone = allGroupMatchIds.length > 0 && allGroupMatchIds.every(id => !!sp[id]);
+      const allGroupsDone = allGroupMatchIds.length > 0 && allGroupMatchIds.every(id => !!effectiveSp[id]);
 
       if (allGroupsDone) {
         setActiveTab("eliminatorias");
@@ -281,6 +291,20 @@ export default function PredictionsPage() {
     init();
   }, [router]);
 
+  // ── Effective preds: treat finished matches without user prediction as predicted with real result ──
+  // This lets late-joiners access the bracket without losing points/achievements for unplayed windows.
+  const effectivePreds = useMemo(() => {
+    const ep: Record<string, string> = { ...savedPreds };
+    for (const g of groups) {
+      for (const m of g.matches) {
+        if (m.phase === "GROUP_STAGE" && m.status === "finished" && !ep[m.id] && m.realOutcome) {
+          ep[m.id] = m.realOutcome;
+        }
+      }
+    }
+    return ep;
+  }, [savedPreds, groups]);
+
   // ── Bracket context (confirmed picks only for downstream resolution) ────────
 
   const thirdSlotAssignments = useMemo(() => {
@@ -300,7 +324,7 @@ export default function PredictionsPage() {
         })),
       })),
       allTeams,
-      savedPreds: savedPreds as Record<string, string>,
+      savedPreds: effectivePreds,
       savedGroupPreds,
       savedBracket,
       savedScores,
@@ -338,7 +362,7 @@ export default function PredictionsPage() {
       })),
     })),
     allTeams,
-    savedPreds: savedPreds as Record<string, string>,
+    savedPreds: effectivePreds,
     savedGroupPreds,
     savedBracket,
     pendingBracket,
@@ -353,12 +377,12 @@ export default function PredictionsPage() {
 
   const isPhaseUnlocked = useCallback(
     (phaseKey: string) => checkPhaseUnlocked(phaseKey, bracketCtx),
-    [groups, allTeams, savedPreds, savedGroupPreds, savedBracket]
+    [groups, allTeams, effectivePreds, savedGroupPreds, savedBracket]
   );
 
   const getPhaseBlockReason = useCallback(
     (phaseKey: string) => getPhaseUnlockBlockReason(phaseKey, bracketCtx),
-    [groups, allTeams, savedPreds, savedGroupPreds, savedBracket]
+    [groups, allTeams, effectivePreds, savedGroupPreds, savedBracket]
   );
 
   const getEligibleTeams = useCallback(
@@ -366,13 +390,13 @@ export default function PredictionsPage() {
       if (phaseKey === "CHAMPION") return getEligibleChampionTeams(bracketCtx) as Team[];
       return [];
     },
-    [groups, allTeams, savedPreds, savedGroupPreds, savedBracket]
+    [groups, allTeams, effectivePreds, savedGroupPreds, savedBracket]
   );
 
   const resolveSource = useCallback(
     (source: string): Team | null =>
       resolveBracketSource(source, bracketCtx) as Team | null,
-    [groups, allTeams, savedPreds, savedGroupPreds, savedBracket]
+    [groups, allTeams, effectivePreds, savedGroupPreds, savedBracket]
   );
 
   useEffect(() => {
