@@ -3,11 +3,10 @@ import prisma from "@/lib/db";
 
 export async function GET() {
   try {
-    // First try up to 3 featured prizes, then fall back to first 3 active prizes by sortOrder
     let prizes = await prisma.prize.findMany({
       where: { active: true, featured: true },
       include: { sponsor: true },
-      orderBy: [{ sortOrder: "asc" }, { requiredPoints: "asc" }],
+      orderBy: { requiredPoints: "asc" },
       take: 4,
     });
 
@@ -15,7 +14,7 @@ export async function GET() {
       const extra = await prisma.prize.findMany({
         where: { active: true, featured: false, id: { notIn: prizes.map(p => p.id) } },
         include: { sponsor: true },
-        orderBy: [{ sortOrder: "asc" }, { requiredPoints: "asc" }],
+        orderBy: { requiredPoints: "asc" },
         take: 4 - prizes.length,
       });
       prizes = [...prizes, ...extra];
