@@ -17,9 +17,12 @@ export function getCalendarDayInTz(date: Date, timeZone = MATCH_PREDICTION_TZ): 
   }).format(date);
 }
 
+/** Minutos antes del kickoff en los que se cierran las predicciones. */
+export const MATCH_PREDICTION_CUTOFF_MINUTES = 10;
+const CUTOFF_MS = MATCH_PREDICTION_CUTOFF_MINUTES * 60 * 1000;
+
 /**
- * Podés predecir un partido solo hasta el día anterior (inclusive).
- * El día del partido (y después) queda cerrado, salvo que ya haya arrancado.
+ * Podés predecir un partido hasta 10 minutos antes del kickoff.
  */
 export function isMatchPredictionWindowOpen(
   startDate?: string | Date | null,
@@ -27,12 +30,7 @@ export function isMatchPredictionWindowOpen(
 ): boolean {
   const start = toDate(startDate);
   if (!start) return true;
-
-  if (start <= now) return false;
-
-  const matchDay = getCalendarDayInTz(start);
-  const today = getCalendarDayInTz(now);
-  return today < matchDay;
+  return now.getTime() < start.getTime() - CUTOFF_MS;
 }
 
 export function getMatchPredictionClosedReason(
@@ -49,10 +47,8 @@ export function getMatchPredictionClosedReason(
 
   if (start <= now) return "El partido ya comenzó";
 
-  const matchDay = getCalendarDayInTz(start);
-  const today = getCalendarDayInTz(now);
-  if (today >= matchDay) {
-    return "Las predicciones cierran el día anterior al partido";
+  if (now.getTime() >= start.getTime() - CUTOFF_MS) {
+    return `Las predicciones cierran ${MATCH_PREDICTION_CUTOFF_MINUTES} minutos antes del partido`;
   }
 
   return null;
@@ -63,17 +59,17 @@ export function getMatchPredictionDeadlineHint(startDate?: string | Date | null)
   const start = toDate(startDate);
   if (!start) return null;
 
-  const [y, m, d] = getCalendarDayInTz(start).split("-").map(Number);
-  const lastOpenDay = new Date(Date.UTC(y, m - 1, d - 1, 12, 0, 0));
-
-  const label = lastOpenDay.toLocaleDateString("es-AR", {
+  const deadline = new Date(start.getTime() - CUTOFF_MS);
+  const label = deadline.toLocaleString("es-AR", {
     weekday: "long",
     day: "numeric",
     month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
     timeZone: MATCH_PREDICTION_TZ,
   });
 
-  return `Podés predecir hasta el ${label} (inclusive)`;
+  return `Podés predecir hasta las ${label}`;
 }
 
 export function formatMatchDate(dateStr?: string | Date | null) {

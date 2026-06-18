@@ -78,11 +78,31 @@ const outcomeLabel = (
   return outcome;
 };
 
+function deriveOutcome(
+  home: number | null | undefined,
+  away: number | null | undefined,
+  fallback?: string | null
+) {
+  if (home !== null && home !== undefined && away !== null && away !== undefined) {
+    if (home > away) return "home";
+    if (away > home) return "away";
+    return "draw";
+  }
+  return fallback ?? null;
+}
+
 function getPredictionStatus(prediction: Prediction) {
   const match = prediction.match;
   if (match.status === "finished") {
-    if (!prediction.predictedOutcome) return "locked";
-    if (prediction.predictedOutcome === match.realOutcome) return "correct";
+    const effectivePredicted = deriveOutcome(
+      prediction.predictedHomeScore,
+      prediction.predictedAwayScore,
+      prediction.predictedOutcome
+    );
+    const effectiveReal = deriveOutcome(match.homeScore, match.awayScore, match.realOutcome);
+    if (!effectivePredicted) return "locked";
+    if (!effectiveReal) return "locked";
+    if (effectivePredicted === effectiveReal) return "correct";
     return "wrong";
   }
   if (match.status === "live") return "locked";

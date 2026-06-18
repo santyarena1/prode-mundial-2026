@@ -132,7 +132,20 @@ export async function calculateUserPoints(userId: string): Promise<number> {
 
   for (const p of predictions) {
     const m = p.match;
-    if (m.status !== "finished" || !m.realOutcome || m.phase !== "GROUP_STAGE") {
+    if (m.status !== "finished" || m.phase !== "GROUP_STAGE") {
+      if (p.pointsEarned !== 0) await prisma.prediction.update({ where: { id: p.id }, data: { pointsEarned: 0 } });
+      continue;
+    }
+
+    // Derive real outcome from scores when stored realOutcome is missing/stale
+    const effectiveReal =
+      m.homeScore !== null && m.awayScore !== null
+        ? m.homeScore > m.awayScore ? "home"
+          : m.awayScore > m.homeScore ? "away"
+          : "draw"
+        : m.realOutcome;
+
+    if (!effectiveReal) {
       if (p.pointsEarned !== 0) await prisma.prediction.update({ where: { id: p.id }, data: { pointsEarned: 0 } });
       continue;
     }
@@ -146,9 +159,9 @@ export async function calculateUserPoints(userId: string): Promise<number> {
         : p.predictedOutcome;
 
     let earned = 0;
-    if (effectiveOutcome && effectiveOutcome === m.realOutcome) {
+    if (effectiveOutcome && effectiveOutcome === effectiveReal) {
       earned += pts("GROUP_SIGN");
-      if (m.realOutcome === "draw") earned += pts("GROUP_DRAW_BONUS");
+      if (effectiveReal === "draw") earned += pts("GROUP_DRAW_BONUS");
 
       // Hardcore bonus: exact scoreline
       if (
