@@ -193,6 +193,15 @@ export default function RegisterPage() {
             </div>
           </Link>
 
+          {/* Aviso global sobre verificación con código de referido */}
+          <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+            <span aria-hidden className="text-amber-400 text-base leading-5">⚠</span>
+            <p className="text-amber-200 text-xs leading-snug">
+              Si te registrás con un <strong className="text-amber-100">código de referido</strong>, te vamos a pedir que{" "}
+              <strong className="text-amber-100">verifiques tu email</strong> antes de acreditar tus puntos y el bonus de referido.
+            </p>
+          </div>
+
           <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
 
             <SectionLabel>Tus datos</SectionLabel>
