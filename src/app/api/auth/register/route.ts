@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 import prisma from "@/lib/db";
 import { signUserToken } from "@/lib/auth";
 import { USER_COOKIE, COOKIE_OPTIONS } from "@/lib/cookies";
-import { sendWelcomeEmail } from "@/lib/email";
-import { calculateUserPoints } from "@/lib/points";
+import { sendWelcomeEmail, sendEmailVerification } from "@/lib/email";
+
+const VERIFICATION_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 días
 
 const registerSchema = z.object({
   firstName: z.string().min(1),
@@ -94,6 +96,12 @@ export async function POST(request: NextRequest) {
       referralCode = generateReferralCode();
     }
 
+    // If user registers with a valid referral code, require email verification
+    // before crediting either party. Without invite code, no verification needed.
+    const requiresVerification = !!referrer;
+    const verificationToken = requiresVerification ? randomBytes(32).toString("hex") : null;
+    const verificationExpiry = requiresVerification ? new Date(Date.now() + VERIFICATION_EXPIRY_MS) : null;
+
     const user = await prisma.user.create({
       data: {
         firstName,
@@ -106,52 +114,21 @@ export async function POST(request: NextRequest) {
         registrationIp: ip !== "unknown" ? ip : null,
         referralCode,
         referredById: referrer?.id ?? null,
+        emailVerified: !requiresVerification,
+        emailVerificationToken: verificationToken,
+        emailVerificationExpiry: verificationExpiry,
+        referralBonusAwarded: false,
       },
     });
 
-    // Award referral points to both parties
-    if (referrer) {
-      const [referralSetting, newUserSetting] = await Promise.all([
-        prisma.setting.findUnique({ where: { key: "referral_points" } }),
-        prisma.setting.findUnique({ where: { key: "referral_new_user_points" } }),
-      ]);
-      const REFERRAL_POINTS = parseInt(referralSetting?.value || "200") || 200;
-      const NEW_USER_POINTS = parseInt(newUserSetting?.value || "300") || 300;
-
-      // Find or create the referral bonus action
-      let referralAction = await prisma.bonusAction.findFirst({ where: { name: "Código de referido" } });
-      if (!referralAction) {
-        referralAction = await prisma.bonusAction.create({
-          data: {
-            name: "Código de referido",
-            description: "Puntos por registrarse con el código de un amigo",
-            points: 0,
-            requiresApproval: false,
-            active: false,
-            allowMultipleClaims: false,
-          },
-        });
-      }
-
-      await Promise.all([
-        // Referrer gets points via referralPoints field
-        prisma.user.update({
-          where: { id: referrer.id },
-          data: { referralPoints: { increment: REFERRAL_POINTS } },
-        }),
-        // New user gets points via a bonus entry
-        prisma.userBonus.create({
-          data: {
-            userId: user.id,
-            bonusActionId: referralAction.id,
-            status: "approved",
-            pointsEarned: NEW_USER_POINTS,
-          },
-        }),
-      ]);
-
-      calculateUserPoints(referrer.id).catch(() => {});
-      calculateUserPoints(user.id).catch(() => {});
+    if (requiresVerification && verificationToken) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const verifyUrl = `${appUrl}/verify-email?token=${verificationToken}`;
+      sendEmailVerification({
+        firstName: user.firstName,
+        email: user.email,
+        verifyUrl,
+      }).catch((err) => console.error("[email] Failed to send verification email:", err));
     }
 
     // Early bird: auto-grant raffle entry if registering before cutoff

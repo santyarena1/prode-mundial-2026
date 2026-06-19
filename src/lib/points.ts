@@ -308,7 +308,7 @@ export async function calculateUserPoints(userId: string): Promise<number> {
   const [bonusAgg, codeAgg, userRec, redemptionAgg] = await Promise.all([
     prisma.userBonus.aggregate({ where: { userId, status: "approved" }, _sum: { pointsEarned: true } }),
     prisma.purchaseCode.aggregate({ where: { userId, status: "redeemed" }, _sum: { points: true } }),
-    prisma.user.findUnique({ where: { id: userId }, select: { referralPoints: true, hardcoreMode: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { referralPoints: true, hardcoreMode: true, emailVerified: true } }),
     prisma.prizeRedemption.aggregate({ where: { userId, status: { not: "rejected" } }, _sum: { pointsSpent: true } }),
   ]);
   const bonusPoints = (bonusAgg._sum.pointsEarned ?? 0) + (codeAgg._sum.points ?? 0) + (userRec?.referralPoints ?? 0);
@@ -324,12 +324,27 @@ export async function calculateUserPoints(userId: string): Promise<number> {
     await prisma.userAchievement.deleteMany({ where: { userId } });
   }
 
-  // ── 6. Update user ───────────────────────────────────────────────────────
-  const totalPoints = predictionPoints + bonusPoints + achievementPoints;
+  // ── 6. Email verification gate ──────────────────────────────────────────
+  // Users registered via referral code must verify their email before any
+  // points (predictions, bonuses, achievements) are credited. Once verified,
+  // the recalculation runs again and credits everything retroactively.
+  const isVerified = userRec?.emailVerified !== false;
+  const finalPredictionPoints = isVerified ? predictionPoints : 0;
+  const finalBonusPoints = isVerified ? bonusPoints : 0;
+  const finalAchievementPoints = isVerified ? achievementPoints : 0;
+
+  // ── 7. Update user ───────────────────────────────────────────────────────
+  const totalPoints = finalPredictionPoints + finalBonusPoints + finalAchievementPoints;
 
   await prisma.user.update({
     where: { id: userId },
-    data: { predictionPoints, bonusPoints, achievementPoints, totalPoints, spentPoints },
+    data: {
+      predictionPoints: finalPredictionPoints,
+      bonusPoints: finalBonusPoints,
+      achievementPoints: finalAchievementPoints,
+      totalPoints,
+      spentPoints,
+    },
   });
 
   return totalPoints;

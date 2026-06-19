@@ -28,6 +28,7 @@ export async function GET() {
         earlyBirdGranted: true,
         createdAt: true,
         passwordHash: true,
+        emailVerified: true,
       },
     });
 
