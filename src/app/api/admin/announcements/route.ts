@@ -6,11 +6,55 @@ import { sendAnnouncement } from "@/lib/email";
 
 const BASE_WHERE = { emailUnsubscribed: false, isBlocked: false };
 
+// Mismo cutoff que el cliente: las predicciones cierran 10 min antes del kickoff.
+const PREDICTION_CUTOFF_MS = 10 * 60 * 1000;
+
+async function resolveUsersWithMissingPredictions(): Promise<
+  Array<{ id: string; email: string; firstName: string }>
+> {
+  const cutoff = new Date(Date.now() + PREDICTION_CUTOFF_MS);
+
+  // Partidos cuya ventana de predicción sigue abierta.
+  const openMatches = await prisma.match.findMany({
+    where: { status: "scheduled", startDate: { gt: cutoff } },
+    select: { id: true },
+  });
+
+  if (openMatches.length === 0) return [];
+
+  const matchIds = openMatches.map((m) => m.id);
+  const totalOpen = matchIds.length;
+
+  // Por usuario: cantidad de predicciones completas (con ambos scores) en esos partidos.
+  const counts = await prisma.prediction.groupBy({
+    by: ["userId"],
+    where: {
+      matchId: { in: matchIds },
+      predictedHomeScore: { not: null },
+      predictedAwayScore: { not: null },
+    },
+    _count: { _all: true },
+  });
+
+  const completeByUser = new Map(counts.map((c) => [c.userId, c._count._all]));
+
+  const allUsers = await prisma.user.findMany({
+    where: BASE_WHERE,
+    select: { id: true, email: true, firstName: true },
+  });
+
+  return allUsers.filter((u) => (completeByUser.get(u.id) ?? 0) < totalOpen);
+}
+
 async function resolveUsers(
   filterType: string,
   filterId: string | null,
   userIds: string[]
 ): Promise<Array<{ id: string; email: string; firstName: string }>> {
+  if (filterType === "missing_predictions") {
+    return resolveUsersWithMissingPredictions();
+  }
+
   if (filterType === "prize" && filterId) {
     const redemptions = await prisma.prizeRedemption.findMany({
       where: { prizeId: filterId },
@@ -73,7 +117,7 @@ const schema = z.object({
   message: z.string().min(1),
   ctaUrl: z.string().url().optional().or(z.literal("")),
   ctaLabel: z.string().max(60).optional(),
-  filterType: z.enum(["all", "prize", "bonus", "individual"]).default("all"),
+  filterType: z.enum(["all", "prize", "bonus", "individual", "missing_predictions"]).default("all"),
   filterId: z.string().optional(),
   userIds: z.array(z.string()).optional(),
   rawHtml: z.boolean().optional().default(false),

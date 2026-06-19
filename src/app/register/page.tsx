@@ -252,6 +252,16 @@ export default function RegisterPage() {
                 onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
               />
               <p className="text-gray-700 text-xs mt-1">Si alguien te invitó, ingresá su código para darle puntos extra.</p>
+              {inviteCode.trim().length > 0 && (
+                <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+                  <span aria-hidden className="text-amber-400 text-sm leading-5">⚠</span>
+                  <p className="text-amber-200 text-xs leading-snug">
+                    Al registrarte con un código de referido te vamos a pedir{" "}
+                    <strong className="text-amber-100">verificar tu email</strong>.
+                    Hasta que verifiques, tus puntos y el bonus de referido no se acreditan.
+                  </p>
+                </div>
+              )}
             </div>
 
             <SectionLabel>Tu contraseña</SectionLabel>

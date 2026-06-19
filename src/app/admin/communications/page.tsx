@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { apiFetch } from "@/lib/api";
 
-type AudienceType = "all" | "prize" | "bonus" | "individual";
+type AudienceType = "all" | "prize" | "bonus" | "individual" | "missing_predictions";
 type Tab = "send" | "history";
 
 interface Prize {
@@ -165,6 +165,8 @@ export default function CommunicationsPage() {
   const audienceLabel =
     audienceType === "all"
       ? "Todos los participantes"
+      : audienceType === "missing_predictions"
+      ? "Participantes con predicciones pendientes"
       : audienceType === "prize"
       ? prizes.find((p) => p.id === selectedPrizeId)?.name ?? "Premio seleccionado"
       : audienceType === "bonus"
@@ -206,8 +208,8 @@ export default function CommunicationsPage() {
           <Card className="p-5 space-y-4">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Audiencia</p>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {(["all", "prize", "bonus", "individual"] as AudienceType[]).map((type) => (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+              {(["all", "missing_predictions", "prize", "bonus", "individual"] as AudienceType[]).map((type) => (
                 <button
                   key={type}
                   onClick={() => {
@@ -224,6 +226,7 @@ export default function CommunicationsPage() {
                   }`}
                 >
                   {type === "all" && "Todos"}
+                  {type === "missing_predictions" && "Faltan predicciones"}
                   {type === "prize" && "Por premio"}
                   {type === "bonus" && "Por bonus"}
                   {type === "individual" && "Individual"}
