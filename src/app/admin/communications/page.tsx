@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import toast from "react-hot-toast";
-import { Send, Users, Link as LinkIcon, AlertTriangle, Search, X, ChevronDown, Code2, AlignLeft, History, CheckCircle2, XCircle, Mail } from "lucide-react";
+import { Send, Users, Link as LinkIcon, AlertTriangle, Search, X, ChevronDown, ChevronRight, Code2, AlignLeft, History, CheckCircle2, XCircle, Mail, Image as ImageIcon, Eye, Monitor, Smartphone, Copy } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -28,6 +28,12 @@ interface Participant {
   email: string;
 }
 
+interface EmailAsset {
+  id: string;
+  name: string;
+  url: string;
+}
+
 interface EmailLogEntry {
   id: string;
   subject: string;
@@ -38,6 +44,49 @@ interface EmailLogEntry {
   sentCount: number;
   failedCount: number;
   sentAt: string;
+}
+
+function AssetCard({
+  name,
+  url,
+  onCopyUrl,
+  onCopyImg,
+}: {
+  name: string;
+  url: string;
+  onCopyUrl: () => void;
+  onCopyImg: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 bg-[#141414] border border-[#2a2a2a] rounded-lg p-2">
+      <div className="flex-shrink-0 w-12 h-12 bg-white rounded-md flex items-center justify-center overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt={name} className="max-w-full max-h-full object-contain" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold text-white truncate" title={name}>{name}</p>
+        <p className="text-[10px] text-gray-500 truncate" title={url}>{url}</p>
+      </div>
+      <div className="flex flex-col gap-1">
+        <button
+          type="button"
+          onClick={onCopyUrl}
+          className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] text-[10px] text-gray-300 font-semibold"
+          title="Copiar URL"
+        >
+          <Copy className="w-3 h-3" /> URL
+        </button>
+        <button
+          type="button"
+          onClick={onCopyImg}
+          className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] text-[10px] text-gray-300 font-semibold"
+          title="Copiar etiqueta <img>"
+        >
+          <Copy className="w-3 h-3" /> &lt;img&gt;
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function CommunicationsPage() {
@@ -68,12 +117,52 @@ export default function CommunicationsPage() {
   const [logsLoading, setLogsLoading] = useState(false);
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
 
+  // Assets + preview state
+  const [sponsors, setSponsors] = useState<Array<{ id: string; name: string; logoUrl: string }>>([]);
+  const [assets, setAssets] = useState<EmailAsset[]>([]);
+  const [showAssets, setShowAssets] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
+  const [previewHtml, setPreviewHtml] = useState<string>("");
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} copiado`);
+    } catch {
+      toast.error("No pude copiar");
+    }
+  };
+
   // Load options once
   useEffect(() => {
     apiFetch("/api/admin/prizes").then((r) => r.json()).then((d) => setPrizes(d.prizes ?? []));
     apiFetch("/api/admin/bonus-actions").then((r) => r.json()).then((d) => setBonusActions(d.bonusActions ?? []));
     apiFetch("/api/admin/participants").then((r) => r.json()).then((d) => setParticipants(d.users ?? []));
+    apiFetch("/api/admin/email-assets")
+      .then((r) => r.json())
+      .then((d) => {
+        setSponsors(d.sponsors ?? []);
+        setAssets(d.assets ?? []);
+      })
+      .catch(() => {});
   }, []);
+
+  // Regenerate preview when content/mode changes (only while panel is open)
+  useEffect(() => {
+    if (!showPreview) return;
+    setPreviewLoading(true);
+    apiFetch("/api/admin/announcements/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subject, message, ctaUrl, ctaLabel, rawHtml }),
+    })
+      .then((r) => r.text())
+      .then((html) => setPreviewHtml(html))
+      .catch(() => setPreviewHtml("<p style='color:#f00;padding:24px;font-family:sans-serif'>Error al generar el preview</p>"))
+      .finally(() => setPreviewLoading(false));
+  }, [showPreview, subject, message, ctaUrl, ctaLabel, rawHtml]);
 
   // Load history when tab changes
   useEffect(() => {
@@ -429,6 +518,130 @@ export default function CommunicationsPage() {
                 </div>
               </>
             )}
+
+            {/* Assets panel */}
+            <div className="border border-[#2a2a2a] rounded-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowAssets((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-[#141414] hover:bg-[#1a1a1a] transition-colors"
+              >
+                <span className="flex items-center gap-2 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  <ImageIcon className="w-4 h-4 text-red-400" />
+                  Imágenes y logos disponibles
+                  <span className="text-gray-500 normal-case font-normal">({sponsors.length + assets.length})</span>
+                </span>
+                {showAssets ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+              </button>
+              {showAssets && (
+                <div className="p-4 space-y-4 bg-[#0d0d0d]">
+                  <p className="text-xs text-gray-500">
+                    Copiá la URL o la etiqueta <code className="text-gray-400">&lt;img&gt;</code> lista para pegar en HTML libre o en CTAs.
+                  </p>
+
+                  {sponsors.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Sponsors</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {sponsors.map((s) => (
+                          <AssetCard
+                            key={s.id}
+                            name={s.name}
+                            url={s.logoUrl}
+                            onCopyUrl={() => copyToClipboard(s.logoUrl, "URL")}
+                            onCopyImg={() => copyToClipboard(`<img src="${s.logoUrl}" alt="${s.name}" style="max-width:140px;height:auto;" />`, "Etiqueta <img>")}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {assets.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Otras imágenes</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {assets.map((a) => (
+                          <AssetCard
+                            key={a.id}
+                            name={a.name}
+                            url={a.url}
+                            onCopyUrl={() => copyToClipboard(a.url, "URL")}
+                            onCopyImg={() => copyToClipboard(`<img src="${a.url}" alt="${a.name}" style="max-width:240px;height:auto;" />`, "Etiqueta <img>")}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {sponsors.length === 0 && assets.length === 0 && (
+                    <p className="text-xs text-gray-600 text-center py-6">No hay imágenes cargadas todavía.</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Preview panel */}
+            <div className="border border-[#2a2a2a] rounded-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowPreview((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-[#141414] hover:bg-[#1a1a1a] transition-colors"
+              >
+                <span className="flex items-center gap-2 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  <Eye className="w-4 h-4 text-red-400" />
+                  Vista previa del email
+                </span>
+                {showPreview ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+              </button>
+              {showPreview && (
+                <div className="p-4 bg-[#0d0d0d] space-y-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewDevice("desktop")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors ${
+                        previewDevice === "desktop"
+                          ? "bg-red-600 border-red-600 text-white"
+                          : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-400 hover:border-gray-500"
+                      }`}
+                    >
+                      <Monitor className="w-3.5 h-3.5" /> PC
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewDevice("mobile")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors ${
+                        previewDevice === "mobile"
+                          ? "bg-red-600 border-red-600 text-white"
+                          : "bg-[#1a1a1a] border-[#2a2a2a] text-gray-400 hover:border-gray-500"
+                      }`}
+                    >
+                      <Smartphone className="w-3.5 h-3.5" /> Móvil
+                    </button>
+                    {previewLoading && (
+                      <span className="text-xs text-gray-500 ml-2">Generando…</span>
+                    )}
+                  </div>
+                  <div className="flex justify-center bg-[#1a1a1a] rounded-lg p-3 overflow-x-auto">
+                    <iframe
+                      title="Email preview"
+                      srcDoc={previewHtml}
+                      style={{
+                        width: previewDevice === "desktop" ? "600px" : "375px",
+                        height: previewDevice === "desktop" ? "720px" : "640px",
+                        border: "1px solid #2a2a2a",
+                        borderRadius: "8px",
+                        background: "#fff",
+                      }}
+                      sandbox=""
+                    />
+                  </div>
+                  <p className="text-[11px] text-gray-600 text-center">
+                    {previewDevice === "desktop" ? "Vista a 600px (desktop)" : "Vista a 375px (iPhone estándar)"}
+                  </p>
+                </div>
+              )}
+            </div>
 
             <Button
               onClick={() => setShowConfirm(true)}

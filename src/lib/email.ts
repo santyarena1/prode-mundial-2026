@@ -558,7 +558,7 @@ export function verifyUnsubscribeToken(userId: string, token: string): boolean {
   return expected === token;
 }
 
-function buildAnnouncementHtml(params: {
+export function buildAnnouncementHtml(params: {
   subject: string;
   message: string;
   ctaUrl?: string;
