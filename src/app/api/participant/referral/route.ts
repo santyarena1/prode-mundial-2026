@@ -16,7 +16,7 @@ export async function GET() {
       referralPoints: true,
       _count: { select: { referrals: true } },
       referrals: {
-        select: { id: true, firstName: true, lastName: true, createdAt: true },
+        select: { id: true, firstName: true, lastName: true, createdAt: true, emailVerified: true, referralBonusAwarded: true },
         orderBy: { createdAt: "desc" as const },
       },
     };
@@ -37,15 +37,21 @@ export async function GET() {
     const setting = await prisma.setting.findUnique({ where: { key: "referral_points" } });
     const pointsPerReferral = setting ? (parseInt(setting.value) || 200) : 200;
 
+    const verifiedReferrals = user.referrals.filter((r) => r.emailVerified && r.referralBonusAwarded).length;
+    const pendingReferrals = user.referrals.length - verifiedReferrals;
+
     return NextResponse.json({
       referralCode: user.referralCode,
       referralPoints: user.referralPoints,
       referralCount: user._count.referrals,
+      verifiedReferrals,
+      pendingReferrals,
       pointsPerReferral,
       referrals: user.referrals.map(r => ({
         id: r.id,
         name: `${r.firstName} ${r.lastName.charAt(0)}.`,
         joinedAt: r.createdAt,
+        verified: r.emailVerified && r.referralBonusAwarded,
       })),
     });
   } catch (error) {

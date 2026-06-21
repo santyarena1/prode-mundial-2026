@@ -47,8 +47,10 @@ interface ReferralData {
   referralCode: string | null;
   referralPoints: number;
   referralCount: number;
+  verifiedReferrals?: number;
+  pendingReferrals?: number;
   pointsPerReferral: number;
-  referrals: { id: string; name: string; joinedAt: string }[];
+  referrals: { id: string; name: string; joinedAt: string; verified?: boolean }[];
 }
 
 export default function BonusesPage() {
@@ -326,10 +328,23 @@ export default function BonusesPage() {
                   {referral.referrals.map(r => (
                     <div key={r.id} className="flex items-center justify-between py-2 border-b border-[#1a1a1a] last:border-0">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-full bg-green-600/20 border border-green-600/30 flex items-center justify-center flex-shrink-0">
-                          <span className="text-green-400 text-xs font-black">{r.name.charAt(0)}</span>
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 border ${
+                          r.verified
+                            ? "bg-green-600/20 border-green-600/30"
+                            : "bg-amber-500/15 border-amber-500/30"
+                        }`}>
+                          <span className={`text-xs font-black ${r.verified ? "text-green-400" : "text-amber-400"}`}>
+                            {r.name.charAt(0)}
+                          </span>
                         </div>
-                        <span className="text-gray-200 text-sm font-semibold">{r.name}</span>
+                        <div className="flex flex-col">
+                          <span className="text-gray-200 text-sm font-semibold leading-tight">{r.name}</span>
+                          {!r.verified && (
+                            <span className="text-amber-400/80 text-[10px] font-semibold leading-tight">
+                              Pendiente de verificar email
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <span className="text-gray-600 text-xs">
                         {new Date(r.joinedAt).toLocaleDateString("es-AR", { day: "numeric", month: "short" })}
@@ -341,7 +356,7 @@ export default function BonusesPage() {
             )}
             <div className="bg-[#111] border border-[#222] rounded-xl p-4">
               <p className="text-gray-600 text-xs leading-relaxed">
-                💡 Cada vez que alguien se registra usando tu código, los puntos se acreditan automáticamente — no necesitás hacer nada más.
+                💡 Los puntos se acreditan cuando tu amigo <strong className="text-gray-400">verifica su email</strong>. Si todavía no lo hizo, recordale que lo haga.
               </p>
             </div>
           </div>

@@ -157,6 +157,9 @@ export async function POST(request: NextRequest) {
       ]);
     }
 
+    // Saltar el welcome email si se requiere verificación: el verify email ya cumple ese rol
+    // y evitamos que el usuario reciba dos mails simultáneos y se confunda.
+    if (!requiresVerification) {
     sendWelcomeEmail({ firstName: user.firstName, lastName: user.lastName, email: user.email })
       .then(() => {
         prisma.emailLog.create({
@@ -181,6 +184,7 @@ export async function POST(request: NextRequest) {
           },
         }).catch(() => {});
       });
+    }
 
     const token = signUserToken(user.id);
     const response = NextResponse.json(
