@@ -37,7 +37,14 @@ export async function GET() {
     const setting = await prisma.setting.findUnique({ where: { key: "referral_points" } });
     const pointsPerReferral = setting ? (parseInt(setting.value) || 200) : 200;
 
-    const verifiedReferrals = user.referrals.filter((r) => r.emailVerified && r.referralBonusAwarded).length;
+    // Cutoff: el flujo de verificación se deployó el 2026-06-19. Cualquier referido creado
+    // antes de esa fecha pertenece al sistema viejo y se considera verificado por definición,
+    // sin importar el valor de los flags.
+    const VERIFICATION_DEPLOY = new Date("2026-06-19T20:30:00-03:00");
+    const isVerified = (r: { createdAt: Date; emailVerified: boolean; referralBonusAwarded: boolean }) =>
+      r.createdAt < VERIFICATION_DEPLOY || (r.emailVerified && r.referralBonusAwarded);
+
+    const verifiedReferrals = user.referrals.filter(isVerified).length;
     const pendingReferrals = user.referrals.length - verifiedReferrals;
 
     return NextResponse.json({
@@ -51,7 +58,7 @@ export async function GET() {
         id: r.id,
         name: `${r.firstName} ${r.lastName.charAt(0)}.`,
         joinedAt: r.createdAt,
-        verified: r.emailVerified && r.referralBonusAwarded,
+        verified: isVerified(r),
       })),
     });
   } catch (error) {
