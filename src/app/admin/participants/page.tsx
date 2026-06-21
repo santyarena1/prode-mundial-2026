@@ -31,6 +31,8 @@ interface Participant {
   totalPoints: number;
   isBlocked: boolean;
   hasPassword?: boolean;
+  emailVerified?: boolean;
+  referredById?: string | null;
   createdAt: string;
   _count?: { predictions: number };
   squadMemberships?: { role: string; squad: { id: string; name: string } }[];
@@ -435,9 +437,18 @@ export default function AdminParticipantsPage() {
 
                 {/* Estado + fecha */}
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <Badge variant={p.isBlocked ? "error" : "success"}>
-                    {p.isBlocked ? "Bloqueado" : "Activo"}
-                  </Badge>
+                  <div className="flex flex-col gap-1 items-start">
+                    <Badge variant={p.isBlocked ? "error" : "success"}>
+                      {p.isBlocked ? "Bloqueado" : "Activo"}
+                    </Badge>
+                    {p.referredById && (
+                      p.emailVerified ? (
+                        <Badge variant="success">Email verificado</Badge>
+                      ) : (
+                        <Badge variant="warning">Email sin verificar</Badge>
+                      )
+                    )}
+                  </div>
                   <div className="text-gray-700 text-[10px] mt-1">
                     {new Date(p.createdAt).toLocaleDateString("es-AR")}
                   </div>

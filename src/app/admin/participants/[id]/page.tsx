@@ -34,6 +34,8 @@ interface UserDetail {
   spentPoints: number;
   referralPoints: number;
   hardcoreMode?: boolean;
+  emailVerified?: boolean;
+  referralBonusAwarded?: boolean;
   referralCode?: string | null;
   referredBy?: {
     id: string;
@@ -250,7 +252,21 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
               {user.firstName[0]}{user.lastName[0]}
             </div>
             <div>
-              <h1 className="text-white font-black text-xl">{user.firstName} {user.lastName}</h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-white font-black text-xl">{user.firstName} {user.lastName}</h1>
+                {user.emailVerified ? (
+                  <Badge variant="success">Email verificado</Badge>
+                ) : (
+                  <Badge variant="warning">Email sin verificar</Badge>
+                )}
+                {user.referredBy && (
+                  user.referralBonusAwarded ? (
+                    <Badge variant="info">Bonus referido OK</Badge>
+                  ) : (
+                    <Badge variant="default">Bonus referido pendiente</Badge>
+                  )
+                )}
+              </div>
               <p className="text-gray-500 text-sm">{user.email}</p>
               <p className="text-gray-600 text-xs mt-0.5">{user.phone}{user.instagram ? ` · @${user.instagram}` : ""}</p>
               {user.referralCode && (

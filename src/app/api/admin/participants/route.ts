@@ -47,6 +47,8 @@ export async function GET() {
           isBlocked: true,
           passwordHash: true,
           createdAt: true,
+          emailVerified: true,
+          referredById: true,
           _count: {
             select: {
               predictions: true,
