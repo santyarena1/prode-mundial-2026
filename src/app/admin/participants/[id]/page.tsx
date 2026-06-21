@@ -386,7 +386,10 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
               </div>
               <div className="flex flex-wrap gap-2">
                 {user.referrals!.map(ref => {
-                  const verified = ref.emailVerified && ref.referralBonusAwarded;
+                  // Referidos pre-deploy del flujo de verificación (2026-06-19) se consideran
+                  // verificados por definición: el código viejo los acreditaba al registrar.
+                  const preCutoff = new Date(ref.createdAt) < new Date("2026-06-19T20:30:00-03:00");
+                  const verified = preCutoff || (!!ref.emailVerified && !!ref.referralBonusAwarded);
                   return (
                     <Link
                       key={ref.id}
