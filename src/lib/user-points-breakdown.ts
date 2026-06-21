@@ -121,7 +121,7 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
           select: { id: true, firstName: true, lastName: true, referralCode: true },
         },
         referrals: {
-          select: { id: true, firstName: true, lastName: true, createdAt: true },
+          select: { id: true, firstName: true, lastName: true, createdAt: true, emailVerified: true, referralBonusAwarded: true },
           orderBy: { createdAt: "desc" },
         },
       },
@@ -261,15 +261,23 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
     });
   }
 
+  // Referidos creados antes de que existiera el flujo de verificación (deploy 2026-06-19)
+  // se consideran acreditados por definición — el código viejo sumaba los puntos al registrar.
+  const VERIFICATION_DEPLOY = new Date("2026-06-19T20:30:00-03:00");
+  const isReferralCredited = (r: { createdAt: Date; emailVerified: boolean; referralBonusAwarded: boolean }) =>
+    r.createdAt < VERIFICATION_DEPLOY || (r.emailVerified && r.referralBonusAwarded);
+
   let referralGivenTotal = 0;
   for (const ref of user.referrals) {
-    referralGivenTotal += ptsPerReferral;
+    const credited = isReferralCredited(ref);
+    if (credited) referralGivenTotal += ptsPerReferral;
     ledger.push({
       id: `referral-given-${ref.id}`,
       category: "referral_given",
-      label: "Invitó a un amigo",
+      label: credited ? "Invitó a un amigo" : "Referido pendiente de verificación",
       detail: `${ref.firstName} ${ref.lastName}`,
-      points: ptsPerReferral,
+      points: credited ? ptsPerReferral : 0,
+      status: credited ? undefined : "pending",
       date: ref.createdAt.toISOString(),
     });
   }
@@ -348,7 +356,9 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
     ledger,
     referredBy: user.referredBy,
     referrals: user.referrals.map(r => ({
-      ...r,
+      id: r.id,
+      firstName: r.firstName,
+      lastName: r.lastName,
       createdAt: r.createdAt.toISOString(),
     })),
   };
