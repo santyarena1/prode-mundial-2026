@@ -48,6 +48,8 @@ interface UserDetail {
     firstName: string;
     lastName: string;
     createdAt: string;
+    emailVerified?: boolean;
+    referralBonusAwarded?: boolean;
   }>;
   createdAt: string;
   bonuses: Array<{
@@ -373,15 +375,24 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                {user.referrals!.map(ref => (
-                  <Link
-                    key={ref.id}
-                    href={`/admin/participants/${ref.id}`}
-                    className="text-xs px-2.5 py-1 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] text-gray-300 hover:border-teal-500/40 hover:text-teal-300 transition-colors"
-                  >
-                    {ref.firstName} {ref.lastName}
-                  </Link>
-                ))}
+                {user.referrals!.map(ref => {
+                  const verified = ref.emailVerified && ref.referralBonusAwarded;
+                  return (
+                    <Link
+                      key={ref.id}
+                      href={`/admin/participants/${ref.id}`}
+                      className={`text-xs px-2.5 py-1 rounded-lg border transition-colors flex items-center gap-1.5 ${
+                        verified
+                          ? "bg-green-900/20 border-green-600/40 text-green-300 hover:border-green-500/60"
+                          : "bg-amber-900/20 border-amber-600/40 text-amber-300 hover:border-amber-500/60"
+                      }`}
+                      title={verified ? "Email verificado — bonus acreditado" : "Email sin verificar — bonus pendiente"}
+                    >
+                      {verified ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                      {ref.firstName} {ref.lastName}
+                    </Link>
+                  );
+                })}
               </div>
             </Card>
           )}

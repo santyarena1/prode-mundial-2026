@@ -34,7 +34,7 @@ export async function GET(
         userAchievements: { include: { achievementRule: true }, orderBy: { awardedAt: "desc" } },
         referredBy: { select: { id: true, firstName: true, lastName: true, referralCode: true } },
         referrals: {
-          select: { id: true, firstName: true, lastName: true, createdAt: true },
+          select: { id: true, firstName: true, lastName: true, createdAt: true, emailVerified: true, referralBonusAwarded: true },
           orderBy: { createdAt: "desc" },
         },
         purchaseCodes: { orderBy: { updatedAt: "desc" } },
