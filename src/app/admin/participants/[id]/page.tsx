@@ -368,11 +368,21 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
 
           {(user.referrals?.length ?? 0) > 0 && (
             <Card className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Users className="w-4 h-4 text-teal-400" />
-                <p className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                  Invitó a {user.referrals!.length} {user.referrals!.length === 1 ? "persona" : "personas"}
-                </p>
+              <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-teal-400" />
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-400">
+                    Invitó a {user.referrals!.length} {user.referrals!.length === 1 ? "persona" : "personas"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 text-[10px] text-gray-500">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-green-500" /> Verificado
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" /> Sin verificar
+                  </span>
+                </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 {user.referrals!.map(ref => {
@@ -381,10 +391,10 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
                     <Link
                       key={ref.id}
                       href={`/admin/participants/${ref.id}`}
-                      className={`text-xs px-2.5 py-1 rounded-lg border transition-colors flex items-center gap-1.5 ${
+                      className={`text-xs px-2.5 py-1 rounded-lg border-2 transition-colors flex items-center gap-1.5 ${
                         verified
-                          ? "bg-green-900/20 border-green-600/40 text-green-300 hover:border-green-500/60"
-                          : "bg-amber-900/20 border-amber-600/40 text-amber-300 hover:border-amber-500/60"
+                          ? "bg-green-900/30 border-green-500 text-green-300 hover:bg-green-900/50"
+                          : "bg-amber-900/30 border-amber-500 text-amber-300 hover:bg-amber-900/50"
                       }`}
                       title={verified ? "Email verificado — bonus acreditado" : "Email sin verificar — bonus pendiente"}
                     >
