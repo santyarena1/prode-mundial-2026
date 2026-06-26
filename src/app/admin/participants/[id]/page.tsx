@@ -854,14 +854,20 @@ function LedgerRow({ entry }: { entry: PointsLedgerEntry }) {
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
+        {entry.status === "correct" && (
+          <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+        )}
+        {entry.status === "wrong" && (
+          <XCircle className="w-4 h-4 text-red-500/60 flex-shrink-0" />
+        )}
         {entry.points !== 0 ? (
           <span className={`font-black text-sm ${entry.points > 0 ? "text-green-400" : "text-red-400"}`}>
             {entry.points > 0 ? "+" : ""}{entry.points.toLocaleString("es-AR")} pts
           </span>
         ) : (
-          <span className="text-gray-600 text-xs">0 pts</span>
+          <span className="text-gray-700 text-xs">0 pts</span>
         )}
-        {entry.status && entry.status !== "approved" && entry.status !== "redeemed" && (
+        {entry.status && !["approved", "redeemed", "correct", "wrong"].includes(entry.status) && (
           <Badge variant={entry.status === "pending" ? "warning" : entry.status === "rejected" ? "error" : "default"}>
             {STATUS_LABEL[entry.status] ?? entry.status}
           </Badge>

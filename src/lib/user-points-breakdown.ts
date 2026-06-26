@@ -127,21 +127,42 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
         },
       },
     }),
-    prisma.prediction.aggregate({
+    prisma.prediction.findMany({
       where: { userId, status: "locked" },
-      _sum: { pointsEarned: true },
+      include: {
+        match: {
+          select: {
+            phase: true,
+            startDate: true,
+            homeScore: true,
+            awayScore: true,
+            realOutcome: true,
+            homeTeam: { select: { name: true } },
+            awayTeam: { select: { name: true } },
+            group: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
     }),
-    prisma.groupPrediction.aggregate({
+    prisma.groupPrediction.findMany({
       where: { userId },
-      _sum: { pointsEarned: true },
+      include: {
+        group: { select: { name: true } },
+        firstTeam: { select: { name: true } },
+        secondTeam: { select: { name: true } },
+        thirdTeam: { select: { name: true } },
+      },
+      orderBy: { updatedAt: "desc" },
     }),
-    prisma.bracketPrediction.aggregate({
+    prisma.bracketPrediction.findMany({
       where: { userId },
-      _sum: { pointsEarned: true },
+      include: { predictedTeam: { select: { name: true } } },
+      orderBy: [{ phase: "asc" }, { matchSlot: "asc" }],
     }),
-    prisma.specialPrediction.aggregate({
+    prisma.specialPrediction.findMany({
       where: { userId },
-      _sum: { pointsEarned: true },
+      orderBy: { createdAt: "desc" },
     }),
     prisma.userBonus.findMany({
       where: { userId },
@@ -174,53 +195,110 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
     throw new Error("User not found");
   }
 
-  const predictionMatches = matchPts._sum.pointsEarned ?? 0;
-  const predictionGroups = groupPts._sum.pointsEarned ?? 0;
-  const predictionBracket = bracketPts._sum.pointsEarned ?? 0;
-  const predictionSpecial = specialPts._sum.pointsEarned ?? 0;
+  // Derive totals from individual records
+  let predictionMatches = 0;
+  let predictionGroups = 0;
+  let predictionBracket = 0;
+  let predictionSpecial = 0;
 
   const ptsPerReferral = parseInt(referralSetting?.value || "200", 10) || 200;
 
   const ledger: PointsLedgerEntry[] = [];
 
-  if (predictionMatches > 0) {
+  // ── Individual match predictions ────────────────────────────────────────
+  const PHASE_LABEL_MAP: Record<string, string> = {
+    ROUND_OF_32: "Ronda de 32",
+    ROUND_OF_16: "Octavos",
+    QUARTER_FINALS: "Cuartos",
+    SEMI_FINALS: "Semifinal",
+    FINAL: "Final",
+  };
+
+  for (const p of matchPts) {
+    const m = p.match;
+    const homeName = m.homeTeam?.name ?? "?";
+    const awayName = m.awayTeam?.name ?? "?";
+    const phase = m.phase;
+    const category: PointsLedgerCategory = phase === "GROUP_STAGE" ? "prediction_matches" : "prediction_bracket";
+    const phaseLabel = phase === "GROUP_STAGE"
+      ? (m.group ? `Grupo ${m.group.name}` : "Fase de grupos")
+      : (PHASE_LABEL_MAP[phase] ?? phase);
+
+    let outcomeDetail = "";
+    if (p.predictedOutcome === "home") outcomeDetail = `Ganó ${homeName}`;
+    else if (p.predictedOutcome === "away") outcomeDetail = `Ganó ${awayName}`;
+    else if (p.predictedOutcome === "draw") outcomeDetail = "Empate";
+
+    if (p.predictedHomeScore != null && p.predictedAwayScore != null) {
+      outcomeDetail += ` · ${p.predictedHomeScore}-${p.predictedAwayScore}`;
+    }
+
+    const earned = p.pointsEarned;
+    if (phase === "GROUP_STAGE") predictionMatches += earned;
+    else predictionBracket += earned;
+
     ledger.push({
-      id: "summary-matches",
-      category: "prediction_matches",
-      label: "Partidos de grupos",
-      detail: "Resultados (local/empate/visitante) de partidos de la fase de grupos",
-      points: predictionMatches,
-      date: new Date(0).toISOString(),
+      id: `match-${p.id}`,
+      category,
+      label: `${homeName} vs ${awayName}`,
+      detail: outcomeDetail || undefined,
+      points: earned,
+      status: earned > 0 ? "correct" : m.homeScore != null ? "wrong" : undefined,
+      date: p.updatedAt.toISOString(),
     });
   }
-  if (predictionGroups > 0) {
+
+  // ── Individual group standing predictions ────────────────────────────────
+  for (const gp of groupPts) {
+    predictionGroups += gp.pointsEarned;
+    const teams = [gp.firstTeam?.name, gp.secondTeam?.name].filter(Boolean).join(" · ");
     ledger.push({
-      id: "summary-groups",
+      id: `group-${gp.id}`,
       category: "prediction_groups",
-      label: "Posiciones de grupos",
-      detail: "Equipos que clasificaron 1° y 2° de cada grupo (se calcula al cerrar el grupo)",
-      points: predictionGroups,
-      date: new Date(0).toISOString(),
+      label: `Grupo ${gp.group.name} — Clasificados`,
+      detail: teams || undefined,
+      points: gp.pointsEarned,
+      date: gp.updatedAt.toISOString(),
     });
   }
-  if (predictionBracket > 0) {
+
+  // ── Individual bracket predictions ──────────────────────────────────────
+  const BRACKET_PHASE_LABEL: Record<string, string> = {
+    ROUND_OF_32: "Ronda de 32",
+    ROUND_OF_16: "Octavos",
+    QUARTER_FINALS: "Cuartos",
+    SEMI_FINALS: "Semifinal",
+    RUNNER_UP: "Subcampeón",
+    CHAMPION: "Campeón",
+  };
+  for (const bp of bracketPts) {
+    if (!bp.predictedTeamId) continue;
+    predictionBracket += bp.pointsEarned;
     ledger.push({
-      id: "summary-bracket",
+      id: `bracket-${bp.id}`,
       category: "prediction_bracket",
-      label: "Eliminatorias y final",
-      detail: "Equipos que avanzaron en eliminatorias + campeón y subcampeón",
-      points: predictionBracket,
-      date: new Date(0).toISOString(),
+      label: `${BRACKET_PHASE_LABEL[bp.phase] ?? bp.phase}: ${bp.predictedTeam?.name ?? "?"}`,
+      points: bp.pointsEarned,
+      date: bp.updatedAt.toISOString(),
     });
   }
-  if (predictionSpecial > 0) {
+
+  // ── Special predictions ──────────────────────────────────────────────────
+  const SPECIAL_TYPE_LABEL: Record<string, string> = {
+    CHAMPION: "Campeón predicho",
+    TOP_SCORER: "Goleador del torneo",
+    REVELATION: "Selección revelación",
+    BEST_PLAYER: "Mejor jugador",
+  };
+  for (const sp of specialPts) {
+    predictionSpecial += sp.pointsEarned;
     ledger.push({
-      id: "summary-special",
+      id: `special-${sp.id}`,
       category: "prediction_special",
-      label: "Predicciones especiales",
-      detail: "Campeón, goleador, revelación y mejor jugador predichos antes del torneo",
-      points: predictionSpecial,
-      date: new Date(0).toISOString(),
+      label: SPECIAL_TYPE_LABEL[sp.type] ?? sp.type,
+      detail: sp.predictedValue,
+      points: sp.pointsEarned,
+      date: sp.createdAt.toISOString(),
     });
   }
 
