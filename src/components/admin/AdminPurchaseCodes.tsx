@@ -15,6 +15,8 @@ interface PurchaseCodeRow {
   type: string;
   points: number;
   status: string;
+  maxUses?: number | null;
+  useCount?: number;
   notes?: string | null;
   createdAt: string;
   user?: {
@@ -57,7 +59,7 @@ export function AdminPurchaseCodes() {
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
   const [removing, setRemoving] = useState<Record<string, boolean>>({});
-  const [form, setForm] = useState({ code: "", points: "30", amount: "", notes: "" });
+  const [form, setForm] = useState({ code: "", points: "30", amount: "", notes: "", maxUses: "" });
 
   const tabMeta = TYPE_TABS.find((t) => t.key === activeType)!;
 
@@ -98,6 +100,7 @@ export function AdminPurchaseCodes() {
     }
     setCreating(true);
     try {
+      const maxUses = form.maxUses.trim() ? parseInt(form.maxUses.trim(), 10) : undefined;
       const res = await fetch("/api/admin/purchase-codes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -105,6 +108,7 @@ export function AdminPurchaseCodes() {
           type: activeType,
           code: form.code.trim() || undefined,
           points,
+          maxUses: maxUses && maxUses > 0 ? maxUses : undefined,
           notes: form.notes.trim() || undefined,
         }),
       });
@@ -114,7 +118,7 @@ export function AdminPurchaseCodes() {
         return;
       }
       setCodes((prev) => [data.purchaseCode, ...prev]);
-      setForm({ code: "", points: form.points, amount: "", notes: "" });
+      setForm({ code: "", points: form.points, amount: "", notes: "", maxUses: form.maxUses });
       toast.success(
         activeType === CODE_TYPES.story
           ? `Código ${data.purchaseCode.code} listo — subilo a historias`
@@ -235,12 +239,21 @@ export function AdminPurchaseCodes() {
               onChange={(e) => setForm((p) => ({ ...p, points: e.target.value }))}
             />
           )}
+          {activeType === CODE_TYPES.story && (
+            <Input
+              type="number"
+              label="Cantidad de usos (dejá vacío para uso único)"
+              placeholder="Ej: 50"
+              value={form.maxUses}
+              onChange={(e) => setForm((p) => ({ ...p, maxUses: e.target.value }))}
+            />
+          )}
           <Input
             label="Nota interna (opcional)"
             placeholder={tabMeta.notesPlaceholder}
             value={form.notes}
             onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-            className="sm:col-span-2"
+            className={activeType === CODE_TYPES.story ? "" : "sm:col-span-2"}
           />
         </div>
         <Button variant="primary" size="sm" loading={creating} onClick={createCode}>
@@ -321,25 +334,34 @@ export function AdminPurchaseCodes() {
                 <Badge variant="success" className="text-[10px]">
                   +{c.points}
                 </Badge>
-                <Badge
-                  variant={
-                    c.status === "redeemed"
-                      ? "success"
+                {c.maxUses != null ? (
+                  <Badge
+                    variant={c.useCount != null && c.useCount >= c.maxUses ? "error" : "info"}
+                    className="text-[10px]"
+                  >
+                    {c.useCount ?? 0}/{c.maxUses} usos
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant={
+                      c.status === "redeemed"
+                        ? "success"
+                        : c.status === "pending"
+                          ? "warning"
+                          : c.status === "rejected"
+                            ? "error"
+                            : "default"
+                    }
+                  >
+                    {c.status === "available"
+                      ? "disponible"
                       : c.status === "pending"
-                        ? "warning"
-                        : c.status === "rejected"
-                          ? "error"
-                          : "default"
-                  }
-                >
-                  {c.status === "available"
-                    ? "disponible"
-                    : c.status === "pending"
-                      ? "pendiente"
-                      : c.status === "redeemed"
-                        ? "canjeado"
-                        : c.status}
-                </Badge>
+                        ? "pendiente"
+                        : c.status === "redeemed"
+                          ? "canjeado"
+                          : c.status}
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 {c.user && c.status !== "available" && (

@@ -73,12 +73,20 @@ export async function DELETE(
     const existing = await prisma.purchaseCode.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    // Collect users to recalculate before deletion
+    const multiUseUsers = existing.maxUses != null
+      ? await prisma.purchaseCodeRedemption.findMany({
+          where: { purchaseCodeId: id },
+          select: { userId: true },
+        })
+      : [];
+
     await prisma.purchaseCode.delete({ where: { id } });
 
-    // Recalculate points if the code had already been redeemed
-    if (existing.status === "redeemed" && existing.userId) {
-      await calculateUserPoints(existing.userId);
-    }
+    // Recalculate points for affected users
+    const userIds = new Set(multiUseUsers.map((r) => r.userId));
+    if (existing.status === "redeemed" && existing.userId) userIds.add(existing.userId);
+    await Promise.all([...userIds].map((uid) => calculateUserPoints(uid)));
 
     return NextResponse.json({ success: true });
   } catch (error) {

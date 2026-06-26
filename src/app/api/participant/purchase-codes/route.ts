@@ -21,23 +21,39 @@ export async function GET(request: NextRequest) {
     const typeParam = request.nextUrl.searchParams.get("type");
     const typeFilter = typeParam && isValidCodeType(typeParam) ? (typeParam as CodeType) : undefined;
 
-    const redemptions = await prisma.purchaseCode.findMany({
-      where: {
-        userId: auth.userId,
-        ...(typeFilter ? { type: typeFilter } : {}),
-      },
-      orderBy: { updatedAt: "desc" },
-      select: {
-        id: true,
-        code: true,
-        type: true,
-        points: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-        redeemedAt: true,
-      },
-    });
+    const [singleUse, multiUse] = await Promise.all([
+      prisma.purchaseCode.findMany({
+        where: {
+          userId: auth.userId,
+          maxUses: null,
+          ...(typeFilter ? { type: typeFilter } : {}),
+        },
+        orderBy: { updatedAt: "desc" },
+        select: { id: true, code: true, type: true, points: true, status: true, createdAt: true, updatedAt: true, redeemedAt: true },
+      }),
+      prisma.purchaseCodeRedemption.findMany({
+        where: {
+          userId: auth.userId,
+          ...(typeFilter ? { purchaseCode: { type: typeFilter } } : {}),
+        },
+        orderBy: { redeemedAt: "desc" },
+        include: { purchaseCode: { select: { code: true, type: true } } },
+      }),
+    ]);
+
+    const redemptions = [
+      ...singleUse,
+      ...multiUse.map((r) => ({
+        id: r.id,
+        code: r.purchaseCode.code,
+        type: r.purchaseCode.type,
+        points: r.pointsEarned,
+        status: "redeemed",
+        createdAt: r.redeemedAt.toISOString(),
+        updatedAt: r.redeemedAt.toISOString(),
+        redeemedAt: r.redeemedAt.toISOString(),
+      })),
+    ].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
     return NextResponse.json({ redemptions });
   } catch (error) {
@@ -70,6 +86,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ── Multi-use code (story codes with maxUses set) ────────────────────────
+    if (purchaseCode.maxUses != null) {
+      if (purchaseCode.status !== "available") {
+        return NextResponse.json({ error: "Este código ya agotó todos sus usos disponibles" }, { status: 409 });
+      }
+
+      const alreadyUsed = await prisma.purchaseCodeRedemption.findUnique({
+        where: { purchaseCodeId_userId: { purchaseCodeId: purchaseCode.id, userId: auth.userId } },
+      });
+      if (alreadyUsed) {
+        return NextResponse.json({ error: "Ya usaste este código" }, { status: 409 });
+      }
+
+      try {
+        await prisma.$transaction(async (tx) => {
+          await tx.purchaseCodeRedemption.create({
+            data: { purchaseCodeId: purchaseCode.id, userId: auth.userId, pointsEarned: purchaseCode.points },
+          });
+          const updated = await tx.purchaseCode.updateMany({
+            where: { id: purchaseCode.id, status: "available" },
+            data: { useCount: { increment: 1 } },
+          });
+          if (updated.count === 0) throw new Error("EXHAUSTED");
+          // Mark exhausted if this was the last use
+          await tx.purchaseCode.updateMany({
+            where: { id: purchaseCode.id, useCount: { gte: purchaseCode.maxUses! } },
+            data: { status: "redeemed" },
+          });
+        });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "";
+        if (msg === "EXHAUSTED") {
+          return NextResponse.json({ error: "Este código ya agotó todos sus usos disponibles" }, { status: 409 });
+        }
+        throw e;
+      }
+
+      await calculateUserPoints(auth.userId);
+      return NextResponse.json(
+        { message: "¡Código válido! Tus puntos fueron acreditados automáticamente." },
+        { status: 201 }
+      );
+    }
+
+    // ── Single-use code ──────────────────────────────────────────────────────
     if (purchaseCode.status === "redeemed") {
       return NextResponse.json({ error: "Este código ya fue utilizado" }, { status: 409 });
     }

@@ -31,7 +31,7 @@ export const DEFAULT_ACHIEVEMENTS = {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function calculateGroupQualifiers(
+export function calculateGroupQualifiers(
   teams: Array<{ id: string }>,
   matches: Array<{
     homeTeamId: string | null;
@@ -305,13 +305,14 @@ export async function calculateUserPoints(userId: string): Promise<number> {
   }
 
   // ── 4. Bonus points (bonus actions + purchase codes + referrals) ─────────
-  const [bonusAgg, codeAgg, userRec, redemptionAgg] = await Promise.all([
+  const [bonusAgg, codeAgg, multiCodeAgg, userRec, redemptionAgg] = await Promise.all([
     prisma.userBonus.aggregate({ where: { userId, status: "approved" }, _sum: { pointsEarned: true } }),
-    prisma.purchaseCode.aggregate({ where: { userId, status: "redeemed" }, _sum: { points: true } }),
+    prisma.purchaseCode.aggregate({ where: { userId, status: "redeemed", maxUses: null }, _sum: { points: true } }),
+    prisma.purchaseCodeRedemption.aggregate({ where: { userId }, _sum: { pointsEarned: true } }),
     prisma.user.findUnique({ where: { id: userId }, select: { referralPoints: true, hardcoreMode: true, emailVerified: true } }),
     prisma.prizeRedemption.aggregate({ where: { userId, status: { not: "rejected" } }, _sum: { pointsSpent: true } }),
   ]);
-  const bonusPoints = (bonusAgg._sum.pointsEarned ?? 0) + (codeAgg._sum.points ?? 0) + (userRec?.referralPoints ?? 0);
+  const bonusPoints = (bonusAgg._sum.pointsEarned ?? 0) + (codeAgg._sum.points ?? 0) + (multiCodeAgg._sum.pointsEarned ?? 0) + (userRec?.referralPoints ?? 0);
   const spentPoints = redemptionAgg._sum.pointsSpent ?? 0;
 
   // ── 5. Achievements — solo aplican en modo Hardcore ──────────────────────

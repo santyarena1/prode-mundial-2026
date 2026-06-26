@@ -103,6 +103,7 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
     specialPts,
     bonuses,
     purchaseCodes,
+    multiUseRedemptions,
     redemptions,
     achievements,
     referralSetting,
@@ -148,8 +149,13 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
       orderBy: { createdAt: "desc" },
     }),
     prisma.purchaseCode.findMany({
-      where: { userId },
+      where: { userId, maxUses: null },
       orderBy: { updatedAt: "desc" },
+    }),
+    prisma.purchaseCodeRedemption.findMany({
+      where: { userId },
+      include: { purchaseCode: { select: { code: true, type: true } } },
+      orderBy: { redeemedAt: "desc" },
     }),
     prisma.prizeRedemption.findMany({
       where: { userId },
@@ -182,7 +188,7 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
       id: "summary-matches",
       category: "prediction_matches",
       label: "Partidos de grupos",
-      detail: "Resultados acertados en fase de grupos",
+      detail: "Resultados (local/empate/visitante) de partidos de la fase de grupos",
       points: predictionMatches,
       date: new Date(0).toISOString(),
     });
@@ -192,7 +198,7 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
       id: "summary-groups",
       category: "prediction_groups",
       label: "Posiciones de grupos",
-      detail: "Clasificados y mejores terceros acertados",
+      detail: "Equipos que clasificaron 1° y 2° de cada grupo (se calcula al cerrar el grupo)",
       points: predictionGroups,
       date: new Date(0).toISOString(),
     });
@@ -202,7 +208,7 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
       id: "summary-bracket",
       category: "prediction_bracket",
       label: "Eliminatorias y final",
-      detail: "Equipos que avanzaron y campeón/subcampeón",
+      detail: "Equipos que avanzaron en eliminatorias + campeón y subcampeón",
       points: predictionBracket,
       date: new Date(0).toISOString(),
     });
@@ -212,6 +218,7 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
       id: "summary-special",
       category: "prediction_special",
       label: "Predicciones especiales",
+      detail: "Campeón, goleador, revelación y mejor jugador predichos antes del torneo",
       points: predictionSpecial,
       date: new Date(0).toISOString(),
     });
@@ -258,6 +265,19 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
       points: approvedPoints,
       status: code.status,
       date: (code.redeemedAt ?? code.updatedAt).toISOString(),
+    });
+  }
+
+  for (const r of multiUseRedemptions) {
+    purchaseCodePoints += r.pointsEarned;
+    ledger.push({
+      id: `multicode-${r.id}`,
+      category: "purchase_code",
+      label: codeTypeLabel(r.purchaseCode.type),
+      detail: r.purchaseCode.code,
+      points: r.pointsEarned,
+      status: "redeemed",
+      date: r.redeemedAt.toISOString(),
     });
   }
 

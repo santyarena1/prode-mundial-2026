@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       data: { passwordResetToken: token, passwordResetExpiry: expiry },
     });
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://thegamershop-premios.com";
     const resetUrl = `${appUrl}/reset-password?token=${token}`;
 
     await sendPasswordResetEmail({

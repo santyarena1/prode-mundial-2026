@@ -1327,6 +1327,79 @@ export default function PredictionsPage() {
                         </button>
                       </div>
                     )}
+
+                    {/* ── Resultado real vs predicción de clasificados ── */}
+                    {(() => {
+                      const allReallyFinished = groupMatches.length > 0 && groupMatches.every(m => m.status === "finished" && m.homeScore != null);
+                      const savedGP = savedGroupPreds[group.id];
+                      if (!allReallyFinished || !savedGP) return null;
+
+                      // Compute real standings from actual scores
+                      const rStats: Record<string, { pts: number; gd: number; gf: number }> = {};
+                      for (const t of group.teams) rStats[t.id] = { pts: 0, gd: 0, gf: 0 };
+                      for (const m of groupMatches) {
+                        const hId = m.homeTeam?.id, aId = m.awayTeam?.id;
+                        if (!hId || !aId || m.homeScore == null || m.awayScore == null) continue;
+                        if (!rStats[hId]) rStats[hId] = { pts: 0, gd: 0, gf: 0 };
+                        if (!rStats[aId]) rStats[aId] = { pts: 0, gd: 0, gf: 0 };
+                        const h = m.homeScore, a = m.awayScore;
+                        if (h > a) rStats[hId].pts += 3;
+                        else if (a > h) rStats[aId].pts += 3;
+                        else { rStats[hId].pts += 1; rStats[aId].pts += 1; }
+                        rStats[hId].gd += h - a; rStats[aId].gd += a - h;
+                        rStats[hId].gf += h; rStats[aId].gf += a;
+                      }
+                      const rSorted = Object.entries(rStats).sort(([, a], [, b]) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+                      const realFirst = rSorted[0]?.[0];
+                      const realSecond = rSorted[1]?.[0];
+                      const teamById = new Map(group.teams.map(t => [t.id, t]));
+
+                      type PredRow = { pos: string; teamName: string; label: string; pts: number; ok: boolean };
+                      let totalPts = 0;
+                      const rows: PredRow[] = [];
+
+                      if (savedGP.first) {
+                        const t = teamById.get(savedGP.first);
+                        if (savedGP.first === realFirst) { rows.push({ pos: "1°", teamName: t?.name ?? "?", label: "exacto", pts: 2000, ok: true }); totalPts += 2000; }
+                        else if (savedGP.first === realSecond) { rows.push({ pos: "1°", teamName: t?.name ?? "?", label: "clasificó (no exacto)", pts: 1500, ok: true }); totalPts += 1500; }
+                        else { rows.push({ pos: "1°", teamName: t?.name ?? "?", label: "no clasificó", pts: 0, ok: false }); }
+                      }
+                      if (savedGP.second) {
+                        const t = teamById.get(savedGP.second);
+                        if (savedGP.second === realSecond) { rows.push({ pos: "2°", teamName: t?.name ?? "?", label: "exacto", pts: 2000, ok: true }); totalPts += 2000; }
+                        else if (savedGP.second === realFirst) { rows.push({ pos: "2°", teamName: t?.name ?? "?", label: "clasificó (no exacto)", pts: 1500, ok: true }); totalPts += 1500; }
+                        else { rows.push({ pos: "2°", teamName: t?.name ?? "?", label: "no clasificó", pts: 0, ok: false }); }
+                      }
+
+                      return (
+                        <div className="border-t border-[#1f1f1f] px-4 py-3 bg-[#0c0c0c]">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-purple-400 mb-2.5">
+                            Tu predicción de clasificados
+                          </p>
+                          <div className="space-y-2">
+                            {rows.map(row => (
+                              <div key={row.pos} className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-gray-600 w-5 flex-shrink-0">{row.pos}</span>
+                                <span className={`text-xs font-semibold flex-1 ${row.ok ? "text-white" : "text-gray-600 line-through"}`}>{row.teamName}</span>
+                                {row.ok ? (
+                                  <span className="text-green-400 text-[10px] font-bold">✓ {row.label} · +{row.pts.toLocaleString("es-AR")}</span>
+                                ) : (
+                                  <span className="text-red-500 text-[10px] font-bold">✗ {row.label}</span>
+                                )}
+                              </div>
+                            ))}
+                            <div className="pt-1.5 border-t border-[#1a1a1a] flex items-center justify-between">
+                              <span className="text-[10px] text-gray-700">
+                                Real: 1° {teamById.get(realFirst ?? "")?.name ?? "?"} · 2° {teamById.get(realSecond ?? "")?.name ?? "?"}
+                              </span>
+                              <span className={`text-xs font-black ${totalPts > 0 ? "text-yellow-400" : "text-gray-700"}`}>
+                                {totalPts > 0 ? `+${totalPts.toLocaleString("es-AR")} pts` : "0 pts"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </motion.div>
               );

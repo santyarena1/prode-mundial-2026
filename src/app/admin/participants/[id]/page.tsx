@@ -65,11 +65,17 @@ interface UserDetail {
     match: { matchCode: string; phase: string; homeTeam?: { name: string } | null; awayTeam?: { name: string } | null };
   }>;
   groupPredictions: Array<{
-    id: string; pointsEarned: number;
-    group: { name: string };
-    firstTeam?: { name: string; flag?: string | null } | null;
-    secondTeam?: { name: string; flag?: string | null } | null;
-    thirdTeam?: { name: string; flag?: string | null } | null;
+    id: string; groupId: string; pointsEarned: number;
+    group: { id: string; name: string };
+    firstTeam?: { id: string; name: string; flag?: string | null } | null;
+    secondTeam?: { id: string; name: string; flag?: string | null } | null;
+    thirdTeam?: { id: string; name: string; flag?: string | null } | null;
+  }>;
+  groupResults?: Record<string, {
+    firstTeam: { id: string; name: string; flagUrl?: string | null } | null;
+    secondTeam: { id: string; name: string; flagUrl?: string | null } | null;
+    thirdTeam: { id: string; name: string; flagUrl?: string | null } | null;
+    isComplete: boolean;
   }>;
   bracketPredictions: Array<{
     id: string; phase: string; matchSlot: string; pointsEarned: number;
@@ -126,6 +132,7 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
     fetch(`/api/admin/participants/${id}`)
       .then(r => r.json())
       .then(d => {
+        if (d.groupResults) d.user.groupResults = d.groupResults;
         setUser(d.user);
         setPointsBreakdown(d.pointsBreakdown ?? null);
       });
@@ -549,40 +556,123 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {user.groupPredictions.map(gp => (
-                  <div key={gp.id} className="px-3 py-2.5 rounded-lg bg-[#111] border border-[#1a1a1a]">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-gray-400 text-xs font-bold uppercase tracking-wider">{gp.group.name}</span>
-                      {gp.pointsEarned > 0
-                        ? <span className="text-yellow-400 text-xs font-bold">+{gp.pointsEarned.toLocaleString("es-AR")}</span>
-                        : <span className="text-gray-700 text-xs">0 pts</span>
-                      }
+                {user.groupPredictions.map(gp => {
+                  const result = user.groupResults?.[gp.group.id];
+                  const hasResult = result?.isComplete;
+
+                  // Compute sub-points for each predicted position
+                  const firstInfo = (() => {
+                    if (!gp.firstTeam || !hasResult) return null;
+                    const tid = gp.firstTeam.id;
+                    if (tid === result!.firstTeam?.id) return { label: "exacto", pts: 1500 + 500, ok: true };
+                    if (tid === result!.secondTeam?.id) return { label: "clasificó", pts: 1500, ok: true };
+                    return { label: "no clasificó", pts: 0, ok: false };
+                  })();
+                  const secondInfo = (() => {
+                    if (!gp.secondTeam || !hasResult) return null;
+                    const tid = gp.secondTeam.id;
+                    if (tid === result!.secondTeam?.id) return { label: "exacto", pts: 1500 + 500, ok: true };
+                    if (tid === result!.firstTeam?.id) return { label: "clasificó", pts: 1500, ok: true };
+                    return { label: "no clasificó", pts: 0, ok: false };
+                  })();
+                  const thirdInfo = (() => {
+                    if (!gp.thirdTeam || !hasResult) return null;
+                    const tid = gp.thirdTeam.id;
+                    if (tid === result!.thirdTeam?.id) return { label: "mejor 3°", pts: 800, ok: true };
+                    return { label: "no avanzó", pts: 0, ok: false };
+                  })();
+
+                  return (
+                    <div key={gp.id} className="px-3 py-2.5 rounded-lg bg-[#111] border border-[#1a1a1a]">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400 text-xs font-bold uppercase tracking-wider">{gp.group.name}</span>
+                          {!hasResult && result !== undefined && (
+                            <span className="text-[10px] text-amber-600">fase en curso</span>
+                          )}
+                          {result === undefined && (
+                            <span className="text-[10px] text-gray-700">sin resultados</span>
+                          )}
+                        </div>
+                        {gp.pointsEarned > 0
+                          ? <span className="text-yellow-400 text-xs font-bold">+{gp.pointsEarned.toLocaleString("es-AR")}</span>
+                          : <span className="text-gray-700 text-xs">0 pts</span>
+                        }
+                      </div>
+                      <div className="space-y-2">
+                        {/* 1° predicho */}
+                        {gp.firstTeam && (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-yellow-500 w-4 flex-shrink-0">1°</span>
+                              <span className="text-white text-xs font-medium">{gp.firstTeam.name}</span>
+                              {firstInfo ? (
+                                firstInfo.ok ? (
+                                  <span className="text-green-400 text-[10px] font-bold">✓ {firstInfo.label} · +{firstInfo.pts.toLocaleString("es-AR")}</span>
+                                ) : (
+                                  <span className="text-red-500 text-[10px] font-bold">✗ {firstInfo.label}</span>
+                                )
+                              ) : null}
+                            </div>
+                            {hasResult && result!.firstTeam && result!.firstTeam.id !== gp.firstTeam.id && (
+                              <div className="flex items-center gap-1 pl-5">
+                                <span className="text-gray-700 text-[10px]">real 1°:</span>
+                                <span className="text-gray-500 text-[10px]">{result!.firstTeam.name}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {/* 2° predicho */}
+                        {gp.secondTeam && (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-gray-400 w-4 flex-shrink-0">2°</span>
+                              <span className="text-white text-xs font-medium">{gp.secondTeam.name}</span>
+                              {secondInfo ? (
+                                secondInfo.ok ? (
+                                  <span className="text-green-400 text-[10px] font-bold">✓ {secondInfo.label} · +{secondInfo.pts.toLocaleString("es-AR")}</span>
+                                ) : (
+                                  <span className="text-red-500 text-[10px] font-bold">✗ {secondInfo.label}</span>
+                                )
+                              ) : null}
+                            </div>
+                            {hasResult && result!.secondTeam && result!.secondTeam.id !== gp.secondTeam.id && (
+                              <div className="flex items-center gap-1 pl-5">
+                                <span className="text-gray-700 text-[10px]">real 2°:</span>
+                                <span className="text-gray-500 text-[10px]">{result!.secondTeam.name}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {/* 3° predicho */}
+                        {gp.thirdTeam && (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-gray-600 w-4 flex-shrink-0">3°</span>
+                              <span className="text-gray-400 text-xs">{gp.thirdTeam.name}</span>
+                              {thirdInfo ? (
+                                thirdInfo.ok ? (
+                                  <span className="text-green-400 text-[10px] font-bold">✓ {thirdInfo.label} · +{thirdInfo.pts}</span>
+                                ) : (
+                                  <span className="text-red-500 text-[10px] font-bold">✗ {thirdInfo.label}</span>
+                                )
+                              ) : null}
+                            </div>
+                            {hasResult && result!.thirdTeam && result!.thirdTeam.id !== gp.thirdTeam.id && (
+                              <div className="flex items-center gap-1 pl-5">
+                                <span className="text-gray-700 text-[10px]">real 3°:</span>
+                                <span className="text-gray-500 text-[10px]">{result!.thirdTeam?.name ?? "—"}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {!gp.firstTeam && !gp.secondTeam && (
+                          <span className="text-gray-700 text-xs">Sin predicción</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      {gp.firstTeam && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold text-yellow-500 w-4">1°</span>
-                          <span className="text-white text-xs">{gp.firstTeam.name}</span>
-                        </div>
-                      )}
-                      {gp.secondTeam && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold text-gray-400 w-4">2°</span>
-                          <span className="text-white text-xs">{gp.secondTeam.name}</span>
-                        </div>
-                      )}
-                      {gp.thirdTeam && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold text-gray-600 w-4">3°</span>
-                          <span className="text-gray-400 text-xs">{gp.thirdTeam.name}</span>
-                        </div>
-                      )}
-                      {!gp.firstTeam && !gp.secondTeam && (
-                        <span className="text-gray-700 text-xs">Sin predicción</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

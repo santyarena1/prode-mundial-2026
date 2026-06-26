@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (requiresVerification && verificationToken) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://thegamershop-premios.com";
       const verifyUrl = `${appUrl}/verify-email?token=${verificationToken}`;
       sendEmailVerification({
         firstName: user.firstName,

@@ -54,6 +54,34 @@ interface Prediction {
   match: Match;
 }
 
+interface GroupPred {
+  id: string;
+  groupId: string;
+  firstTeamId?: string | null;
+  secondTeamId?: string | null;
+  thirdTeamId?: string | null;
+  pointsEarned: number;
+  group: { id: string; name: string };
+  firstTeam?: Team | null;
+  secondTeam?: Team | null;
+  thirdTeam?: Team | null;
+}
+
+interface GroupData {
+  id: string;
+  name: string;
+  teams: Team[];
+  matches: Array<{
+    id: string;
+    phase: string;
+    status: string;
+    homeTeam?: Team;
+    awayTeam?: Team;
+    homeScore?: number | null;
+    awayScore?: number | null;
+  }>;
+}
+
 const phaseLabels: Record<string, string> = {
   GROUP_STAGE: "Fase de Grupos",
   ROUND_OF_32: "Ronda de 32",
@@ -332,6 +360,8 @@ function PredictionCard({
 export default function MyPredictionsPage() {
   const router = useRouter();
   const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [groupPredictions, setGroupPredictions] = useState<GroupPred[]>([]);
+  const [groups, setGroups] = useState<GroupData[]>([]);
   const [loadMore, setLoadMore] = useState<LoadMoreStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -358,6 +388,20 @@ export default function MyPredictionsPage() {
         setPredictions(preds);
       }
 
+      let parsedGroupPreds: GroupPred[] = [];
+      if (groupPredRes.ok) {
+        const gp = await groupPredRes.json();
+        parsedGroupPreds = gp.groupPredictions || [];
+        setGroupPredictions(parsedGroupPreds);
+      }
+
+      let fetchedGroups: GroupData[] = [];
+      if (groupsRes.ok) {
+        const { groups: g } = await groupsRes.json();
+        fetchedGroups = g || [];
+        setGroups(fetchedGroups);
+      }
+
       const savedMatchIds = new Set(
         preds
           .filter((p) => p.predictedOutcome)
@@ -365,34 +409,22 @@ export default function MyPredictionsPage() {
       );
 
       let totalOpenMatches = 0;
-      let groupCount = 0;
-      if (groupsRes.ok) {
-        const { groups } = await groupsRes.json();
-        groupCount = groups?.length ?? 0;
-        for (const g of groups || []) {
-          for (const m of g.matches || []) {
-            if (
-              m.status === "scheduled" &&
-              isMatchPredictionWindowOpen(m.startDate) &&
-              !savedMatchIds.has(m.id)
-            ) {
-              totalOpenMatches++;
-            }
+      const groupCount = fetchedGroups.length;
+      for (const g of fetchedGroups) {
+        for (const m of g.matches || []) {
+          if (
+            m.status === "scheduled" &&
+            isMatchPredictionWindowOpen((m as Match).startDate) &&
+            !savedMatchIds.has(m.id)
+          ) {
+            totalOpenMatches++;
           }
         }
       }
 
-      let lockedGroups = 0;
-      if (groupPredRes.ok) {
-        const gp = await groupPredRes.json();
-        lockedGroups = (gp.groupPredictions || []).filter(
-          (p: {
-            isLocked: boolean;
-            firstTeamId?: string;
-            secondTeamId?: string;
-          }) => p.isLocked && p.firstTeamId && p.secondTeamId
-        ).length;
-      }
+      const lockedGroups = parsedGroupPreds.filter(
+        (p) => p.firstTeamId && p.secondTeamId
+      ).length;
 
       let hasBracketProgress = false;
       if (bracketPredRes.ok) {
@@ -559,6 +591,119 @@ export default function MyPredictionsPage() {
             </div>
           </div>
         ))}
+
+        {/* ── Posiciones de grupos ── */}
+        {groupPredictions.length > 0 && (() => {
+          const groupMap = new Map(groups.map(g => [g.id, g]));
+          const groupPtsTotal = groupPredictions.reduce((s, gp) => s + gp.pointsEarned, 0);
+          const finishedGroups = groupPredictions.filter(gp => {
+            const g = groupMap.get(gp.groupId);
+            if (!g) return false;
+            const gMatches = g.matches.filter(m => m.phase === "GROUP_STAGE");
+            return gMatches.length > 0 && gMatches.every(m => m.status === "finished");
+          });
+          if (finishedGroups.length === 0) return null;
+
+          return (
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xs font-bold uppercase tracking-widest text-purple-400">
+                  Clasificados de grupos
+                </h2>
+                {groupPtsTotal > 0 && (
+                  <span className="text-xs font-black text-yellow-400">+{groupPtsTotal.toLocaleString("es-AR")} pts totales</span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {finishedGroups.map(gp => {
+                  const g = groupMap.get(gp.groupId);
+                  if (!g) return null;
+                  const gMatches = g.matches.filter(m => m.phase === "GROUP_STAGE");
+
+                  // Compute real standings from actual scores
+                  const rStats: Record<string, { pts: number; gd: number; gf: number }> = {};
+                  for (const t of g.teams) rStats[t.id] = { pts: 0, gd: 0, gf: 0 };
+                  for (const m of gMatches) {
+                    const hId = m.homeTeam?.id, aId = m.awayTeam?.id;
+                    if (!hId || !aId || m.homeScore == null || m.awayScore == null) continue;
+                    if (!rStats[hId]) rStats[hId] = { pts: 0, gd: 0, gf: 0 };
+                    if (!rStats[aId]) rStats[aId] = { pts: 0, gd: 0, gf: 0 };
+                    const h = m.homeScore, a = m.awayScore;
+                    if (h > a) rStats[hId].pts += 3;
+                    else if (a > h) rStats[aId].pts += 3;
+                    else { rStats[hId].pts += 1; rStats[aId].pts += 1; }
+                    rStats[hId].gd += h - a; rStats[aId].gd += a - h;
+                    rStats[hId].gf += h; rStats[aId].gf += a;
+                  }
+                  const rSorted = Object.entries(rStats).sort(([, a], [, b]) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+                  const realFirst = rSorted[0]?.[0];
+                  const realSecond = rSorted[1]?.[0];
+                  const teamById = new Map(g.teams.map(t => [t.id, t]));
+
+                  type GPRow = { pos: string; team: Team | null | undefined; label: string; pts: number; ok: boolean };
+                  const rows: GPRow[] = [];
+                  if (gp.firstTeamId) {
+                    const t = gp.firstTeam;
+                    if (gp.firstTeamId === realFirst) rows.push({ pos: "1°", team: t, label: "exacto", pts: 2000, ok: true });
+                    else if (gp.firstTeamId === realSecond) rows.push({ pos: "1°", team: t, label: "clasificó (no exacto)", pts: 1500, ok: true });
+                    else rows.push({ pos: "1°", team: t, label: "no clasificó", pts: 0, ok: false });
+                  }
+                  if (gp.secondTeamId) {
+                    const t = gp.secondTeam;
+                    if (gp.secondTeamId === realSecond) rows.push({ pos: "2°", team: t, label: "exacto", pts: 2000, ok: true });
+                    else if (gp.secondTeamId === realFirst) rows.push({ pos: "2°", team: t, label: "clasificó (no exacto)", pts: 1500, ok: true });
+                    else rows.push({ pos: "2°", team: t, label: "no clasificó", pts: 0, ok: false });
+                  }
+                  if (gp.thirdTeamId) {
+                    const t = gp.thirdTeam;
+                    rows.push({ pos: "3°", team: t, label: "mejor 3°", pts: gp.pointsEarned > (rows.reduce((s, r) => s + r.pts, 0)) ? gp.pointsEarned - rows.reduce((s, r) => s + r.pts, 0) : 0, ok: gp.pointsEarned > rows.reduce((s, r) => s + r.pts, 0) });
+                  }
+
+                  const allOk = rows.every(r => r.ok);
+                  const anyOk = rows.some(r => r.ok);
+
+                  return (
+                    <Card key={gp.id} className={`p-0 overflow-hidden ${allOk ? "border-green-500/20" : anyOk ? "border-yellow-500/15" : "border-red-500/10"}`}>
+                      <div className={`px-4 py-2.5 flex items-center justify-between ${allOk ? "bg-green-500/10" : anyOk ? "bg-yellow-500/5" : "bg-red-500/5"}`}>
+                        <div className="flex items-center gap-2">
+                          <span className="w-7 h-7 rounded-lg bg-red-600 flex items-center justify-center text-white font-black text-xs flex-shrink-0">
+                            {gp.group.name}
+                          </span>
+                          <span className="text-white text-sm font-bold">Grupo {gp.group.name}</span>
+                        </div>
+                        {gp.pointsEarned > 0
+                          ? <span className="text-yellow-400 text-xs font-black">+{gp.pointsEarned.toLocaleString("es-AR")} pts</span>
+                          : <span className="text-gray-700 text-xs">0 pts</span>
+                        }
+                      </div>
+                      <div className="px-4 py-3 space-y-2">
+                        {rows.map(row => (
+                          <div key={row.pos} className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-gray-600 w-5 flex-shrink-0">{row.pos}</span>
+                            {row.team?.flagUrl && (
+                              <img src={row.team.flagUrl} alt="" className="w-5 h-[13px] object-cover rounded flex-shrink-0" />
+                            )}
+                            <span className={`text-xs font-semibold flex-1 ${row.ok ? "text-white" : "text-gray-600"}`}>
+                              {row.team?.name ?? "?"}
+                            </span>
+                            {row.ok ? (
+                              <span className="text-green-400 text-[10px] font-bold">✓ {row.label}{row.pts > 0 ? ` · +${row.pts.toLocaleString("es-AR")}` : ""}</span>
+                            ) : (
+                              <span className="text-red-500 text-[10px]">✗ {row.label}</span>
+                            )}
+                          </div>
+                        ))}
+                        <div className="pt-1.5 border-t border-[#1a1a1a] text-[10px] text-gray-700">
+                          Real: 1° {teamById.get(realFirst ?? "")?.name ?? "?"} · 2° {teamById.get(realSecond ?? "")?.name ?? "?"}
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       <Footer />

@@ -14,6 +14,7 @@ const createSchema = z.object({
   code: z.string().min(4).max(32).optional(),
   type: z.enum(CODE_TYPE_VALUES).default("purchase"),
   points: z.number().int().min(1).max(10000),
+  maxUses: z.number().int().min(1).max(10000).optional(),
   notes: z.string().max(500).optional(),
 });
 
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
         code,
         type: codeType,
         points: parsed.data.points,
+        maxUses: parsed.data.maxUses ?? null,
         notes: parsed.data.notes || null,
         status: "available",
       },

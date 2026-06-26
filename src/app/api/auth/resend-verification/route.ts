@@ -45,7 +45,7 @@ export async function POST() {
       data: { emailVerificationToken: token, emailVerificationExpiry: expiry },
     });
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://thegamershop-premios.com";
     const verifyUrl = `${appUrl}/verify-email?token=${token}`;
 
     await sendEmailVerification({
