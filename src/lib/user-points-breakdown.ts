@@ -237,6 +237,8 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
     if (phase === "GROUP_STAGE") predictionMatches += earned;
     else predictionBracket += earned;
 
+    if (earned === 0) continue;
+
     ledger.push({
       id: `match-${p.id}`,
       category,
@@ -251,6 +253,7 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
   // ── Individual group standing predictions ────────────────────────────────
   for (const gp of groupPts) {
     predictionGroups += gp.pointsEarned;
+    if (gp.pointsEarned === 0) continue;
     const teams = [gp.firstTeam?.name, gp.secondTeam?.name].filter(Boolean).join(" · ");
     ledger.push({
       id: `group-${gp.id}`,
@@ -274,6 +277,7 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
   for (const bp of bracketPts) {
     if (!bp.predictedTeamId) continue;
     predictionBracket += bp.pointsEarned;
+    if (bp.pointsEarned === 0) continue;
     ledger.push({
       id: `bracket-${bp.id}`,
       category: "prediction_bracket",
@@ -292,6 +296,7 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
   };
   for (const sp of specialPts) {
     predictionSpecial += sp.pointsEarned;
+    if (sp.pointsEarned === 0) continue;
     ledger.push({
       id: `special-${sp.id}`,
       category: "prediction_special",
