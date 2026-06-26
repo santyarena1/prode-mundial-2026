@@ -21,8 +21,8 @@ export const DEFAULT_POINT_RULES = {
 };
 
 export const DEFAULT_ACHIEVEMENTS = {
-  // Logro 1: acertar 1° y 2° exacto en al menos 4 grupos
-  L1_EAGLE_EYE:    { name: "Ojo de águila",   description: "Acertar el 1° y 2° exacto en al menos 4 grupos",        points: 15000 },
+  // Logro 1: acertar 1° y 2° exacto en los 12 grupos
+  L1_EAGLE_EYE:    { name: "Ojo de águila",   description: "Acertar el 1° y 2° exacto en los 12 grupos",            points: 15000 },
   // Logro 2: acertar al menos 6 de los 8 clasificados a cuartos de final
   L2_BRACKET_PRO:  { name: "Bracket de lujo", description: "Acertar al menos 6 de los 8 clasificados a cuartos de final", points: 20000 },
   // Logro 3: acertar el campeón (predicción especial antes del torneo)
@@ -84,8 +84,8 @@ async function applyAchievements(userId: string, stats: AchievementStats): Promi
   const earned: string[] = [];
   const { groupsPositionPerfect, bracketQfCorrect, specialChampionCorrect } = stats;
 
-  // L1: Ojo de águila — 1° y 2° exacto en al menos 4 grupos
-  if (groupsPositionPerfect >= 4) earned.push("L1_EAGLE_EYE");
+  // L1: Ojo de águila — 1° y 2° exacto en los 12 grupos
+  if (groupsPositionPerfect >= 12) earned.push("L1_EAGLE_EYE");
 
   // L2: Bracket de lujo — al menos 6 de los 8 clasificados a cuartos
   if (bracketQfCorrect >= 6) earned.push("L2_BRACKET_PRO");

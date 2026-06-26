@@ -134,7 +134,7 @@ export default function ComoJugarPage() {
               Los logros se calculan automáticamente al cerrar cada fase del torneo. No hace falta reclamarlos.
             </p>
             <p className="text-orange-400/80 text-xs mb-4 font-semibold">🔥 Solo disponibles activando el Modo Hardcore</p>
-            <Achievement name="Ojo de águila"   condition="Acertar el 1° y 2° exacto en al menos 4 grupos"          pts="15.000" />
+            <Achievement name="Ojo de águila"   condition="Acertar el 1° y 2° exacto en los 12 grupos"          pts="15.000" />
             <Achievement name="Bracket de lujo" condition="Acertar 6 o más de los 8 clasificados a cuartos de final" pts="20.000" />
             <Achievement name="Lo vi venir"     condition="Acertar al campeón en la predicción del ganador"           pts="50.000" />
           </Card>

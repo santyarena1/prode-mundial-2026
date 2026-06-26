@@ -2107,7 +2107,7 @@ export default function PredictionsPage() {
 // ─── Points & Achievements Modal ─────────────────────────────────────────────
 
 const LOGROS = [
-  { icon: "🦅", name: "Ojo de águila",   condition: "Acertar el 1° y 2° exacto en al menos 4 grupos (se calcula al cerrar la fase de grupos)", pts: "15.000", target: 4,  type: "groups" as const },
+  { icon: "🦅", name: "Ojo de águila",   condition: "Acertar el 1° y 2° exacto en los 12 grupos (se calcula al cerrar la fase de grupos)", pts: "15.000", target: 12, type: "groups" as const },
   { icon: "🎯", name: "Bracket de lujo", condition: "Acertar 6 o más de los 8 clasificados a cuartos de final (se calcula al terminar octavos)", pts: "20.000", target: 1,  type: "champion" as const },
   { icon: "🏆", name: "Lo vi venir",     condition: "Acertar al campeón en la predicción del ganador (se calcula al terminar el torneo)",        pts: "50.000", target: 1,  type: "champion" as const },
 ];
