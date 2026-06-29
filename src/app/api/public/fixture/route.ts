@@ -8,6 +8,7 @@ export async function GET() {
         homeTeam: true,
         awayTeam: true,
         group: true,
+        events: { orderBy: { minute: "asc" } },
       },
       orderBy: { startDate: "asc" },
     });

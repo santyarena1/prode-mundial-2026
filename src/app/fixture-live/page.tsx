@@ -14,15 +14,18 @@ import { FixtureMatchRow, type FixtureMatch } from "@/components/fixture/Fixture
 
 const REFRESH_MS = 60_000;
 
-// Fases eliminatorias en orden, con su etiqueta.
+// Fases eliminatorias en orden, con etiqueta corta.
 const KNOCKOUT_PHASES: { key: string; label: string }[] = [
-  { key: "ROUND_OF_32", label: "16vos de final" },
-  { key: "ROUND_OF_16", label: "Octavos de final" },
-  { key: "QUARTER_FINALS", label: "Cuartos de final" },
-  { key: "SEMI_FINALS", label: "Semifinales" },
-  { key: "THIRD_PLACE", label: "Tercer puesto" },
+  { key: "ROUND_OF_32", label: "16vos" },
+  { key: "ROUND_OF_16", label: "Octavos" },
+  { key: "QUARTER_FINALS", label: "Cuartos" },
+  { key: "SEMI_FINALS", label: "Semis" },
+  { key: "THIRD_PLACE", label: "3er puesto" },
   { key: "FINAL", label: "Final" },
 ];
+const PHASE_LABEL: Record<string, string> = Object.fromEntries(
+  KNOCKOUT_PHASES.map((p) => [p.key, p.label])
+);
 
 export default function FixtureLivePage() {
   const [groups, setGroups] = useState<FixtureGroup[]>([]);
@@ -44,12 +47,7 @@ export default function FixtureLivePage() {
         const byPhase: Record<string, FixtureMatch[]> = {};
         for (const block of data.fixture || []) {
           if (block.phase === "GROUP_STAGE") continue;
-          // Más recientes/próximos arriba, los ya jugados (viejos) abajo.
-          byPhase[block.phase] = [...(block.matches || [])].sort((a: FixtureMatch, b: FixtureMatch) => {
-            const ta = a.startDate ? new Date(a.startDate).getTime() : Number.MAX_SAFE_INTEGER;
-            const tb = b.startDate ? new Date(b.startDate).getTime() : Number.MAX_SAFE_INTEGER;
-            return tb - ta;
-          });
+          byPhase[block.phase] = block.matches || [];
         }
         setKnockout(byPhase);
       }
@@ -74,6 +72,19 @@ export default function FixtureLivePage() {
     );
 
   const hasKnockout = KNOCKOUT_PHASES.some((p) => (knockout[p.key]?.length ?? 0) > 0);
+
+  // Lista plana de eliminatorias por fecha (viejo → nuevo), separando lo que ya
+  // se jugó: próximos/en vivo arriba, finalizados abajo.
+  const allKnockout = Object.entries(knockout).flatMap(([phase, ms]) =>
+    ms.map((m) => ({ m, phase }))
+  );
+  const byDateAsc = (a: { m: FixtureMatch }, b: { m: FixtureMatch }) => {
+    const ta = a.m.startDate ? new Date(a.m.startDate).getTime() : Number.MAX_SAFE_INTEGER;
+    const tb = b.m.startDate ? new Date(b.m.startDate).getTime() : Number.MAX_SAFE_INTEGER;
+    return ta - tb;
+  };
+  const upcomingKO = allKnockout.filter((x) => x.m.status !== "finished").sort(byDateAsc);
+  const playedKO = allKnockout.filter((x) => x.m.status === "finished").sort(byDateAsc);
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
@@ -136,28 +147,52 @@ export default function FixtureLivePage() {
                   Eliminatorias
                 </h2>
                 <p className="text-gray-500 text-xs text-center mb-8">
-                  Llaves del mundial · se actualiza automáticamente
+                  Lo que sigue y lo que está en vivo arriba · se actualiza solo
                 </p>
-                <div className="space-y-8">
-                  {KNOCKOUT_PHASES.filter((p) => (knockout[p.key]?.length ?? 0) > 0).slice().reverse().map((p) => (
-                    <div key={p.key}>
-                      <div className="flex items-center gap-3 mb-4">
-                        <h3 className="text-lg font-black uppercase text-white tracking-wide whitespace-nowrap">
-                          {p.label}
-                        </h3>
-                        <div className="flex-1 h-px bg-[#1f1f1f]" />
-                        <span className="text-gray-600 text-xs font-bold">
-                          {knockout[p.key].length} partido{knockout[p.key].length !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {knockout[p.key].map((m) => (
-                          <FixtureMatchRow key={m.id} match={m} />
-                        ))}
-                      </div>
+
+                {/* Próximos / en vivo */}
+                {upcomingKO.length > 0 && (
+                  <div className="mb-10">
+                    <div className="flex items-center gap-3 mb-4">
+                      <h3 className="text-lg font-black uppercase text-white tracking-wide whitespace-nowrap">
+                        Próximos y en vivo
+                      </h3>
+                      <div className="flex-1 h-px bg-[#1f1f1f]" />
                     </div>
-                  ))}
-                </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {upcomingKO.map(({ m, phase }) => (
+                        <div key={m.id}>
+                          <div className="text-[10px] font-black uppercase tracking-wider text-yellow-500/70 mb-1 ml-1">
+                            {PHASE_LABEL[phase] ?? phase}
+                          </div>
+                          <FixtureMatchRow match={m} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Ya jugados */}
+                {playedKO.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-3 mb-4">
+                      <h3 className="text-base font-black uppercase text-gray-500 tracking-wide whitespace-nowrap">
+                        Ya jugados
+                      </h3>
+                      <div className="flex-1 h-px bg-[#1f1f1f]" />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 opacity-80">
+                      {playedKO.map(({ m, phase }) => (
+                        <div key={m.id}>
+                          <div className="text-[10px] font-black uppercase tracking-wider text-gray-600 mb-1 ml-1">
+                            {PHASE_LABEL[phase] ?? phase}
+                          </div>
+                          <FixtureMatchRow match={m} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
