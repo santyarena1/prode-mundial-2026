@@ -197,9 +197,14 @@ export default function PredictionsPage() {
           const byPhase: Record<string, Match[]> = {};
           for (const block of fx.fixture || []) {
             if (block.phase === "GROUP_STAGE") continue;
-            // Match.phase "FINAL" se mapea al bracket phase "CHAMPION".
-            const key = block.phase === "FINAL" ? "CHAMPION" : block.phase;
-            byPhase[key] = (block.matches || []).sort((a: Match, b: Match) => {
+            // La final ("FINAL") y el 3er puesto ("THIRD_PLACE") van juntos en la
+            // pestaña Final (CHAMPION). El resto mantiene su fase.
+            const key = block.phase === "FINAL" || block.phase === "THIRD_PLACE" ? "CHAMPION" : block.phase;
+            byPhase[key] = [...(byPhase[key] || []), ...(block.matches || [])];
+          }
+          // Ordenar cada fase por fecha (el 3er puesto suele jugarse antes de la final).
+          for (const k of Object.keys(byPhase)) {
+            byPhase[k].sort((a: Match, b: Match) => {
               const ta = a.startDate ? new Date(a.startDate).getTime() : Number.MAX_SAFE_INTEGER;
               const tb = b.startDate ? new Date(b.startDate).getTime() : Number.MAX_SAFE_INTEGER;
               if (ta !== tb) return ta - tb;
@@ -1628,6 +1633,10 @@ export default function PredictionsPage() {
                       }));
                     }}
                     onSave={handleSaveOfficialPhase}
+                    changesRemaining={changesRemaining}
+                    onUseChange={handleUseChange}
+                    usingChange={usingChange}
+                    onBuyChange={() => setShowChangeModal(true)}
                   />
                 ) : (
                   <>
@@ -3596,6 +3605,7 @@ function BracketTeamSide({ team, isLocked, isPending, onOpen, changesRemaining, 
 function OfficialBracketPhase({
   phase, phaseLabel, phaseIcon, matches, savedBracket, pendingBracket,
   savedScores, pendingScores, fieldErrors, hardcoreMode, saving, onPick, onScore, onSave,
+  changesRemaining, onUseChange, usingChange, onBuyChange,
 }: {
   phase: string;
   phaseLabel: string;
@@ -3611,6 +3621,10 @@ function OfficialBracketPhase({
   onPick: (phase: string, matchCode: string, teamId: string) => void;
   onScore: (matchCode: string, side: "home" | "away", val: number) => void;
   onSave: () => void;
+  changesRemaining: number;
+  onUseChange: (type: "match" | "group" | "bracket", id: string) => void;
+  usingChange: boolean;
+  onBuyChange: () => void;
 }) {
   const pendingCount = matches.filter((m) => {
     const key = `${phase}:${m.matchCode}`;
@@ -3730,6 +3744,21 @@ function OfficialBracketPhase({
                       }
                       return <p className="text-xs text-red-400 font-black text-center pt-2">✗ No acertaste</p>;
                     })()}
+
+                    {/* Cambiar la predicción (solo partido PRÓXIMO ya confirmado) — usa un crédito */}
+                    {locked && !started && (
+                      <button
+                        onClick={() => (changesRemaining > 0 ? onUseChange("bracket", key) : onBuyChange())}
+                        disabled={usingChange}
+                        className="mt-3 w-full text-xs font-bold text-amber-300 border border-amber-500/30 bg-amber-500/10 rounded-lg py-2 hover:bg-amber-500/20 transition disabled:opacity-50"
+                      >
+                        {usingChange
+                          ? "Desbloqueando…"
+                          : changesRemaining > 0
+                            ? `Cambiar mi predicción (usás 1 crédito · te quedan ${changesRemaining})`
+                            : "Cambiar mi predicción (canjeá 800 pts)"}
+                      </button>
+                    )}
 
                     {started && !finished && <p className="text-[11px] text-amber-500 text-center pt-2">El partido ya empezó — no se puede modificar.</p>}
                     {err && <p className="text-[11px] text-red-400 pt-2 text-center">{err}</p>}
