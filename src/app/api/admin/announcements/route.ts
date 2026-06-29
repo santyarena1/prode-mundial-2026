@@ -142,6 +142,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ sent: 0, failed: 0, message: "No recipients" });
     }
 
+    // Creamos el log ANTES de enviar para que siempre quede registro (aunque la
+    // función se corte por timeout a mitad del envío masivo).
+    const log = await prisma.emailLog.create({
+      data: {
+        subject,
+        message,
+        ctaUrl: ctaUrl || null,
+        ctaLabel: ctaLabel || null,
+        recipientCount: users.length,
+        sentCount: 0,
+        failedCount: 0,
+      },
+    });
+
     const result = await sendAnnouncement({
       users,
       subject,
@@ -151,16 +165,9 @@ export async function POST(request: NextRequest) {
       rawHtml,
     });
 
-    await prisma.emailLog.create({
-      data: {
-        subject,
-        message,
-        ctaUrl: ctaUrl || null,
-        ctaLabel: ctaLabel || null,
-        recipientCount: users.length,
-        sentCount: result.sent,
-        failedCount: result.failed,
-      },
+    await prisma.emailLog.update({
+      where: { id: log.id },
+      data: { sentCount: result.sent, failedCount: result.failed },
     });
 
     return NextResponse.json({ ...result, total: users.length });

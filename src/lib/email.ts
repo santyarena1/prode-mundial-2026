@@ -626,7 +626,12 @@ export async function sendAnnouncement(params: {
   let sent = 0;
   let failed = 0;
 
-  // Resend batch: max 100 per call
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const isRateLimit = (e: unknown) => /rate.?limit|too many|429/i.test(JSON.stringify(e) || String(e));
+
+  // Resend batch: máx 100 por llamada. Resend limita ~2 requests/seg, así que
+  // pausamos entre lotes y reintentamos ante rate limit (si no, con 1300 usuarios
+  // los lotes posteriores se rechazan y "no le llega a nadie").
   const CHUNK = 100;
   for (let i = 0; i < users.length; i += CHUNK) {
     const chunk = users.slice(i, i + CHUNK);
@@ -639,21 +644,31 @@ export async function sendAnnouncement(params: {
         : buildAnnouncementHtml({ subject, message, ctaUrl, ctaLabel, userId: u.id, firstName: u.firstName }),
     }));
 
-    try {
-      const result = await resend.batch.send(emails);
-      if (result.error) {
-        console.error("[resend] batch error:", JSON.stringify(result.error));
+    let done = false;
+    for (let attempt = 1; attempt <= 4 && !done; attempt++) {
+      try {
+        const result = await resend.batch.send(emails);
+        if (result.error) {
+          if (isRateLimit(result.error) && attempt < 4) { await sleep(1500 * attempt); continue; }
+          console.error("[resend] batch error:", JSON.stringify(result.error));
+          failed += chunk.length;
+        } else if (result.data) {
+          sent += chunk.length;
+        } else {
+          console.error("[resend] batch returned no data and no error");
+          failed += chunk.length;
+        }
+        done = true;
+      } catch (err) {
+        if (isRateLimit(err) && attempt < 4) { await sleep(1500 * attempt); continue; }
+        console.error("[resend] batch exception:", err);
         failed += chunk.length;
-      } else if (result.data) {
-        sent += result.data.length;
-      } else {
-        console.error("[resend] batch returned no data and no error");
-        failed += chunk.length;
+        done = true;
       }
-    } catch (err) {
-      console.error("[resend] batch exception:", err);
-      failed += chunk.length;
     }
+
+    // Pausa entre lotes para respetar el rate limit de Resend (~2 req/seg).
+    if (i + CHUNK < users.length) await sleep(600);
   }
 
   return { sent, failed };
