@@ -1,5 +1,5 @@
 import prisma from "./db";
-import { BRACKET_PHASE_ORDER, earlierBracketPhase, getTournamentPhaseState } from "./tournament-phase";
+import { BRACKET_PHASE_ORDER, getEffectiveOfficialFromPhase } from "./tournament-phase";
 
 export const DEFAULT_POINT_RULES = {
   GROUP_SIGN:       { label: "Acertar resultado (ganador/perdedor)",       points: 500 },
@@ -281,17 +281,13 @@ export async function calculateUserPoints(userId: string): Promise<number> {
     where: { id: userId },
     select: { bracketMode: true, officialFromPhase: true },
   });
-  let officialFromIdx = -1;
-  if (bracketModeUser?.bracketMode === "OFFICIAL") {
-    const { firstUnfinishedBracketPhase } = await getTournamentPhaseState();
-    const effective = earlierBracketPhase(
-      bracketModeUser.officialFromPhase,
-      firstUnfinishedBracketPhase
-    );
-    officialFromIdx = effective
-      ? BRACKET_PHASE_ORDER.indexOf(effective as (typeof BRACKET_PHASE_ORDER)[number])
-      : -1;
-  }
+  const effectiveOfficialFrom = await getEffectiveOfficialFromPhase(
+    bracketModeUser?.bracketMode,
+    bracketModeUser?.officialFromPhase
+  );
+  const officialFromIdx = effectiveOfficialFrom
+    ? BRACKET_PHASE_ORDER.indexOf(effectiveOfficialFrom as (typeof BRACKET_PHASE_ORDER)[number])
+    : -1;
 
   // Pre-fetch all finished matches indexed by matchCode to avoid N+1
   const finishedMatches = await prisma.match.findMany({

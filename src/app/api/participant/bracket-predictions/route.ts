@@ -8,7 +8,7 @@ import {
   migrateLegacyBracketSlots,
   validateBracketPickForUser,
 } from "@/lib/bracket-server";
-import { BRACKET_PHASE_ORDER } from "@/lib/tournament-phase";
+import { BRACKET_PHASE_ORDER, getEffectiveOfficialFromPhase } from "@/lib/tournament-phase";
 
 /**
  * En modo OFICIAL (desde officialFromPhase) las llaves usan los cruces reales:
@@ -81,10 +81,13 @@ export async function POST(request: NextRequest) {
       where: { id: auth.userId },
       select: { bracketMode: true, officialFromPhase: true },
     });
-    const officialFromIdx =
-      modeUser?.bracketMode === "OFFICIAL" && modeUser.officialFromPhase
-        ? BRACKET_PHASE_ORDER.indexOf(modeUser.officialFromPhase as (typeof BRACKET_PHASE_ORDER)[number])
-        : -1;
+    const effectiveOfficialFrom = await getEffectiveOfficialFromPhase(
+      modeUser?.bracketMode,
+      modeUser?.officialFromPhase
+    );
+    const officialFromIdx = effectiveOfficialFrom
+      ? BRACKET_PHASE_ORDER.indexOf(effectiveOfficialFrom as (typeof BRACKET_PHASE_ORDER)[number])
+      : -1;
     const phaseIdx = BRACKET_PHASE_ORDER.indexOf(phase as (typeof BRACKET_PHASE_ORDER)[number]);
     const isOfficialPhase = officialFromIdx >= 0 && phaseIdx >= officialFromIdx;
 

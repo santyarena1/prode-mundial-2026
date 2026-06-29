@@ -3650,7 +3650,7 @@ function OfficialBracketPhase({
             return (
               <div key={m.matchCode} className={`rounded-2xl border p-3 ${err ? "border-red-500/50" : locked ? "border-green-600/30 bg-[#0c1207]" : "border-[#2a2a2a] bg-[#121212]"}`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] text-gray-600 font-bold">P{m.matchCode} · {formatDate(m.startDate)}</span>
+                  <span className="text-[10px] text-gray-600 font-bold">{formatDate(m.startDate)}</span>
                   {locked && <span className="text-[10px] text-green-500 font-bold flex items-center gap-1"><Lock className="w-3 h-3" /> Confirmado</span>}
                   {finished && !locked && <span className="text-[10px] text-gray-500 font-bold">Finalizado</span>}
                 </div>
@@ -3704,7 +3704,7 @@ function OfficialBracketPhase({
 
       {pendingCount > 0 && (
         <div className="sticky bottom-4 mt-4 flex justify-center">
-          <button onClick={onSave} disabled={saving}
+          <button onClick={onSave} disabled={saving} data-save-predictions
             className="px-8 py-3 bg-yellow-400 hover:bg-yellow-300 disabled:opacity-50 text-black font-black rounded-xl shadow-lg flex items-center gap-2">
             <Save className="w-4 h-4" />
             {saving ? "Guardando…" : `Guardar ${pendingCount} predicción${pendingCount > 1 ? "es" : ""}`}

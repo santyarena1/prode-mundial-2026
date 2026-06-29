@@ -80,6 +80,21 @@ function computeProgress(
   return { started, finished, total };
 }
 
+/**
+ * Fase EFECTIVA desde la que corre el modo oficial para un usuario: la más
+ * temprana entre la guardada y la primera fase no terminada. Autocorrige cuentas
+ * que quedaron con un officialFromPhase posterior al que corresponde.
+ * Devuelve null si el usuario no está en modo oficial.
+ */
+export async function getEffectiveOfficialFromPhase(
+  bracketMode: string | null | undefined,
+  storedOfficialFromPhase: string | null | undefined
+): Promise<string | null> {
+  if (bracketMode !== "OFFICIAL") return null;
+  const { firstUnfinishedBracketPhase } = await getTournamentPhaseState();
+  return earlierBracketPhase(storedOfficialFromPhase, firstUnfinishedBracketPhase);
+}
+
 export async function getTournamentPhaseState(
   now: Date = new Date()
 ): Promise<TournamentPhaseState> {

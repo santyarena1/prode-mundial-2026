@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getUserFromCookies } from "@/lib/cookies";
-import { earlierBracketPhase, getTournamentPhaseState } from "@/lib/tournament-phase";
+import { getEffectiveOfficialFromPhase } from "@/lib/tournament-phase";
 
 export async function GET() {
   try {
@@ -46,10 +46,9 @@ export async function GET() {
     // la primera fase del torneo todavía no terminada. Esto autocorrige cuentas
     // que quedaron con un officialFromPhase posterior al que corresponde.
     if (user.bracketMode === "OFFICIAL") {
-      const { firstUnfinishedBracketPhase } = await getTournamentPhaseState();
-      profile.officialFromPhase = earlierBracketPhase(
-        user.officialFromPhase,
-        firstUnfinishedBracketPhase
+      profile.officialFromPhase = await getEffectiveOfficialFromPhase(
+        user.bracketMode,
+        user.officialFromPhase
       );
     }
 
