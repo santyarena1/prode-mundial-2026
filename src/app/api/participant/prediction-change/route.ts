@@ -23,20 +23,21 @@ export async function POST() {
       }, { status: 400 });
     }
 
-    // Deduct points and grant 3 prediction change credits
+    // Deduct points and grant prediction change credits (2 en eliminatorias).
+    const CREDITS_PER_PURCHASE = 2;
     await prisma.user.update({
       where: { id: auth.userId },
       data: {
         spentPoints: { increment: cost },
-        predictionChangesRemaining: { increment: 3 },
+        predictionChangesRemaining: { increment: CREDITS_PER_PURCHASE },
       },
     });
 
     return NextResponse.json({
       success: true,
-      message: `¡Obtuviste 3 créditos para cambiar predicciones!`,
+      message: `¡Obtuviste ${CREDITS_PER_PURCHASE} créditos para cambiar predicciones!`,
       cost,
-      changesRemaining: user.predictionChangesRemaining + 3,
+      changesRemaining: user.predictionChangesRemaining + CREDITS_PER_PURCHASE,
     });
   } catch (error) {
     console.error("Prediction change error:", error);

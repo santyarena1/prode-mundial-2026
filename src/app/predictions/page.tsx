@@ -1045,6 +1045,9 @@ export default function PredictionsPage() {
   ).length;
   const currentPhaseUnlocked = isPhaseUnlocked(activeElimTab);
   const showOfficialPhase = isOfficialPhaseKey(activeElimTab);
+  // Cuando se muestra la fase oficial, ésta ya tiene su propia barra fija de
+  // guardar, así que ocultamos el banner global para no encimar dos barras.
+  const officialBarActive = activeTab === "eliminatorias" && showOfficialPhase;
 
   // Ensure active elim tab is always an unlocked phase
   const eligibleTeams = selectionModal ? getEligibleTeams(selectionModal.phase) : [];
@@ -1159,7 +1162,7 @@ export default function PredictionsPage() {
           <div className="flex-1 min-w-0">
             <p className="text-amber-300 text-sm font-bold">⚠️ Una vez confirmada, tu predicción queda bloqueada</p>
             <p className="text-amber-500/80 text-xs mt-1 leading-relaxed">
-              No podrás cambiarla después de confirmar. Canjear <span className="text-amber-400 font-semibold">{changeCost} pts</span> te da <strong className="text-amber-400">3 créditos</strong> para cambiar predicciones individuales.
+              No podrás cambiarla después de confirmar. Canjear <span className="text-amber-400 font-semibold">{changeCost} pts</span> te da <strong className="text-amber-400">2 créditos</strong> para cambiar predicciones individuales.
             </p>
           </div>
           {hasAnyLocked && changesRemaining === 0 && (
@@ -1942,7 +1945,7 @@ export default function PredictionsPage() {
                   <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
                     <p className="text-amber-300 text-sm font-semibold mb-1">¿Qué incluye este canje?</p>
                     <ul className="text-amber-500/80 text-xs space-y-1">
-                      <li>✓ Obtenés <strong className="text-amber-400">3 créditos</strong> para cambiar predicciones</li>
+                      <li>✓ Obtenés <strong className="text-amber-400">2 créditos</strong> para cambiar predicciones</li>
                       <li>✓ Cada crédito desbloquea <strong className="text-amber-400">una predicción individual</strong></li>
                       <li>✓ Se descuentan <strong className="text-amber-400">{changeCost} puntos</strong> al instante</li>
                     </ul>
@@ -1966,7 +1969,7 @@ export default function PredictionsPage() {
                   </button>
                   <Button variant="primary" size="sm" loading={buyingChange}
                     disabled={availablePoints < changeCost} onClick={handleBuyChange} className="flex-1">
-                    {availablePoints < changeCost ? "Sin puntos" : `Obtener 3 créditos (${changeCost} pts)`}
+                    {availablePoints < changeCost ? "Sin puntos" : `Obtener 2 créditos (${changeCost} pts)`}
                   </Button>
                 </div>
               </div>
@@ -2168,7 +2171,7 @@ export default function PredictionsPage() {
 
       {/* ── Unsaved changes banner ──────────────────────────────────────────── */}
       <AnimatePresence>
-        {hasUnsaved && (
+        {hasUnsaved && !officialBarActive && (
           <motion.div
             initial={{ opacity: 0, y: 80 }}
             animate={{ opacity: 1, y: 0 }}
@@ -3632,7 +3635,7 @@ function OfficialBracketPhase({
           Todavía no están definidos los partidos de esta fase. Volvé cuando termine la fase anterior.
         </div>
       ) : (
-        <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
+        <div className="grid gap-3 grid-cols-1 lg:grid-cols-2 pb-28">
           {matches.map((m) => {
             const key = `${phase}:${m.matchCode}`;
             const home = m.homeTeam;
@@ -3649,74 +3652,88 @@ function OfficialBracketPhase({
 
             return (
               <div key={m.matchCode} className={`rounded-2xl border p-3 ${err ? "border-red-500/50" : locked ? "border-green-600/30 bg-[#0c1207]" : "border-[#2a2a2a] bg-[#121212]"}`}>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-3">
                   <span className="text-[10px] text-gray-600 font-bold">{formatDate(m.startDate)}</span>
-                  {locked && <span className="text-[10px] text-green-500 font-bold flex items-center gap-1"><Lock className="w-3 h-3" /> Confirmado</span>}
-                  {finished && !locked && <span className="text-[10px] text-gray-500 font-bold">Finalizado</span>}
+                  {locked && !finished && <span className="text-[10px] text-green-500 font-bold flex items-center gap-1"><Lock className="w-3 h-3" /> Confirmado</span>}
+                  {finished && <span className="text-[10px] text-gray-500 font-bold">Finalizado</span>}
                 </div>
 
                 {!ready ? (
-                  <div className="text-center py-4 text-gray-600 text-xs">Esperando los equipos de la fase anterior…</div>
+                  <div className="text-center py-6 text-gray-600 text-xs">Esperando los equipos de la fase anterior…</div>
                 ) : (
-                  <div className="space-y-2">
-                    {[home!, away!].map((t, idx) => {
-                      const isPicked = pickedId === t.id;
-                      const isRealWinner = finished && m.winnerTeamId === t.id;
-                      const teamRealScore = finished ? (idx === 0 ? m.homeScore : m.awayScore) : undefined;
-                      return (
-                        <button
-                          key={t.id}
-                          disabled={locked || started}
-                          onClick={() => onPick(phase, m.matchCode, t.id)}
-                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border transition ${
-                            finished && isRealWinner ? "bg-green-500/10 border-green-600/40" :
-                            isPicked ? "bg-yellow-500/15 border-yellow-500/50" : "bg-[#1a1a1a] border-[#2a2a2a] hover:border-[#444]"
-                          } ${(locked || started) ? "opacity-90 cursor-not-allowed" : ""}`}
-                        >
-                          {t.flagUrl
-                            // eslint-disable-next-line @next/next/no-img-element
-                            ? <img src={t.flagUrl} alt="" className="w-7 h-5 object-cover rounded" />
-                            : <span className="w-7 h-5 rounded bg-[#222] text-[9px] flex items-center justify-center text-gray-400">{t.code}</span>}
-                          <span className={`text-sm font-bold flex-1 text-left ${isPicked ? "text-yellow-300" : "text-white"}`}>{t.name}</span>
-                          {isPicked && <span className="text-[9px] text-yellow-400 font-bold uppercase tracking-wide">tu pick</span>}
-                          {isRealWinner && <span className="text-[10px] text-green-500 font-bold">ganó</span>}
-                          {finished && teamRealScore != null && (
-                            <span className="text-base font-black text-white tabular-nums w-5 text-center">{teamRealScore}</span>
-                          )}
-                          {isPicked && !finished && <CheckCircle2 className="w-4 h-4 text-yellow-400" />}
-                        </button>
-                      );
-                    })}
+                  <>
+                    {/* Equipos enfrentados: izquierda vs derecha */}
+                    <div className="flex items-stretch gap-2">
+                      {[home!, away!].map((t, idx) => {
+                        const isPicked = pickedId === t.id;
+                        const isRealWinner = finished && m.winnerTeamId === t.id;
+                        const isRealLoser = finished && m.winnerTeamId && m.winnerTeamId !== t.id;
+                        return (
+                          <button
+                            key={t.id}
+                            disabled={locked || started}
+                            onClick={() => onPick(phase, m.matchCode, t.id)}
+                            className={`flex-1 min-w-0 flex flex-col items-center gap-2 px-2 py-3 rounded-xl border-2 transition ${
+                              isRealWinner ? "bg-green-500/10 border-green-500/50" :
+                              isRealLoser ? "bg-[#161616] border-[#2a2a2a] opacity-50" :
+                              isPicked ? "bg-yellow-500/15 border-yellow-400" : "bg-[#1a1a1a] border-[#2a2a2a] hover:border-[#555]"
+                            } ${(locked || started) ? "cursor-not-allowed" : ""}`}
+                          >
+                            {t.flagUrl
+                              // eslint-disable-next-line @next/next/no-img-element
+                              ? <img src={t.flagUrl} alt="" className="w-12 h-8 object-cover rounded shadow" />
+                              : <span className="w-12 h-8 rounded bg-[#222] text-[10px] flex items-center justify-center text-gray-400">{t.code}</span>}
+                            <span className={`text-sm font-bold text-center leading-tight ${isPicked && !finished ? "text-yellow-300" : "text-white"}`}>{t.name}</span>
+                            {!finished && isPicked && <span className="text-[9px] text-yellow-400 font-black uppercase tracking-wide flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> tu pick</span>}
+                            {isRealWinner && <span className="text-[9px] text-green-500 font-black uppercase tracking-wide">ganó {pickedId === t.id ? "· tu pick" : ""}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
 
+                    {/* Marcador real (terminado) o VS */}
+                    <div className="text-center pt-2">
+                      {finished ? (
+                        <span className="text-xl font-black text-white tabular-nums">
+                          {m.homeScore ?? "-"} <span className="text-gray-600">-</span> {m.awayScore ?? "-"}
+                        </span>
+                      ) : (
+                        <span className="text-gray-700 font-black text-xs tracking-widest">VS</span>
+                      )}
+                    </div>
+
+                    {/* Marcador a predecir (Hardcore, partido próximo y editable) */}
                     {hardcoreMode && !locked && !started && (
-                      <div className="flex items-center justify-center gap-2 pt-1">
+                      <div className="flex items-center justify-center gap-2 pt-2">
+                        <span className="text-[10px] text-gray-500 font-bold">{home!.code}</span>
                         <input type="number" min={0} max={30} value={score?.home ?? ""} onChange={(e) => onScore(m.matchCode, "home", parseInt(e.target.value || "0", 10))}
                           className="w-12 text-center bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg py-1 text-white text-sm" placeholder="0" />
                         <span className="text-gray-600 text-xs">-</span>
                         <input type="number" min={0} max={30} value={score?.away ?? ""} onChange={(e) => onScore(m.matchCode, "away", parseInt(e.target.value || "0", 10))}
                           className="w-12 text-center bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg py-1 text-white text-sm" placeholder="0" />
+                        <span className="text-[10px] text-gray-500 font-bold">{away!.code}</span>
                       </div>
                     )}
 
                     {/* Veredicto cuando el partido terminó */}
                     {finished && (() => {
                       if (!savedId) {
-                        return <p className="text-[11px] text-gray-500 text-center pt-1">No predijiste este partido.</p>;
+                        return <p className="text-[11px] text-gray-500 text-center pt-2">No predijiste este partido.</p>;
                       }
                       const us = savedScores[key];
                       const exact = us && m.homeScore != null && m.awayScore != null && us.home === m.homeScore && us.away === m.awayScore;
                       if (exact) {
-                        return <p className="text-[11px] text-green-400 font-black text-center pt-1">🎯 ¡Resultado exacto! +2.000 pts</p>;
+                        return <p className="text-xs text-green-400 font-black text-center pt-2">🎯 ¡Resultado exacto! +2.000 pts</p>;
                       }
                       if (savedId === m.winnerTeamId) {
-                        return <p className="text-[11px] text-green-400 font-black text-center pt-1">✓ Acertaste el ganador · +1.500 pts</p>;
+                        return <p className="text-xs text-green-400 font-black text-center pt-2">✓ Acertaste el ganador · +1.500 pts</p>;
                       }
-                      return <p className="text-[11px] text-red-400 font-black text-center pt-1">✗ No acertaste</p>;
+                      return <p className="text-xs text-red-400 font-black text-center pt-2">✗ No acertaste</p>;
                     })()}
 
-                    {started && !finished && <p className="text-[11px] text-amber-500 text-center pt-1">El partido ya empezó</p>}
-                    {err && <p className="text-[11px] text-red-400 pt-1">{err}</p>}
-                  </div>
+                    {started && !finished && <p className="text-[11px] text-amber-500 text-center pt-2">El partido ya empezó — no se puede modificar.</p>}
+                    {err && <p className="text-[11px] text-red-400 pt-2 text-center">{err}</p>}
+                  </>
                 )}
               </div>
             );
@@ -3724,11 +3741,12 @@ function OfficialBracketPhase({
         </div>
       )}
 
+      {/* Barra de guardar fija, grande y siempre visible mientras haya pendientes */}
       {pendingCount > 0 && (
-        <div className="sticky bottom-4 mt-4 flex justify-center">
+        <div className="fixed bottom-0 left-0 right-0 z-50 p-3 sm:p-4 pointer-events-none">
           <button onClick={onSave} disabled={saving} data-save-predictions
-            className="px-8 py-3 bg-yellow-400 hover:bg-yellow-300 disabled:opacity-50 text-black font-black rounded-xl shadow-lg flex items-center gap-2">
-            <Save className="w-4 h-4" />
+            className="pointer-events-auto max-w-lg mx-auto w-full flex items-center justify-center gap-2 px-6 py-4 bg-yellow-400 hover:bg-yellow-300 disabled:opacity-60 text-black font-black text-base rounded-2xl shadow-2xl shadow-yellow-500/30 active:scale-[0.99] transition">
+            <Save className="w-5 h-5" />
             {saving ? "Guardando…" : `Guardar ${pendingCount} predicción${pendingCount > 1 ? "es" : ""}`}
           </button>
         </div>
