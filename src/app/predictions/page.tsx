@@ -3659,25 +3659,31 @@ function OfficialBracketPhase({
                   <div className="text-center py-4 text-gray-600 text-xs">Esperando los equipos de la fase anterior…</div>
                 ) : (
                   <div className="space-y-2">
-                    {[home!, away!].map((t) => {
+                    {[home!, away!].map((t, idx) => {
                       const isPicked = pickedId === t.id;
                       const isRealWinner = finished && m.winnerTeamId === t.id;
+                      const teamRealScore = finished ? (idx === 0 ? m.homeScore : m.awayScore) : undefined;
                       return (
                         <button
                           key={t.id}
                           disabled={locked || started}
                           onClick={() => onPick(phase, m.matchCode, t.id)}
                           className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border transition ${
+                            finished && isRealWinner ? "bg-green-500/10 border-green-600/40" :
                             isPicked ? "bg-yellow-500/15 border-yellow-500/50" : "bg-[#1a1a1a] border-[#2a2a2a] hover:border-[#444]"
-                          } ${(locked || started) ? "opacity-80 cursor-not-allowed" : ""}`}
+                          } ${(locked || started) ? "opacity-90 cursor-not-allowed" : ""}`}
                         >
                           {t.flagUrl
                             // eslint-disable-next-line @next/next/no-img-element
                             ? <img src={t.flagUrl} alt="" className="w-7 h-5 object-cover rounded" />
                             : <span className="w-7 h-5 rounded bg-[#222] text-[9px] flex items-center justify-center text-gray-400">{t.code}</span>}
                           <span className={`text-sm font-bold flex-1 text-left ${isPicked ? "text-yellow-300" : "text-white"}`}>{t.name}</span>
+                          {isPicked && <span className="text-[9px] text-yellow-400 font-bold uppercase tracking-wide">tu pick</span>}
                           {isRealWinner && <span className="text-[10px] text-green-500 font-bold">ganó</span>}
-                          {isPicked && <CheckCircle2 className="w-4 h-4 text-yellow-400" />}
+                          {finished && teamRealScore != null && (
+                            <span className="text-base font-black text-white tabular-nums w-5 text-center">{teamRealScore}</span>
+                          )}
+                          {isPicked && !finished && <CheckCircle2 className="w-4 h-4 text-yellow-400" />}
                         </button>
                       );
                     })}
@@ -3691,6 +3697,22 @@ function OfficialBracketPhase({
                           className="w-12 text-center bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg py-1 text-white text-sm" placeholder="0" />
                       </div>
                     )}
+
+                    {/* Veredicto cuando el partido terminó */}
+                    {finished && (() => {
+                      if (!savedId) {
+                        return <p className="text-[11px] text-gray-500 text-center pt-1">No predijiste este partido.</p>;
+                      }
+                      const us = savedScores[key];
+                      const exact = us && m.homeScore != null && m.awayScore != null && us.home === m.homeScore && us.away === m.awayScore;
+                      if (exact) {
+                        return <p className="text-[11px] text-green-400 font-black text-center pt-1">🎯 ¡Resultado exacto! +2.000 pts</p>;
+                      }
+                      if (savedId === m.winnerTeamId) {
+                        return <p className="text-[11px] text-green-400 font-black text-center pt-1">✓ Acertaste el ganador · +1.500 pts</p>;
+                      }
+                      return <p className="text-[11px] text-red-400 font-black text-center pt-1">✗ No acertaste</p>;
+                    })()}
 
                     {started && !finished && <p className="text-[11px] text-amber-500 text-center pt-1">El partido ya empezó</p>}
                     {err && <p className="text-[11px] text-red-400 pt-1">{err}</p>}
