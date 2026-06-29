@@ -240,7 +240,7 @@ export function FixtureMatchRow({ match }: FixtureMatchRowProps) {
           <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
         </button>
       )}
-      {(isFinished || isLive) && expanded && (
+      {(isFinished || isLive) && expanded && hasEvents && (
         <div className="px-4 py-3 border-t border-[#1a1a1a]">
           <EventsPanel
             events={match.events ?? []}

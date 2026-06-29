@@ -23,9 +23,6 @@ const KNOCKOUT_PHASES: { key: string; label: string }[] = [
   { key: "THIRD_PLACE", label: "3er puesto" },
   { key: "FINAL", label: "Final" },
 ];
-const PHASE_LABEL: Record<string, string> = Object.fromEntries(
-  KNOCKOUT_PHASES.map((p) => [p.key, p.label])
-);
 
 export default function FixtureLivePage() {
   const [groups, setGroups] = useState<FixtureGroup[]>([]);
@@ -85,6 +82,16 @@ export default function FixtureLivePage() {
   };
   const upcomingKO = allKnockout.filter((x) => x.m.status !== "finished").sort(byDateAsc);
   const playedKO = allKnockout.filter((x) => x.m.status === "finished").sort(byDateAsc);
+
+  // Agrupa por fase (en orden del torneo) preservando el orden por fecha.
+  const groupByPhase = (items: { m: FixtureMatch; phase: string }[]) =>
+    KNOCKOUT_PHASES.map((p) => ({
+      key: p.key,
+      label: p.label,
+      matches: items.filter((x) => x.phase === p.key).map((x) => x.m),
+    })).filter((g) => g.matches.length > 0);
+  const upcomingGroups = groupByPhase(upcomingKO);
+  const playedGroups = groupByPhase(playedKO);
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
@@ -151,21 +158,26 @@ export default function FixtureLivePage() {
                 </p>
 
                 {/* Próximos / en vivo */}
-                {upcomingKO.length > 0 && (
+                {upcomingGroups.length > 0 && (
                   <div className="mb-10">
-                    <div className="flex items-center gap-3 mb-4">
-                      <h3 className="text-lg font-black uppercase text-white tracking-wide whitespace-nowrap">
+                    <div className="flex items-center gap-2 mb-5">
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                      <h3 className="text-sm font-black uppercase text-white tracking-[0.15em]">
                         Próximos y en vivo
                       </h3>
-                      <div className="flex-1 h-px bg-[#1f1f1f]" />
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {upcomingKO.map(({ m, phase }) => (
-                        <div key={m.id}>
-                          <div className="text-[10px] font-black uppercase tracking-wider text-yellow-500/70 mb-1 ml-1">
-                            {PHASE_LABEL[phase] ?? phase}
+                    <div className="space-y-7">
+                      {upcomingGroups.map((g) => (
+                        <div key={g.key}>
+                          <div className="flex items-center gap-3 mb-3">
+                            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-yellow-500">{g.label}</span>
+                            <div className="flex-1 h-px bg-gradient-to-r from-yellow-500/20 to-transparent" />
                           </div>
-                          <FixtureMatchRow match={m} />
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            {g.matches.map((m) => (
+                              <FixtureMatchRow key={m.id} match={m} />
+                            ))}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -173,21 +185,23 @@ export default function FixtureLivePage() {
                 )}
 
                 {/* Ya jugados */}
-                {playedKO.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-3 mb-4">
-                      <h3 className="text-base font-black uppercase text-gray-500 tracking-wide whitespace-nowrap">
-                        Ya jugados
-                      </h3>
-                      <div className="flex-1 h-px bg-[#1f1f1f]" />
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2 opacity-80">
-                      {playedKO.map(({ m, phase }) => (
-                        <div key={m.id}>
-                          <div className="text-[10px] font-black uppercase tracking-wider text-gray-600 mb-1 ml-1">
-                            {PHASE_LABEL[phase] ?? phase}
+                {playedGroups.length > 0 && (
+                  <div className="mt-12 pt-8 border-t border-[#181818]">
+                    <h3 className="text-sm font-black uppercase text-gray-500 tracking-[0.15em] mb-5">
+                      Ya jugados
+                    </h3>
+                    <div className="space-y-7 opacity-75">
+                      {playedGroups.map((g) => (
+                        <div key={g.key}>
+                          <div className="flex items-center gap-3 mb-3">
+                            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-600">{g.label}</span>
+                            <div className="flex-1 h-px bg-[#181818]" />
                           </div>
-                          <FixtureMatchRow match={m} />
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            {g.matches.map((m) => (
+                              <FixtureMatchRow key={m.id} match={m} />
+                            ))}
+                          </div>
                         </div>
                       ))}
                     </div>
