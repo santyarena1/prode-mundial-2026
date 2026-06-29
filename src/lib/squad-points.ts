@@ -136,7 +136,6 @@ export async function calculateSquadMemberPoints(memberId: string): Promise<numb
     QUARTER_FINALS: "QUARTER_FINALS",
     SEMI_FINALS: "SEMI_FINALS",
     CHAMPION: "CHAMPION",
-    RUNNER_UP: "RUNNER_UP",
   };
 
   const allMatches = await prisma.match.findMany({
@@ -152,9 +151,6 @@ export async function calculateSquadMemberPoints(memberId: string): Promise<numb
     if (winner) winnersByPhase[m.phase].add(winner);
   }
 
-  let championPredId: string | null = null;
-  let runnerUpPredId: string | null = null;
-
   for (const bp of bracketPreds) {
     if (!bp.predictedTeamId) continue;
     const ruleKey = phaseRuleMap[bp.phase];
@@ -166,26 +162,10 @@ export async function calculateSquadMemberPoints(memberId: string): Promise<numb
       pts = rules[ruleKey] ?? 0;
     }
 
-    if (bp.phase === "CHAMPION") championPredId = bp.predictedTeamId;
-    if (bp.phase === "RUNNER_UP") runnerUpPredId = bp.predictedTeamId;
-
     if (bp.pointsEarned !== pts) {
       await prisma.squadBracketPrediction.update({ where: { id: bp.id }, data: { pointsEarned: pts } });
     }
     total += pts;
-  }
-
-  // Final exact bonus
-  if (championPredId && runnerUpPredId) {
-    const finalMatches = allMatches.filter((m) => m.phase === "CHAMPION");
-    if (finalMatches.length > 0) {
-      const fm = finalMatches[0];
-      const winner = fm.homeScore! > fm.awayScore! ? fm.homeTeamId : fm.awayTeamId;
-      const loser = fm.homeScore! > fm.awayScore! ? fm.awayTeamId : fm.homeTeamId;
-      if (championPredId === winner && runnerUpPredId === loser) {
-        total += rules.FINAL_EXACT ?? 15000;
-      }
-    }
   }
 
   await prisma.squadMember.update({ where: { id: memberId }, data: { totalPoints: total } });

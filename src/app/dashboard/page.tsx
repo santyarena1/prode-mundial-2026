@@ -9,6 +9,7 @@ import {
   Clock, Shuffle, Package, XCircle, Users, X, Ticket, MessageCircle, Copy,
 } from "lucide-react";
 import { VirtualAlbumModal } from "@/components/dashboard/VirtualAlbumModal";
+import { BracketModeModal } from "@/components/dashboard/BracketModeModal";
 import { SponsorCTA } from "@/components/home/SponsorCTA";
 import { EarlyBirdModal } from "@/components/home/EarlyBirdModal";
 import { Navbar } from "@/components/layout/Navbar";
@@ -30,6 +31,8 @@ interface UserData {
   spentPoints: number;
   earlyBirdGranted: boolean;
   earlyBirdEligible?: boolean;
+  bracketMode?: string | null;
+  officialFromPhase?: string | null;
 }
 
 interface RankingUser {
@@ -206,17 +209,23 @@ export default function DashboardPage() {
         const meData = await meRes.json();
         setUser(meData.user);
 
-        if (meData.user.earlyBirdEligible && !meData.user.earlyBirdGranted) {
-          // Eligible but not yet claimed — show every visit until claimed
-          setEarlyBirdMode("claim");
-          setShowEarlyBird(true);
-        } else {
-          // Show welcome raffle modal once for all registered users
-          const shownKey = `raffleWelcomeShown_${meData.user.id}`;
-          if (!localStorage.getItem(shownKey)) {
-            setEarlyBirdMode("confirmed");
+        // Si el usuario todavía no eligió modo de llaves, el modal de modo tiene
+        // prioridad: no mostramos el de early bird/sorteo encima.
+        const modeChosen = meData.user.bracketMode != null;
+
+        if (modeChosen) {
+          if (meData.user.earlyBirdEligible && !meData.user.earlyBirdGranted) {
+            // Eligible but not yet claimed — show every visit until claimed
+            setEarlyBirdMode("claim");
             setShowEarlyBird(true);
-            localStorage.setItem(shownKey, "1");
+          } else {
+            // Show welcome raffle modal once for all registered users
+            const shownKey = `raffleWelcomeShown_${meData.user.id}`;
+            if (!localStorage.getItem(shownKey)) {
+              setEarlyBirdMode("confirmed");
+              setShowEarlyBird(true);
+              localStorage.setItem(shownKey, "1");
+            }
           }
         }
 
@@ -877,6 +886,18 @@ export default function DashboardPage() {
       <Footer />
 
       <VirtualAlbumModal open={albumModalOpen} onClose={() => setAlbumModalOpen(false)} />
+
+      {/* Modal forzado: elección de modo de llaves (se muestra hasta que el usuario elige) */}
+      {user && (user.bracketMode === null || user.bracketMode === undefined) && (
+        <BracketModeModal
+          onChosen={(mode, data) => {
+            setUser((u) =>
+              u ? { ...u, bracketMode: mode, officialFromPhase: data.officialFromPhase ?? null } : u
+            );
+            if (mode === "OFFICIAL") router.push("/predictions");
+          }}
+        />
+      )}
       {showEarlyBird && (
         <EarlyBirdModal
           mode={earlyBirdMode}

@@ -82,6 +82,7 @@ interface Match {
   awayPlaceholder?: string;
   homeScore?: number;
   awayScore?: number;
+  winnerTeamId?: string | null;
   group?: { id: string; name: string };
 }
 
@@ -140,9 +141,19 @@ export default function PredictionsPage() {
   const [savedScores, setSavedScores] = useState<Record<string, { home: number; away: number }>>({});
   const [pendingBracketScores, setPendingBracketScores] = useState<Record<string, { home?: number; away?: number }>>({});
   const [savedBracketScores, setSavedBracketScores] = useState<Record<string, { home: number; away: number }>>({});
+
+  // Modo de llaves del usuario (Resultados Oficiales)
+  const [bracketMode, setBracketMode] = useState<string | null>(null);
+  const [officialFromPhase, setOfficialFromPhase] = useState<string | null>(null);
+  // Partidos reales de eliminatorias (para el modo oficial), por bracket phase key
+  const [officialMatches, setOfficialMatches] = useState<Record<string, Match[]>>({});
   const [showHardcoreSpotlight, setShowHardcoreSpotlight] = useState(false);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [pendingNavUrl, setPendingNavUrl] = useState<string | null>(null);
+
+  // Estado real del torneo por fase (para habilitar fases por estado real)
+  const [tournamentPhases, setTournamentPhases] =
+    useState<Record<string, { started: boolean; finished: boolean }> | undefined>(undefined);
 
   // Team selection modal for bracket picks
   const [selectionModal, setSelectionModal] = useState<{ phase: string; slot: string } | null>(null);
@@ -160,15 +171,44 @@ export default function PredictionsPage() {
       if (!meRes.ok) { router.replace("/login"); return; }
       const meData = await meRes.json();
       if (meData.user?.hardcoreMode) setHardcoreMode(true);
+      setBracketMode(meData.user?.bracketMode ?? null);
+      setOfficialFromPhase(meData.user?.officialFromPhase ?? null);
 
-      const [groupsRes, predRes, groupPredRes, bracketRes, changeRes, bannerRes] = await Promise.all([
+      const [groupsRes, predRes, groupPredRes, bracketRes, changeRes, bannerRes, phasesRes] = await Promise.all([
         fetch("/api/public/groups"),
         apiFetch("/api/participant/predictions"),
         apiFetch("/api/participant/group-predictions"),
         apiFetch("/api/participant/bracket-predictions"),
         apiFetch("/api/participant/prediction-change"),
         fetch("/api/public/sponsor-banners"),
+        fetch("/api/public/tournament-phases"),
       ]);
+
+      if (phasesRes.ok) {
+        const data = await phasesRes.json();
+        if (data.phases) setTournamentPhases(data.phases);
+      }
+
+      // Fixture real de eliminatorias (para el modo Resultados Oficiales).
+      try {
+        const fixtureRes = await fetch("/api/public/fixture");
+        if (fixtureRes.ok) {
+          const fx = await fixtureRes.json();
+          const byPhase: Record<string, Match[]> = {};
+          for (const block of fx.fixture || []) {
+            if (block.phase === "GROUP_STAGE") continue;
+            // Match.phase "FINAL" se mapea al bracket phase "CHAMPION".
+            const key = block.phase === "FINAL" ? "CHAMPION" : block.phase;
+            byPhase[key] = (block.matches || []).sort((a: Match, b: Match) => {
+              const ta = a.startDate ? new Date(a.startDate).getTime() : Number.MAX_SAFE_INTEGER;
+              const tb = b.startDate ? new Date(b.startDate).getTime() : Number.MAX_SAFE_INTEGER;
+              if (ta !== tb) return ta - tb;
+              return parseInt(a.matchCode, 10) - parseInt(b.matchCode, 10);
+            });
+          }
+          setOfficialMatches(byPhase);
+        }
+      } catch { /* el modo oficial degrada a "esperando resultados" */ }
 
       const sp: Record<string, Outcome> = {};
       const sg: Record<string, { first?: string; second?: string; third?: string }> = {};
@@ -319,6 +359,7 @@ export default function PredictionsPage() {
         matches: g.matches.map((m) => ({
           id: m.id,
           phase: m.phase,
+          status: m.status,
           homeTeamId: m.homeTeam?.id ?? null,
           awayTeamId: m.awayTeam?.id ?? null,
         })),
@@ -357,6 +398,7 @@ export default function PredictionsPage() {
       matches: g.matches.map((m) => ({
         id: m.id,
         phase: m.phase,
+        status: m.status,
         homeTeamId: m.homeTeam?.id ?? null,
         awayTeamId: m.awayTeam?.id ?? null,
       })),
@@ -368,6 +410,7 @@ export default function PredictionsPage() {
     pendingBracket,
     thirdSlotAssignments,
     savedScores,
+    tournamentPhases,
   };
 
   const displayBracketCtx: BracketContext = {
@@ -377,12 +420,12 @@ export default function PredictionsPage() {
 
   const isPhaseUnlocked = useCallback(
     (phaseKey: string) => checkPhaseUnlocked(phaseKey, bracketCtx),
-    [groups, allTeams, effectivePreds, savedGroupPreds, savedBracket]
+    [groups, allTeams, effectivePreds, savedGroupPreds, savedBracket, tournamentPhases]
   );
 
   const getPhaseBlockReason = useCallback(
     (phaseKey: string) => getPhaseUnlockBlockReason(phaseKey, bracketCtx),
-    [groups, allTeams, effectivePreds, savedGroupPreds, savedBracket]
+    [groups, allTeams, effectivePreds, savedGroupPreds, savedBracket, tournamentPhases]
   );
 
   const getEligibleTeams = useCallback(
@@ -621,6 +664,12 @@ export default function PredictionsPage() {
         if (!p || !slot) return false;
         const savedId = savedBracket[key];
         if (savedId && !canReplaceBracketPick(p, slot, savedId, bracketCtx)) return false;
+        // CHAMPION no está en BRACKET_MATCHES (no es un cruce): se valida contra
+        // los finalistas elegibles. Sin esto, el pick del campeón se descartaba
+        // del guardado y "se perdía" al recargar.
+        if (p === "CHAMPION") {
+          return getEligibleChampionTeams(bracketCtx).some((t) => t.id === teamId);
+        }
         const matchNum = parseInt(normalizeMatchSlot(p, slot), 10);
         const match = (BRACKET_MATCHES[p] ?? []).find((m) => m.matchNum === matchNum);
         if (!match) return false;
@@ -760,6 +809,69 @@ export default function PredictionsPage() {
     if (ok > 0) toast.success(`${ok} selección${ok > 1 ? "es" : ""} guardada${ok > 1 ? "s" : ""} ✓`);
     setSavingBracket(false);
   }, [pendingBracket, savedBracket, savedBracketScores, activeElimTab, hardcoreMode, pendingBracketScores, resolveSource, bracketCtx, thirdSlotAssignments]);
+
+  // ── Modo Resultados Oficiales ────────────────────────────────────────────
+  const officialModeActive = bracketMode === "OFFICIAL" && !!officialFromPhase;
+
+  const isOfficialPhaseKey = useCallback(
+    (phaseKey: string) => {
+      if (!officialModeActive) return false;
+      const fromIdx = ELIMINATORIAS_PHASES.findIndex((p) => p.key === officialFromPhase);
+      const idx = ELIMINATORIAS_PHASES.findIndex((p) => p.key === phaseKey);
+      return fromIdx >= 0 && idx >= fromIdx;
+    },
+    [officialModeActive, officialFromPhase]
+  );
+
+  // Pick de un partido real (modo oficial): elige el ganador.
+  const handlePickOfficial = useCallback((phase: string, matchCode: string, teamId: string) => {
+    const key = `${phase}:${matchCode}`;
+    if (savedBracket[key]) return; // ya confirmado/bloqueado
+    setBracketFieldErrors((prev) => { const n = { ...prev }; delete n[key]; return n; });
+    setPendingBracket((prev) => {
+      if (prev[key] === teamId) { const n = { ...prev }; delete n[key]; return n; }
+      return { ...prev, [key]: teamId };
+    });
+  }, [savedBracket]);
+
+  // Guarda las predicciones oficiales pendientes de la fase activa.
+  const handleSaveOfficialPhase = useCallback(async () => {
+    const phase = activeElimTab;
+    const matches = officialMatches[phase] ?? [];
+    setSavingBracket(true);
+    let ok = 0;
+    for (const m of matches) {
+      const key = `${phase}:${m.matchCode}`;
+      const teamId = pendingBracket[key];
+      if (!teamId || savedBracket[key]) continue;
+      const score = hardcoreMode ? pendingBracketScores[key] : undefined;
+      const scorePayload =
+        score?.home !== undefined && score?.away !== undefined
+          ? { predictedHomeScore: score.home, predictedAwayScore: score.away }
+          : {};
+      try {
+        const res = await apiFetch("/api/participant/bracket-predictions", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phase, matchSlot: m.matchCode, predictedTeamId: teamId, ...scorePayload }),
+        });
+        if (res.ok) {
+          setSavedBracket((prev) => ({ ...prev, [key]: teamId }));
+          setPendingBracket((prev) => { const n = { ...prev }; delete n[key]; return n; });
+          if (scorePayload.predictedHomeScore !== undefined) {
+            setSavedBracketScores((prev) => ({ ...prev, [key]: { home: score!.home!, away: score!.away! } }));
+            setPendingBracketScores((prev) => { const n = { ...prev }; delete n[key]; return n; });
+          }
+          ok++;
+        } else {
+          const d = await res.json();
+          setBracketFieldErrors((prev) => ({ ...prev, [key]: d.error || "Error al guardar" }));
+          toast.error(d.error || "Error al guardar", { duration: 6000 });
+        }
+      } catch { toast.error("Error de conexión"); }
+    }
+    if (ok > 0) toast.success(`${ok} predicción${ok > 1 ? "es" : ""} guardada${ok > 1 ? "s" : ""} ✓`);
+    setSavingBracket(false);
+  }, [activeElimTab, officialMatches, pendingBracket, savedBracket, hardcoreMode, pendingBracketScores]);
 
   const handleToggleHardcore = useCallback(async () => {
     setTogglingHardcore(true);
@@ -932,6 +1044,7 @@ export default function PredictionsPage() {
     k.startsWith(`${activeElimTab}:`)
   ).length;
   const currentPhaseUnlocked = isPhaseUnlocked(activeElimTab);
+  const showOfficialPhase = isOfficialPhaseKey(activeElimTab);
 
   // Ensure active elim tab is always an unlocked phase
   const eligibleTeams = selectionModal ? getEligibleTeams(selectionModal.phase) : [];
@@ -1354,20 +1467,25 @@ export default function PredictionsPage() {
                       const realSecond = rSorted[1]?.[0];
                       const teamById = new Map(group.teams.map(t => [t.id, t]));
 
+                      // Use the visual table standings as the predicted positions
+                      // (same source as the scoring engine — derived from match predictions)
+                      const predFirst  = sorted[0]?.team.id ?? null;
+                      const predSecond = sorted[1]?.team.id ?? null;
+
                       type PredRow = { pos: string; teamName: string; label: string; pts: number; ok: boolean };
                       let totalPts = 0;
                       const rows: PredRow[] = [];
 
-                      if (savedGP.first) {
-                        const t = teamById.get(savedGP.first);
-                        if (savedGP.first === realFirst) { rows.push({ pos: "1°", teamName: t?.name ?? "?", label: "exacto", pts: 2000, ok: true }); totalPts += 2000; }
-                        else if (savedGP.first === realSecond) { rows.push({ pos: "1°", teamName: t?.name ?? "?", label: "clasificó (no exacto)", pts: 1500, ok: true }); totalPts += 1500; }
+                      if (predFirst) {
+                        const t = teamById.get(predFirst);
+                        if (predFirst === realFirst) { rows.push({ pos: "1°", teamName: t?.name ?? "?", label: "exacto", pts: 2000, ok: true }); totalPts += 2000; }
+                        else if (predFirst === realSecond) { rows.push({ pos: "1°", teamName: t?.name ?? "?", label: "clasificó (no exacto)", pts: 1500, ok: true }); totalPts += 1500; }
                         else { rows.push({ pos: "1°", teamName: t?.name ?? "?", label: "no clasificó", pts: 0, ok: false }); }
                       }
-                      if (savedGP.second) {
-                        const t = teamById.get(savedGP.second);
-                        if (savedGP.second === realSecond) { rows.push({ pos: "2°", teamName: t?.name ?? "?", label: "exacto", pts: 2000, ok: true }); totalPts += 2000; }
-                        else if (savedGP.second === realFirst) { rows.push({ pos: "2°", teamName: t?.name ?? "?", label: "clasificó (no exacto)", pts: 1500, ok: true }); totalPts += 1500; }
+                      if (predSecond) {
+                        const t = teamById.get(predSecond);
+                        if (predSecond === realSecond) { rows.push({ pos: "2°", teamName: t?.name ?? "?", label: "exacto", pts: 2000, ok: true }); totalPts += 2000; }
+                        else if (predSecond === realFirst) { rows.push({ pos: "2°", teamName: t?.name ?? "?", label: "clasificó (no exacto)", pts: 1500, ok: true }); totalPts += 1500; }
                         else { rows.push({ pos: "2°", teamName: t?.name ?? "?", label: "no clasificó", pts: 0, ok: false }); }
                       }
 
@@ -1485,6 +1603,29 @@ export default function PredictionsPage() {
                       </button>
                     )}
                   </div>
+                ) : showOfficialPhase ? (
+                  <OfficialBracketPhase
+                    phase={activeElimTab}
+                    phaseLabel={currentPhase.fullLabel}
+                    phaseIcon={currentPhase.icon}
+                    matches={officialMatches[activeElimTab] ?? []}
+                    savedBracket={savedBracket}
+                    pendingBracket={pendingBracket}
+                    savedScores={savedBracketScores}
+                    pendingScores={pendingBracketScores}
+                    fieldErrors={bracketFieldErrors}
+                    hardcoreMode={hardcoreMode}
+                    saving={savingBracket}
+                    onPick={handlePickOfficial}
+                    onScore={(matchCode, side, val) => {
+                      const key = `${activeElimTab}:${matchCode}`;
+                      setPendingBracketScores((prev) => ({
+                        ...prev,
+                        [key]: { ...prev[key], [side]: val },
+                      }));
+                    }}
+                    onSave={handleSaveOfficialPhase}
+                  />
                 ) : (
                   <>
                     {/* Phase header */}
@@ -1501,7 +1642,7 @@ export default function PredictionsPage() {
                         </div>
                         <p className="text-gray-600 text-xs mt-0.5">
                           {currentPhase.key === "CHAMPION"
-                            ? "Campeón: 30.000 pts · Subcampeón: 15.000 pts · Ambos exactos: +40.000 pts"
+                            ? "Acertar al campeón: 10.000 pts"
                             : `${savedInPhase} guardados · ${pendingInPhase} listos · ${Math.max(0, draftInPhase)} incompletos · ${emptyInPhase} sin elegir`}
                         </p>
                       </div>
@@ -1954,11 +2095,11 @@ export default function PredictionsPage() {
                         icon: "🏆",
                         title: "Eliminatorias",
                         rows: [
-                          { label: "Ronda de 32",  pts: "2.000 pts" },
-                          { label: "Octavos",      pts: "3.500 pts" },
-                          { label: "Cuartos",      pts: "6.000 pts" },
-                          { label: "Semifinal",    pts: "10.000 pts" },
-                          { label: "Campeón 🏆",   pts: "30.000 pts" },
+                          { label: "Ronda de 32",  pts: "1.500 pts" },
+                          { label: "Octavos",      pts: "2.000 pts" },
+                          { label: "Cuartos",      pts: "4.000 pts" },
+                          { label: "Semifinal",    pts: "6.000 pts" },
+                          { label: "Campeón 🏆",   pts: "10.000 pts" },
                         ],
                         note: null,
                       },
@@ -2124,13 +2265,11 @@ const POINTS_TABLE = [
     { label: "Ejemplo: Argentina 1° exacto",        pts: "2.000",  note: "1.500 + 500 = 2.000 pts" },
   ]},
   { section: "Eliminatorias", items: [
-    { label: "Equipo que pasa en Ronda de 32",      pts: "2.000",  note: "× 32 equipos" },
-    { label: "Equipo que pasa en Octavos",          pts: "3.500",  note: "× 16 equipos" },
-    { label: "Equipo que pasa en Cuartos",          pts: "6.000",  note: "× 8 equipos" },
-    { label: "Equipo que pasa en Semifinal",        pts: "10.000", note: "× 4 equipos" },
-    { label: "Acertar al subcampeón (finalista)",   pts: "15.000", note: "" },
-    { label: "Acertar al campeón",                  pts: "30.000", note: "" },
-    { label: "Campeón + subcampeón exactos",        pts: "+40.000",note: "bonus adicional" },
+    { label: "Ganador en Ronda de 32",   pts: "1.500",  note: "× 16 partidos" },
+    { label: "Ganador en Octavos",       pts: "2.000",  note: "× 8 partidos" },
+    { label: "Ganador en Cuartos",       pts: "4.000",  note: "× 4 partidos" },
+    { label: "Ganador en Semifinal",     pts: "6.000",  note: "× 2 partidos" },
+    { label: "Acertar al campeón",       pts: "10.000", note: "" },
   ]},
 ];
 
@@ -2187,7 +2326,7 @@ function PointsAndAchievementsModal({
             </button>
             <button onClick={() => setTab("logros")}
               className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${tab === "logros" ? "bg-red-600 text-white" : "text-gray-500 hover:text-gray-300"}`}>
-              Logros ({LOGROS.length})
+              Logros
             </button>
           </div>
 
@@ -2239,8 +2378,8 @@ function PointsAndAchievementsModal({
                 {LOGROS.map(logro => {
                   const progress = getProgress(logro);
                   const current = getCurrent(logro);
-                  // Groups logro: cannot determine client-side if positions are exact — never show as "done"
-                  const done = logro.type !== "groups" && progress >= 1;
+                  // Logros are only awarded after phase closes — never show as "done" client-side
+                  const done = false;
                   return (
                     <div key={logro.name} className={`p-4 rounded-xl border transition-colors ${done ? "bg-yellow-500/5 border-yellow-500/20" : "bg-[#141414] border-[#1e1e1e]"}`}>
                       <div className="flex items-start gap-3 mb-3">
@@ -3446,6 +3585,133 @@ function BracketTeamSide({ team, isLocked, isPending, onOpen, changesRemaining, 
         </button>
       )}
     </div>
+  );
+}
+
+// ─── Modo Resultados Oficiales: llaves con cruces reales ───────────────────────
+
+function OfficialBracketPhase({
+  phase, phaseLabel, phaseIcon, matches, savedBracket, pendingBracket,
+  savedScores, pendingScores, fieldErrors, hardcoreMode, saving, onPick, onScore, onSave,
+}: {
+  phase: string;
+  phaseLabel: string;
+  phaseIcon: string;
+  matches: Match[];
+  savedBracket: Record<string, string>;
+  pendingBracket: Record<string, string>;
+  savedScores: Record<string, { home: number; away: number }>;
+  pendingScores: Record<string, { home?: number; away?: number }>;
+  fieldErrors: Record<string, string>;
+  hardcoreMode: boolean;
+  saving: boolean;
+  onPick: (phase: string, matchCode: string, teamId: string) => void;
+  onScore: (matchCode: string, side: "home" | "away", val: number) => void;
+  onSave: () => void;
+}) {
+  const pendingCount = matches.filter((m) => {
+    const key = `${phase}:${m.matchCode}`;
+    return pendingBracket[key] && !savedBracket[key];
+  }).length;
+
+  return (
+    <>
+      <div className="flex items-center gap-4 mb-4">
+        <div className="w-12 h-12 rounded-2xl bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center text-2xl flex-shrink-0">{phaseIcon}</div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-white font-black text-lg leading-tight">{phaseLabel}</h3>
+            <span className="bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">1.500 / 2.000 pts</span>
+          </div>
+          <p className="text-gray-600 text-xs mt-0.5">Resultados Oficiales · elegí el ganador de cada partido</p>
+        </div>
+      </div>
+
+      {matches.length === 0 ? (
+        <div className="text-center py-12 text-gray-500 text-sm">
+          Todavía no están definidos los partidos de esta fase. Volvé cuando termine la fase anterior.
+        </div>
+      ) : (
+        <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
+          {matches.map((m) => {
+            const key = `${phase}:${m.matchCode}`;
+            const home = m.homeTeam;
+            const away = m.awayTeam;
+            const ready = !!home && !!away;
+            const started = m.status === "live" || m.status === "finished";
+            const finished = m.status === "finished";
+            const savedId = savedBracket[key];
+            const pendingId = pendingBracket[key];
+            const pickedId = pendingId ?? savedId;
+            const locked = !!savedId && !pendingId;
+            const err = fieldErrors[key];
+            const score = pendingScores[key] ?? savedScores[key];
+
+            return (
+              <div key={m.matchCode} className={`rounded-2xl border p-3 ${err ? "border-red-500/50" : locked ? "border-green-600/30 bg-[#0c1207]" : "border-[#2a2a2a] bg-[#121212]"}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] text-gray-600 font-bold">P{m.matchCode} · {formatDate(m.startDate)}</span>
+                  {locked && <span className="text-[10px] text-green-500 font-bold flex items-center gap-1"><Lock className="w-3 h-3" /> Confirmado</span>}
+                  {finished && !locked && <span className="text-[10px] text-gray-500 font-bold">Finalizado</span>}
+                </div>
+
+                {!ready ? (
+                  <div className="text-center py-4 text-gray-600 text-xs">Esperando los equipos de la fase anterior…</div>
+                ) : (
+                  <div className="space-y-2">
+                    {[home!, away!].map((t) => {
+                      const isPicked = pickedId === t.id;
+                      const isRealWinner = finished && m.winnerTeamId === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          disabled={locked || started}
+                          onClick={() => onPick(phase, m.matchCode, t.id)}
+                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border transition ${
+                            isPicked ? "bg-yellow-500/15 border-yellow-500/50" : "bg-[#1a1a1a] border-[#2a2a2a] hover:border-[#444]"
+                          } ${(locked || started) ? "opacity-80 cursor-not-allowed" : ""}`}
+                        >
+                          {t.flagUrl
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img src={t.flagUrl} alt="" className="w-7 h-5 object-cover rounded" />
+                            : <span className="w-7 h-5 rounded bg-[#222] text-[9px] flex items-center justify-center text-gray-400">{t.code}</span>}
+                          <span className={`text-sm font-bold flex-1 text-left ${isPicked ? "text-yellow-300" : "text-white"}`}>{t.name}</span>
+                          {isRealWinner && <span className="text-[10px] text-green-500 font-bold">ganó</span>}
+                          {isPicked && <CheckCircle2 className="w-4 h-4 text-yellow-400" />}
+                        </button>
+                      );
+                    })}
+
+                    {hardcoreMode && !locked && !started && (
+                      <div className="flex items-center justify-center gap-2 pt-1">
+                        <input type="number" min={0} max={30} value={score?.home ?? ""} onChange={(e) => onScore(m.matchCode, "home", parseInt(e.target.value || "0", 10))}
+                          className="w-12 text-center bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg py-1 text-white text-sm" placeholder="0" />
+                        <span className="text-gray-600 text-xs">-</span>
+                        <input type="number" min={0} max={30} value={score?.away ?? ""} onChange={(e) => onScore(m.matchCode, "away", parseInt(e.target.value || "0", 10))}
+                          className="w-12 text-center bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg py-1 text-white text-sm" placeholder="0" />
+                      </div>
+                    )}
+
+                    {started && !finished && <p className="text-[11px] text-amber-500 text-center pt-1">El partido ya empezó</p>}
+                    {err && <p className="text-[11px] text-red-400 pt-1">{err}</p>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {pendingCount > 0 && (
+        <div className="sticky bottom-4 mt-4 flex justify-center">
+          <button onClick={onSave} disabled={saving}
+            className="px-8 py-3 bg-yellow-400 hover:bg-yellow-300 disabled:opacity-50 text-black font-black rounded-xl shadow-lg flex items-center gap-2">
+            <Save className="w-4 h-4" />
+            {saving ? "Guardando…" : `Guardar ${pendingCount} predicción${pendingCount > 1 ? "es" : ""}`}
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 

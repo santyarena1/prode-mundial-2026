@@ -18,6 +18,8 @@ interface Prize {
   requiredPoints: number;
   stock: number;
   prizeType: string;
+  isLastOne?: boolean;
+  isSoldOut?: boolean;
   sponsor?: Sponsor | null;
 }
 
@@ -111,12 +113,16 @@ export function PrizeDetailModal({ prize, user, redeeming, onClose, onRedeem }: 
               <span className="text-[10px] font-black uppercase tracking-widest text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full">
                 {PRIZE_TYPE_LABEL[prize.prizeType] ?? "Premio"}
               </span>
-              {prize.stock > 0 && (
+              {prize.isLastOne ? (
+                <span className="text-[10px] font-black uppercase tracking-widest text-orange-400 bg-orange-500/10 border border-orange-500/30 px-2 py-0.5 rounded-full">
+                  ¡Último disponible!
+                </span>
+              ) : prize.stock > 0 ? (
                 <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 bg-[#1a1a1a] border border-[#2a2a2a] px-2 py-0.5 rounded-full">
                   <Package className="w-2.5 h-2.5 inline mr-1" />
                   {prize.stock} disponibles
                 </span>
-              )}
+              ) : null}
               {prize.sponsor && (
                 <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 bg-[#1a1a1a] border border-[#2a2a2a] px-2 py-0.5 rounded-full">
                   por {prize.sponsor.name}
@@ -179,7 +185,14 @@ export function PrizeDetailModal({ prize, user, redeeming, onClose, onRedeem }: 
 
           {/* CTA fijo */}
           <div className="px-5 pt-3 flex-shrink-0 border-t border-[#1a1a1a]" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
-            {noStock === false ? (
+            {prize.isSoldOut ? (
+              <div className="space-y-2">
+                <Button variant="secondary" size="lg" className="w-full opacity-50" disabled>
+                  Sin stock disponible
+                </Button>
+                <p className="text-center text-gray-600 text-xs">Próximamente reingreso de stock</p>
+              </div>
+            ) : noStock === false ? (
               <Button variant="secondary" size="lg" className="w-full" disabled>
                 Sin stock disponible
               </Button>

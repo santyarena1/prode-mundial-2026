@@ -640,23 +640,44 @@ export default function MyPredictionsPage() {
                   const realSecond = rSorted[1]?.[0];
                   const teamById = new Map(g.teams.map(t => [t.id, t]));
 
+                  // Compute predicted standings from match predictions (same as scoring engine)
+                  const predStats: Record<string, { pts: number; gd: number; gf: number }> = {};
+                  for (const t of g.teams) predStats[t.id] = { pts: 0, gd: 0, gf: 0 };
+                  const predByMatchId = new Map(predictions.map(p => [p.matchId, p]));
+                  for (const m of gMatches) {
+                    if (!m.homeTeam?.id || !m.awayTeam?.id) continue;
+                    const pred = predByMatchId.get(m.id);
+                    if (!pred?.predictedOutcome) continue;
+                    const hId = m.homeTeam.id, aId = m.awayTeam.id;
+                    if (!predStats[hId]) predStats[hId] = { pts: 0, gd: 0, gf: 0 };
+                    if (!predStats[aId]) predStats[aId] = { pts: 0, gd: 0, gf: 0 };
+                    if (pred.predictedOutcome === "home") predStats[hId].pts += 3;
+                    else if (pred.predictedOutcome === "away") predStats[aId].pts += 3;
+                    else { predStats[hId].pts += 1; predStats[aId].pts += 1; }
+                    if (pred.predictedHomeScore != null && pred.predictedAwayScore != null) {
+                      predStats[hId].gd += pred.predictedHomeScore - pred.predictedAwayScore;
+                      predStats[aId].gd += pred.predictedAwayScore - pred.predictedHomeScore;
+                      predStats[hId].gf += pred.predictedHomeScore;
+                      predStats[aId].gf += pred.predictedAwayScore;
+                    }
+                  }
+                  const predSorted = Object.entries(predStats).sort(([, a], [, b]) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+                  const predFirst  = predSorted[0]?.[0] ?? null;
+                  const predSecond = predSorted[1]?.[0] ?? null;
+
                   type GPRow = { pos: string; team: Team | null | undefined; label: string; pts: number; ok: boolean };
                   const rows: GPRow[] = [];
-                  if (gp.firstTeamId) {
-                    const t = gp.firstTeam;
-                    if (gp.firstTeamId === realFirst) rows.push({ pos: "1°", team: t, label: "exacto", pts: 2000, ok: true });
-                    else if (gp.firstTeamId === realSecond) rows.push({ pos: "1°", team: t, label: "clasificó (no exacto)", pts: 1500, ok: true });
+                  if (predFirst) {
+                    const t = teamById.get(predFirst);
+                    if (predFirst === realFirst) rows.push({ pos: "1°", team: t, label: "exacto", pts: 2000, ok: true });
+                    else if (predFirst === realSecond) rows.push({ pos: "1°", team: t, label: "clasificó (no exacto)", pts: 1500, ok: true });
                     else rows.push({ pos: "1°", team: t, label: "no clasificó", pts: 0, ok: false });
                   }
-                  if (gp.secondTeamId) {
-                    const t = gp.secondTeam;
-                    if (gp.secondTeamId === realSecond) rows.push({ pos: "2°", team: t, label: "exacto", pts: 2000, ok: true });
-                    else if (gp.secondTeamId === realFirst) rows.push({ pos: "2°", team: t, label: "clasificó (no exacto)", pts: 1500, ok: true });
+                  if (predSecond) {
+                    const t = teamById.get(predSecond);
+                    if (predSecond === realSecond) rows.push({ pos: "2°", team: t, label: "exacto", pts: 2000, ok: true });
+                    else if (predSecond === realFirst) rows.push({ pos: "2°", team: t, label: "clasificó (no exacto)", pts: 1500, ok: true });
                     else rows.push({ pos: "2°", team: t, label: "no clasificó", pts: 0, ok: false });
-                  }
-                  if (gp.thirdTeamId) {
-                    const t = gp.thirdTeam;
-                    rows.push({ pos: "3°", team: t, label: "mejor 3°", pts: gp.pointsEarned > (rows.reduce((s, r) => s + r.pts, 0)) ? gp.pointsEarned - rows.reduce((s, r) => s + r.pts, 0) : 0, ok: gp.pointsEarned > rows.reduce((s, r) => s + r.pts, 0) });
                   }
 
                   const allOk = rows.every(r => r.ok);

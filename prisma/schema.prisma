@@ -27,6 +27,13 @@ model User {
   earlyBirdGranted           Boolean  @default(false)
   predictionChangesRemaining Int      @default(0)
   hardcoreMode               Boolean  @default(false)
+  // Modo de llaves: null = el usuario todavía no eligió (se le muestra el modal),
+  // "CLASSIC" = bracket armado con sus predicciones, "OFFICIAL" = bracket con resultados reales.
+  bracketMode                String?
+  // Fase (key de eliminatoria) a partir de la cual corre el modo OFICIAL.
+  // Las fases anteriores se siguen puntuando con las reglas clásicas.
+  officialFromPhase          String?
+  bracketModeChosenAt        DateTime?
   isBlocked              Boolean  @default(false)
   emailUnsubscribed      Boolean  @default(false)
   acceptedTerms          Boolean  @default(false)

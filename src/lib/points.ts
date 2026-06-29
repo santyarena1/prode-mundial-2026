@@ -1,4 +1,5 @@
 import prisma from "./db";
+import { BRACKET_PHASE_ORDER } from "./tournament-phase";
 
 export const DEFAULT_POINT_RULES = {
   GROUP_SIGN:       { label: "Acertar resultado (ganador/perdedor)",       points: 500 },
@@ -7,13 +8,14 @@ export const DEFAULT_POINT_RULES = {
   GROUP_CLASSIFIED:       { label: "Acertar equipo clasificado 1° o 2°",       points: 1500 },
   GROUP_POSITION:         { label: "Acertar posición exacta en grupo (1° o 2°)", points: 500 },
   GROUP_THIRD_QUALIFIED:  { label: "Acertar 3° que avanza como mejor tercero",   points: 800 },
-  ROUND_OF_32:      { label: "Acertar equipo que pasa en Ronda de 32",     points: 2000 },
-  ROUND_OF_16:      { label: "Acertar equipo que pasa en Octavos",         points: 3500 },
-  QUARTER_FINALS:   { label: "Acertar equipo que pasa en Cuartos",         points: 6000 },
-  SEMI_FINALS:      { label: "Acertar equipo que pasa en Semifinal",       points: 10000 },
-  CHAMPION:         { label: "Acertar campeón",                            points: 30000 },
-  RUNNER_UP:        { label: "Acertar finalista (subcampeón)",             points: 15000 },
-  FINAL_EXACT:      { label: "Acertar campeón + subcampeón (bonus extra)", points: 40000 },
+  ROUND_OF_32:      { label: "Acertar ganador en Ronda de 32",            points: 1500 },
+  ROUND_OF_16:      { label: "Acertar ganador en Octavos",                points: 2000 },
+  QUARTER_FINALS:   { label: "Acertar ganador en Cuartos",                points: 4000 },
+  SEMI_FINALS:      { label: "Acertar ganador en Semifinal",              points: 6000 },
+  CHAMPION:         { label: "Acertar campeón",                           points: 10000 },
+  // Modo Resultados Oficiales (plano en todas las fases eliminatorias).
+  OFFICIAL_WINNER:  { label: "Acertar ganador (Resultados Oficiales)",    points: 1500 },
+  OFFICIAL_EXACT:   { label: "Acertar resultado exacto (Resultados Oficiales)", points: 2000 },
   SPECIAL_CHAMPION:    { label: "Campeón predicho antes del torneo",       points: 60 },
   SPECIAL_TOP_SCORER:  { label: "Goleador del torneo",                     points: 40 },
   SPECIAL_REVELATION:  { label: "Selección revelación",                    points: 20 },
@@ -180,6 +182,9 @@ export async function calculateUserPoints(userId: string): Promise<number> {
   }
 
   // ── 2. Group classification predictions ─────────────────────────────────
+  // Build a lookup of the user's locked predictions by matchId
+  const predByMatchId = new Map(predictions.map(p => [p.matchId, p]));
+
   const groupPredictions = await prisma.groupPrediction.findMany({
     where: { userId },
     include: {
@@ -187,7 +192,7 @@ export async function calculateUserPoints(userId: string): Promise<number> {
         include: {
           teams: { select: { id: true } },
           matches: {
-            select: { phase: true, status: true, homeTeamId: true, awayTeamId: true, homeScore: true, awayScore: true },
+            select: { id: true, phase: true, status: true, homeTeamId: true, awayTeamId: true, homeScore: true, awayScore: true },
           },
         },
       },
@@ -203,31 +208,61 @@ export async function calculateUserPoints(userId: string): Promise<number> {
       continue;
     }
 
-    const { first, second, third } = calculateGroupQualifiers(gp.group.teams, gp.group.matches);
+    // Compute predicted standings from the user's match predictions (same logic as the UI)
+    // so that what gives points always matches what's shown in the standings table.
+    const predStats: Record<string, { pts: number; gd: number; gf: number }> = {};
+    for (const t of gp.group.teams) predStats[t.id] = { pts: 0, gd: 0, gf: 0 };
+
+    let allPredicted = true;
+    for (const m of groupMatches) {
+      if (!m.homeTeamId || !m.awayTeamId) continue;
+      const pred = predByMatchId.get(m.id);
+      if (!pred?.predictedOutcome) { allPredicted = false; break; }
+
+      if (pred.predictedOutcome === "home") predStats[m.homeTeamId].pts += 3;
+      else if (pred.predictedOutcome === "away") predStats[m.awayTeamId].pts += 3;
+      else { predStats[m.homeTeamId].pts += 1; predStats[m.awayTeamId].pts += 1; }
+
+      if (pred.predictedHomeScore != null && pred.predictedAwayScore != null) {
+        predStats[m.homeTeamId].gd += pred.predictedHomeScore - pred.predictedAwayScore;
+        predStats[m.awayTeamId].gd += pred.predictedAwayScore - pred.predictedHomeScore;
+        predStats[m.homeTeamId].gf += pred.predictedHomeScore;
+        predStats[m.awayTeamId].gf += pred.predictedAwayScore;
+      }
+    }
+
+    if (!allPredicted) {
+      if (gp.pointsEarned !== 0) await prisma.groupPrediction.update({ where: { id: gp.id }, data: { pointsEarned: 0 } });
+      continue;
+    }
+
+    const predSorted = Object.entries(predStats)
+      .sort(([, a], [, b]) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+    const predFirst  = predSorted[0]?.[0] ?? null;
+    const predSecond = predSorted[1]?.[0] ?? null;
+
+    const { first, second } = calculateGroupQualifiers(gp.group.teams, gp.group.matches);
     let earned = 0;
     let positionPerfect = true;
 
-    if (gp.firstTeamId) {
-      if (gp.firstTeamId === first || gp.firstTeamId === second) {
+    if (predFirst) {
+      if (predFirst === first || predFirst === second) {
         earned += pts("GROUP_CLASSIFIED");
-        if (gp.firstTeamId === first) earned += pts("GROUP_POSITION");
+        if (predFirst === first) earned += pts("GROUP_POSITION");
         else positionPerfect = false;
       } else positionPerfect = false;
-    }
+    } else positionPerfect = false;
 
-    if (gp.secondTeamId) {
-      if (gp.secondTeamId === first || gp.secondTeamId === second) {
+    if (predSecond) {
+      if (predSecond === first || predSecond === second) {
         earned += pts("GROUP_CLASSIFIED");
-        if (gp.secondTeamId === second) earned += pts("GROUP_POSITION");
+        if (predSecond === second) earned += pts("GROUP_POSITION");
         else positionPerfect = false;
       } else positionPerfect = false;
-    }
+    } else positionPerfect = false;
 
-    if (gp.thirdTeamId && third && gp.thirdTeamId === third) {
-      earned += pts("GROUP_THIRD_QUALIFIED");
-    }
-
-    if (positionPerfect && gp.firstTeamId && gp.secondTeamId) {
+    // 3° no da puntos de clasificación
+    if (positionPerfect && predFirst && predSecond) {
       achievementStats.groupsPositionPerfect++;
     }
 
@@ -240,10 +275,30 @@ export async function calculateUserPoints(userId: string): Promise<number> {
   // ── 3. Bracket predictions ───────────────────────────────────────────────
   const bracketPredictions = await prisma.bracketPrediction.findMany({ where: { userId } });
 
+  // Modo de llaves del usuario: en OFICIAL las fases >= officialFromPhase se
+  // puntúan plano (1500 ganador / 2000 exacto); las anteriores siguen clásicas.
+  const bracketModeUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { bracketMode: true, officialFromPhase: true },
+  });
+  const officialFromIdx =
+    bracketModeUser?.bracketMode === "OFFICIAL" && bracketModeUser.officialFromPhase
+      ? BRACKET_PHASE_ORDER.indexOf(
+          bracketModeUser.officialFromPhase as (typeof BRACKET_PHASE_ORDER)[number]
+        )
+      : -1;
+
   // Pre-fetch all finished matches indexed by matchCode to avoid N+1
   const finishedMatches = await prisma.match.findMany({
     where: { status: "finished" },
-    select: { matchCode: true, winnerTeamId: true, homeTeamId: true, awayTeamId: true },
+    select: {
+      matchCode: true,
+      winnerTeamId: true,
+      homeTeamId: true,
+      awayTeamId: true,
+      homeScore: true,
+      awayScore: true,
+    },
   });
   const matchByCode = new Map(finishedMatches.map((m) => [m.matchCode, m]));
 
@@ -253,9 +308,6 @@ export async function calculateUserPoints(userId: string): Promise<number> {
     QUARTER_FINALS: "QUARTER_FINALS",
     SEMI_FINALS:    "SEMI_FINALS",
   };
-
-  let finalChampionCorrect = false;
-  let finalRunnerUpCorrect = false;
 
   for (const bp of bracketPredictions) {
     if (!bp.predictedTeamId) {
@@ -274,16 +326,30 @@ export async function calculateUserPoints(userId: string): Promise<number> {
 
     let earned = 0;
 
-    if (bp.phase === "CHAMPION" && match.winnerTeamId) {
+    // Modo Resultados Oficiales: puntaje plano para las fases desde officialFromPhase.
+    const phaseIdx = BRACKET_PHASE_ORDER.indexOf(bp.phase as (typeof BRACKET_PHASE_ORDER)[number]);
+    const isOfficialPhase = officialFromIdx >= 0 && phaseIdx >= officialFromIdx;
+
+    if (isOfficialPhase) {
+      if (match.winnerTeamId) {
+        const exactScore =
+          bp.predictedHomeScore != null &&
+          bp.predictedAwayScore != null &&
+          match.homeScore != null &&
+          match.awayScore != null &&
+          bp.predictedHomeScore === match.homeScore &&
+          bp.predictedAwayScore === match.awayScore;
+        if (exactScore) {
+          earned = pts("OFFICIAL_EXACT");
+        } else if (bp.predictedTeamId === match.winnerTeamId) {
+          earned = pts("OFFICIAL_WINNER");
+        }
+        // Logro de cuartos: en oficial los cruces son reales, igual cuenta el acierto.
+        if (earned > 0 && bp.phase === "QUARTER_FINALS") achievementStats.bracketQfCorrect++;
+      }
+    } else if (bp.phase === "CHAMPION" && match.winnerTeamId) {
       if (bp.predictedTeamId === match.winnerTeamId) {
         earned = pts("CHAMPION");
-        finalChampionCorrect = true;
-      } else if (
-        bp.predictedTeamId === match.homeTeamId ||
-        bp.predictedTeamId === match.awayTeamId
-      ) {
-        earned = pts("RUNNER_UP");
-        finalRunnerUpCorrect = true;
       }
     } else {
       const ruleKey = phaseRuleMap[bp.phase];
@@ -297,11 +363,6 @@ export async function calculateUserPoints(userId: string): Promise<number> {
     if (bp.pointsEarned !== earned) {
       await prisma.bracketPrediction.update({ where: { id: bp.id }, data: { pointsEarned: earned } });
     }
-  }
-
-  // FINAL_EXACT bonus: both champion and runner-up correct
-  if (finalChampionCorrect && finalRunnerUpCorrect) {
-    predictionPoints += pts("FINAL_EXACT");
   }
 
   // ── 4. Bonus points (bonus actions + purchase codes + referrals) ─────────

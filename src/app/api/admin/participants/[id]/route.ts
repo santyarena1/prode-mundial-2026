@@ -82,7 +82,10 @@ export async function GET(
       }
     }
 
-    return NextResponse.json({ user, pointsBreakdown, groupResults });
+    const rankingPosition =
+      (await prisma.user.count({ where: { totalPoints: { gt: user.totalPoints } } })) + 1;
+
+    return NextResponse.json({ user, pointsBreakdown, groupResults, rankingPosition });
   } catch (error) {
     console.error("Participant GET error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -32,6 +32,8 @@ interface Prize {
   stock: number;
   active: boolean;
   prizeType: string;
+  isLastOne?: boolean;
+  isSoldOut?: boolean;
   sponsor?: { id: string; name: string; logoUrl?: string | null } | null;
 }
 
@@ -170,6 +172,51 @@ export default function PrizesPage() {
                         <img src={prize.imageUrl} alt={prize.name} className="w-full h-full object-contain" />
                       ) : (
                         <div className="h-full flex items-center justify-center"><span className="text-5xl">🎁</span></div>
+                      )}
+                      {prize.isSoldOut && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ background: "rgba(0,0,0,0.78)" }}>
+                          {/* Glow de fondo pulsante */}
+                          <motion.div
+                            className="absolute inset-0 rounded"
+                            animate={{ opacity: [0, 0.18, 0] }}
+                            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                            style={{ background: "radial-gradient(ellipse at center, rgba(239,68,68,0.6) 0%, transparent 70%)" }}
+                          />
+                          {/* Sello */}
+                          <motion.div
+                            key={`soldout-${prize.id}`}
+                            animate={{
+                              scale:  [0.82, 1, 0.95, 1, 0.82],
+                              rotate: [-18, -13, -15, -13, -18],
+                              opacity: [0.7, 1, 0.9, 1, 0.7],
+                            }}
+                            transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+                            className="border-[3px] border-red-500 px-4 py-1.5 rounded relative z-10"
+                            style={{ boxShadow: "0 0 20px rgba(239,68,68,0.5)" }}
+                          >
+                            <span
+                              className="block text-red-400 font-black text-xl uppercase tracking-[0.25em] select-none"
+                              style={{ textShadow: "0 0 12px rgba(239,68,68,0.9)" }}
+                            >
+                              Sin stock
+                            </span>
+                          </motion.div>
+                          {/* Subtítulo */}
+                          <motion.span
+                            animate={{ opacity: [0.5, 1, 0.5] }}
+                            transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+                            className="absolute bottom-2 text-gray-400 text-[9px] uppercase tracking-widest z-10"
+                          >
+                            Próximamente reingreso de stock
+                          </motion.span>
+                        </div>
+                      )}
+                      {!prize.isSoldOut && prize.isLastOne && (
+                        <div className="absolute top-2 left-2">
+                          <span className="bg-orange-500 text-white text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-full">
+                            ¡Último disponible!
+                          </span>
+                        </div>
                       )}
                       {prize.sponsor?.logoUrl && (
                         <div className="absolute bottom-0 right-0 pointer-events-none">

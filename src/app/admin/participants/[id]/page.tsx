@@ -118,6 +118,7 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
   const router = useRouter();
   const [user, setUser] = useState<UserDetail | null>(null);
   const [pointsBreakdown, setPointsBreakdown] = useState<PointsBreakdownData | null>(null);
+  const [rankingPosition, setRankingPosition] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("origen");
   const [deleting, setDeleting] = useState<Record<string, boolean>>({});
@@ -135,6 +136,7 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
         if (d.groupResults) d.user.groupResults = d.groupResults;
         setUser(d.user);
         setPointsBreakdown(d.pointsBreakdown ?? null);
+        setRankingPosition(d.rankingPosition ?? null);
       });
 
   useEffect(() => {
@@ -293,6 +295,12 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
             </div>
           </div>
           <div className="flex gap-3 flex-wrap">
+            {rankingPosition && (
+              <div className="text-center px-3 border-r border-[#252525] mr-1">
+                <div className="text-xl font-black text-orange-400">#{rankingPosition}</div>
+                <div className="text-gray-600 text-xs uppercase tracking-wider">Ranking</div>
+              </div>
+            )}
             {[
               { label: "Total pts", value: user.totalPoints, color: "text-yellow-400" },
               { label: "Disponibles", value: (user.totalPoints - user.spentPoints), color: "text-lime-400" },
@@ -679,10 +687,10 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
 
           {/* ── Eliminatorias ── */}
           {(user.bracketPredictions?.length ?? 0) > 0 && (() => {
-            const PHASE_ORDER = ["ROUND_OF_32", "ROUND_OF_16", "QUARTER_FINALS", "SEMI_FINALS", "RUNNER_UP", "CHAMPION"];
+            const PHASE_ORDER = ["ROUND_OF_32", "ROUND_OF_16", "QUARTER_FINALS", "SEMI_FINALS", "CHAMPION"];
             const PHASE_LABEL: Record<string, string> = {
               ROUND_OF_32: "Ronda de 32", ROUND_OF_16: "Octavos", QUARTER_FINALS: "Cuartos",
-              SEMI_FINALS: "Semifinal", RUNNER_UP: "Subcampeón", CHAMPION: "Campeón",
+              SEMI_FINALS: "Semifinal", CHAMPION: "Campeón",
             };
             const byPhase = PHASE_ORDER.reduce((acc, ph) => {
               const items = user.bracketPredictions.filter(b => b.phase === ph);

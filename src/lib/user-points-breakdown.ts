@@ -271,7 +271,6 @@ export async function getUserPointsBreakdown(userId: string): Promise<{
     ROUND_OF_16: "Octavos",
     QUARTER_FINALS: "Cuartos",
     SEMI_FINALS: "Semifinal",
-    RUNNER_UP: "Subcampeón",
     CHAMPION: "Campeón",
   };
   for (const bp of bracketPts) {

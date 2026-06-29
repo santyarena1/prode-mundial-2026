@@ -16,13 +16,18 @@ export async function GET() {
 
     const prizes = await prisma.prize.findMany({
       where: { active: true },
-      include: { sponsor: true },
+      include: {
+        sponsor: true,
+        redemptions: { where: { status: { in: ["pending", "approved", "delivered"] } }, select: { id: true } },
+      },
       orderBy: { requiredPoints: "asc" },
     });
 
-    const result = prizes.map((prize) => ({
+    const result = prizes.map(({ redemptions, ...prize }) => ({
       ...prize,
       unlocked: user.totalPoints >= prize.requiredPoints,
+      isLastOne: prize.stock === 1 && redemptions.length > 0,
+      isSoldOut: prize.stock === 0 && redemptions.length > 0,
     }));
 
     return NextResponse.json({ prizes: result, userPoints: user.totalPoints });

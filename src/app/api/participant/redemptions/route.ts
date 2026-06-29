@@ -50,6 +50,18 @@ export async function POST(request: NextRequest) {
       if (!user) throw new Error("404:User not found");
       if (user.totalPoints - user.spentPoints < prize.requiredPoints) throw new Error("400:Insufficient points");
 
+      // Max 1 physical prize ≥ 20.000 pts per user
+      if (prize.prizeType === "physical" && prize.requiredPoints >= 20000) {
+        const existingPhysical = await tx.prizeRedemption.findFirst({
+          where: {
+            userId: auth.userId,
+            status: { in: ["pending", "approved", "delivered"] },
+            prize: { prizeType: "physical", requiredPoints: { gte: 20000 } },
+          },
+        });
+        if (existingPhysical) throw new Error("400:Ya canjeaste un premio físico. Solo se permite 1 premio físico de 20.000 pts o más por usuario.");
+      }
+
       if (prize.stock > 0) {
         // Limited stock: block duplicate pending and decrement atomically
         const existing = await tx.prizeRedemption.findFirst({

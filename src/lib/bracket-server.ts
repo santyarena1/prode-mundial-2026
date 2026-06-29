@@ -8,15 +8,19 @@ import {
   normalizeSavedBracket,
   validateBracketPick,
 } from "./bracket-validation";
+import { getTournamentPhaseState } from "./tournament-phase";
 
 export async function buildBracketContext(userId: string): Promise<BracketContext> {
-  const [groups, predictions, groupPredictions, bracketPredictions] = await Promise.all([
+  const [groups, predictions, groupPredictions, bracketPredictions, phaseState] = await Promise.all([
     prisma.worldCupGroup.findMany({
       include: {
         teams: { select: { id: true, name: true, code: true, flagUrl: true } },
         matches: {
           where: { phase: "GROUP_STAGE" },
-          select: { id: true, phase: true, homeTeamId: true, awayTeamId: true },
+          select: {
+            id: true, phase: true, homeTeamId: true, awayTeamId: true,
+            status: true, realOutcome: true, homeScore: true, awayScore: true,
+          },
         },
       },
       orderBy: { name: "asc" },
@@ -38,6 +42,7 @@ export async function buildBracketContext(userId: string): Promise<BracketContex
       where: { userId, predictedTeamId: { not: null } },
       select: { phase: true, matchSlot: true, predictedTeamId: true },
     }),
+    getTournamentPhaseState(),
   ]);
 
   const allTeamsMap = new Map<string, { id: string; name: string; code: string; flagUrl?: string | null }>();
@@ -56,6 +61,28 @@ export async function buildBracketContext(userId: string): Promise<BracketContex
       p.predictedAwayScore !== undefined
     ) {
       savedScores[p.matchId] = { home: p.predictedHomeScore, away: p.predictedAwayScore };
+    }
+  }
+
+  // Rellená con el resultado REAL los partidos de grupo ya jugados que el usuario
+  // no predijo. Así el bracket del lado servidor se resuelve igual que en el
+  // cliente y los usuarios con partidos sin predecir pueden guardar bien sus
+  // selecciones de 16vos en adelante (no quedan trabados por partidos pasados).
+  for (const g of groups) {
+    for (const m of g.matches) {
+      if (m.status === "finished" && !savedPreds[m.id] && m.realOutcome) {
+        savedPreds[m.id] = m.realOutcome;
+      }
+      if (
+        m.status === "finished" &&
+        savedScores[m.id] === undefined &&
+        m.homeScore !== null &&
+        m.homeScore !== undefined &&
+        m.awayScore !== null &&
+        m.awayScore !== undefined
+      ) {
+        savedScores[m.id] = { home: m.homeScore, away: m.awayScore };
+      }
     }
   }
 
@@ -83,6 +110,11 @@ export async function buildBracketContext(userId: string): Promise<BracketContex
   }));
   const allTeams = [...allTeamsMap.values()].sort((a, b) => a.name.localeCompare(b.name));
 
+  const tournamentPhases: Record<string, { started: boolean; finished: boolean }> = {};
+  for (const [key, p] of Object.entries(phaseState.phases)) {
+    tournamentPhases[key] = { started: p.started, finished: p.finished };
+  }
+
   const ctx: BracketContext = {
     groups: mappedGroups,
     allTeams,
@@ -90,6 +122,7 @@ export async function buildBracketContext(userId: string): Promise<BracketContex
     savedGroupPreds,
     savedBracket,
     savedScores,
+    tournamentPhases,
   };
 
   return {

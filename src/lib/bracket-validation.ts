@@ -1,11 +1,11 @@
 import { BRACKET_MATCHES, BracketMatch } from "./bracket-structure";
 
 export const ELIMINATORIAS_PHASES = [
-  { key: "ROUND_OF_32", label: "16vos", fullLabel: "Ronda de 32", slots: 16, icon: "⚽", ptsLabel: "2.000 pts c/u" },
-  { key: "ROUND_OF_16", label: "8vos", fullLabel: "Octavos de Final", slots: 8, icon: "🔥", ptsLabel: "3.500 pts c/u" },
-  { key: "QUARTER_FINALS", label: "4tos", fullLabel: "Cuartos de Final", slots: 4, icon: "⚡", ptsLabel: "6.000 pts c/u" },
-  { key: "SEMI_FINALS", label: "Semis", fullLabel: "Semifinales", slots: 2, icon: "🌟", ptsLabel: "10.000 pts c/u" },
-  { key: "CHAMPION", label: "Final", fullLabel: "Campeón del Mundo", slots: 1, icon: "🏆", ptsLabel: "30.000 / 15.000 pts" },
+  { key: "ROUND_OF_32", label: "16vos", fullLabel: "Ronda de 32", slots: 16, icon: "⚽", ptsLabel: "1.500 pts c/u" },
+  { key: "ROUND_OF_16", label: "8vos", fullLabel: "Octavos de Final", slots: 8, icon: "🔥", ptsLabel: "2.000 pts c/u" },
+  { key: "QUARTER_FINALS", label: "4tos", fullLabel: "Cuartos de Final", slots: 4, icon: "⚡", ptsLabel: "4.000 pts c/u" },
+  { key: "SEMI_FINALS", label: "Semis", fullLabel: "Semifinales", slots: 2, icon: "🌟", ptsLabel: "6.000 pts c/u" },
+  { key: "CHAMPION", label: "Final", fullLabel: "Campeón del Mundo", slots: 1, icon: "🏆", ptsLabel: "10.000 pts" },
 ] as const;
 
 export type ElimPhaseKey = (typeof ELIMINATORIAS_PHASES)[number]["key"];
@@ -27,6 +27,7 @@ export interface BracketTeam {
 export interface BracketGroupMatch {
   id: string;
   phase: string;
+  status?: string | null;
   homeTeamId?: string | null;
   awayTeamId?: string | null;
 }
@@ -50,6 +51,13 @@ export interface BracketContext {
   /** Which 3° plays each third-slot R32 match (rival del cruce) */
   thirdSlotAssignments?: Record<string, string>;
   savedScores?: Record<string, { home: number; away: number }>;
+  /**
+   * Estado REAL del torneo por fase (GROUP_STAGE, ROUND_OF_32 … CHAMPION).
+   * Cuando está presente, el desbloqueo de fases se rige por el estado real
+   * del torneo (fase empezada / fase anterior terminada) en vez de exigir que
+   * el usuario haya completado sus predicciones de la fase previa.
+   */
+  tournamentPhases?: Record<string, { started: boolean; finished: boolean }>;
 }
 
 export interface ThirdPlaceRanking {
@@ -75,7 +83,10 @@ export function getThirdSlotMatches(): BracketMatch[] {
 
 export function isGroupPredictionComplete(group: BracketGroup, ctx: BracketContext): boolean {
   const groupMatches = group.matches.filter((m) => m.phase === "GROUP_STAGE");
-  return groupMatches.length > 0 && groupMatches.every((m) => !!ctx.savedPreds[m.id]);
+  // A finished match counts as covered even if the user didn't predict it (window was closed)
+  return groupMatches.length > 0 && groupMatches.every(
+    (m) => !!ctx.savedPreds[m.id] || m.status === "finished"
+  );
 }
 
 /** Standings derived from saved match predictions — same logic as the group table UI */
@@ -694,15 +705,25 @@ export function isGroupStageComplete(ctx: BracketContext): boolean {
 }
 
 export function countCompletedGroups(ctx: BracketContext): number {
-  return ctx.groups.filter((group) => {
-    const groupMatches = group.matches.filter((m) => m.phase === "GROUP_STAGE");
-    return groupMatches.length > 0 && groupMatches.every((m) => !!ctx.savedPreds[m.id]);
-  }).length;
+  return ctx.groups.filter((group) => isGroupPredictionComplete(group, ctx)).length;
 }
 
 export function isPhaseUnlocked(phaseKey: string, ctx: BracketContext): boolean {
   const idx = ELIMINATORIAS_PHASES.findIndex((p) => p.key === phaseKey);
   if (idx < 0) return false;
+
+  // El estado REAL del torneo SOLO abre fases, nunca las cierra: una fase se
+  // habilita cuando ya empezó, o cuando terminó la fase anterior (grupos para
+  // 16vos). Esto desbloquea a quienes quedaban trabados por no poder completar
+  // predicciones de partidos que ya se jugaron (p. ej. empates en grupos).
+  if (ctx.tournamentPhases) {
+    if (ctx.tournamentPhases[phaseKey]?.started) return true;
+    const prevKey = idx === 0 ? "GROUP_STAGE" : ELIMINATORIAS_PHASES[idx - 1].key;
+    if (ctx.tournamentPhases[prevKey]?.finished) return true;
+    // Si el estado real todavía no la abre, caemos a la lógica de progreso del
+    // usuario: así el clásico que ya cargó fases siguientes las mantiene activas.
+  }
+
   if (idx === 0) return isGroupStageComplete(ctx);
 
   const prev = ELIMINATORIAS_PHASES[idx - 1];
@@ -727,11 +748,15 @@ export function isPhaseUnlocked(phaseKey: string, ctx: BracketContext): boolean 
 export function getPhaseUnlockBlockReason(phaseKey: string, ctx: BracketContext): string | null {
   if (isPhaseUnlocked(phaseKey, ctx)) return null;
   const idx = ELIMINATORIAS_PHASES.findIndex((p) => p.key === phaseKey);
+
+  // Con estado real del torneo, la fase se habilita sola cuando termina la anterior.
+  if (ctx.tournamentPhases) {
+    const prevLabel = idx <= 0 ? "la fase de grupos" : ELIMINATORIAS_PHASES[idx - 1].fullLabel;
+    return `Esta fase se habilita cuando termine ${prevLabel}.`;
+  }
+
   if (idx === 0) {
-    const incomplete = ctx.groups.filter((group) => {
-      const groupMatches = group.matches.filter((m) => m.phase === "GROUP_STAGE");
-      return !(groupMatches.length > 0 && groupMatches.every((m) => !!ctx.savedPreds[m.id]));
-    });
+    const incomplete = ctx.groups.filter((group) => !isGroupPredictionComplete(group, ctx));
     if (incomplete.length === 0) return "Completá todos los partidos de fase de grupos.";
     const names = incomplete.map((g) => `Grupo ${g.name}`).join(", ");
     return `Faltan predicciones en: ${names}.`;

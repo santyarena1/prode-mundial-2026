@@ -22,23 +22,29 @@ export async function PUT(
       return NextResponse.json({ error: "Validation error", details: parsed.error.issues }, { status: 400 });
     }
 
+    const existing = await prisma.prizeRedemption.findUnique({
+      where: { id },
+      select: { userId: true, pointsSpent: true, prizeId: true, status: true },
+    });
+    if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
     const redemption = await prisma.prizeRedemption.update({
       where: { id },
       data: { status: parsed.data.status },
     });
 
-    // If rejected, refund points to user
-    if (parsed.data.status === "rejected") {
-      const redemptionWithUser = await prisma.prizeRedemption.findUnique({
-        where: { id },
-        select: { userId: true, pointsSpent: true },
-      });
-      if (redemptionWithUser) {
-        await prisma.user.update({
-          where: { id: redemptionWithUser.userId },
-          data: { spentPoints: { decrement: redemptionWithUser.pointsSpent } },
-        });
-      }
+    if (parsed.data.status === "rejected" && existing.status !== "rejected") {
+      // Refund points and restore stock (stock > 0 = limited prize; 0 = unlimited, nothing to restore)
+      await Promise.all([
+        prisma.user.update({
+          where: { id: existing.userId },
+          data: { spentPoints: { decrement: existing.pointsSpent } },
+        }),
+        prisma.prize.updateMany({
+          where: { id: existing.prizeId, stock: { gt: 0 } },
+          data: { stock: { increment: 1 } },
+        }),
+      ]);
     }
 
     return NextResponse.json({ redemption });
@@ -60,16 +66,18 @@ export async function DELETE(
     const r = await prisma.prizeRedemption.findUnique({ where: { id } });
     if (!r) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    // If approved/delivered, restore stock before deleting
+    const needsStockRestore = r.status === "approved" || r.status === "delivered";
     await prisma.$transaction([
       prisma.prizeRedemption.delete({ where: { id } }),
       prisma.user.update({
         where: { id: r.userId },
         data: { spentPoints: { decrement: r.pointsSpent } },
       }),
-      prisma.prize.update({
-        where: { id: r.prizeId },
-        data: { stock: { increment: 1 } },
-      }),
+      ...(needsStockRestore
+        ? [prisma.prize.updateMany({ where: { id: r.prizeId, stock: { gt: 0 } }, data: { stock: { increment: 1 } } })]
+        : []
+      ),
     ]);
 
     return NextResponse.json({ ok: true });

@@ -8,6 +8,31 @@ import {
   migrateLegacyBracketSlots,
   validateBracketPickForUser,
 } from "@/lib/bracket-server";
+import { BRACKET_PHASE_ORDER } from "@/lib/tournament-phase";
+
+/**
+ * En modo OFICIAL (desde officialFromPhase) las llaves usan los cruces reales:
+ * el pick se valida contra los dos equipos reales del partido, no contra la
+ * cascada de predicciones del usuario.
+ */
+async function validateOfficialBracketPick(
+  phase: string,
+  matchSlot: string,
+  teamId: string
+): Promise<{ valid: boolean; error?: string }> {
+  const matchCode = phase === "CHAMPION" ? "103" : matchSlot;
+  const match = await prisma.match.findUnique({
+    where: { matchCode },
+    select: { homeTeamId: true, awayTeamId: true },
+  });
+  if (!match || !match.homeTeamId || !match.awayTeamId) {
+    return { valid: false, error: "Este partido todavía no tiene los equipos definidos." };
+  }
+  if (teamId !== match.homeTeamId && teamId !== match.awayTeamId) {
+    return { valid: false, error: "Solo podés elegir uno de los dos equipos del partido." };
+  }
+  return { valid: true };
+}
 
 const bracketPredictionSchema = z.object({
   phase: z.string().min(1),
@@ -52,6 +77,18 @@ export async function POST(request: NextRequest) {
     let { phase, matchSlot, predictedTeamId, assignedThirdTeamId, predictedHomeScore, predictedAwayScore } = parsed.data;
     matchSlot = normalizeMatchSlot(phase, matchSlot);
 
+    // ¿Está este usuario en modo OFICIAL para esta fase?
+    const modeUser = await prisma.user.findUnique({
+      where: { id: auth.userId },
+      select: { bracketMode: true, officialFromPhase: true },
+    });
+    const officialFromIdx =
+      modeUser?.bracketMode === "OFFICIAL" && modeUser.officialFromPhase
+        ? BRACKET_PHASE_ORDER.indexOf(modeUser.officialFromPhase as (typeof BRACKET_PHASE_ORDER)[number])
+        : -1;
+    const phaseIdx = BRACKET_PHASE_ORDER.indexOf(phase as (typeof BRACKET_PHASE_ORDER)[number]);
+    const isOfficialPhase = officialFromIdx >= 0 && phaseIdx >= officialFromIdx;
+
     const existing = await prisma.bracketPrediction.findFirst({
       where: {
         userId: auth.userId,
@@ -79,18 +116,22 @@ export async function POST(request: NextRequest) {
     }
 
     if (predictedTeamId) {
-      const validation = await validateBracketPickForUser(
-        auth.userId,
-        phase,
-        matchSlot,
-        predictedTeamId,
-        assignedThirdTeamId
-      );
+      const validation = isOfficialPhase
+        ? await validateOfficialBracketPick(phase, matchSlot, predictedTeamId)
+        : await validateBracketPickForUser(
+            auth.userId,
+            phase,
+            matchSlot,
+            predictedTeamId,
+            assignedThirdTeamId
+          );
       if (!validation.valid) {
         return NextResponse.json({ error: validation.error || "Equipo inválido." }, { status: 400 });
       }
 
+      // En oficial cada partido es independiente: no hay cascada que invalidar.
       if (
+        !isOfficialPhase &&
         existing?.predictedTeamId &&
         existing.predictedTeamId !== predictedTeamId &&
         existing.isLocked

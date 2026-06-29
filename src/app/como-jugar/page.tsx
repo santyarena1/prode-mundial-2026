@@ -90,8 +90,8 @@ export default function ComoJugarPage() {
             <div>
               <h3 className="text-white font-bold mb-1">Eliminatorias (bracket)</h3>
               <p>
-                Predecís qué equipo avanza en cada fase del bracket: Ronda de 32, Octavos, Cuartos,
-                Semifinales y Final. También podés predecir al campeón y al subcampeón.
+                Predecís qué equipo gana cada partido del bracket: Ronda de 32, Octavos, Cuartos,
+                Semifinales y Final. También predecís al campeón del torneo.
               </p>
             </div>
             <div>
@@ -110,20 +110,19 @@ export default function ComoJugarPage() {
             <p className="text-gray-500 text-xs mb-4">Cada predicción acertada suma puntos automáticamente.</p>
             <Rule pts="500" label="Acertar resultado (ganador o perdedor)" />
             <Rule pts="800" label="Acertar empate exacto (500 + 300 bonus)" />
-            <Rule pts="1.500" label="Acertar equipo clasificado del grupo" />
-            <Rule pts="2.000" label="Acertar 1° o 2° posición exacta (1.500 + 500 extra)" />
+            <Rule pts="1.500" label="Acertar equipo clasificado (1° o 2° del grupo)" />
+            <Rule pts="2.000" label="Acertar posición exacta del 1° o 2° (1.500 + 500 extra)" />
+            <p className="text-gray-600 text-xs mt-3">El 3° lugar del grupo no da puntos de clasificación — solo se usa para armar el bracket de llaves.</p>
           </Card>
         </Section>
 
         <Section title="4. Sistema de puntos — Eliminatorias">
           <Card className="p-5">
-            <Rule pts="2.000"  label="Acertar equipo que pasa en Ronda de 32" />
-            <Rule pts="3.500"  label="Acertar equipo que pasa en Octavos" />
-            <Rule pts="6.000"  label="Acertar equipo que pasa en Cuartos" />
-            <Rule pts="10.000" label="Acertar equipo que pasa en Semifinal" />
-            <Rule pts="15.000" label="Acertar finalista (subcampeón)" />
-            <Rule pts="30.000" label="Acertar al campeón" />
-            <Rule pts="+40.000" label="Bonus: campeón + subcampeón exactos" />
+            <Rule pts="1.500"  label="Acertar ganador de partido en Ronda de 32" />
+            <Rule pts="2.000"  label="Acertar ganador de partido en Octavos" />
+            <Rule pts="4.000"  label="Acertar ganador de partido en Cuartos" />
+            <Rule pts="6.000"  label="Acertar ganador de partido en Semifinal" />
+            <Rule pts="10.000" label="Acertar al campeón" />
           </Card>
         </Section>
 
