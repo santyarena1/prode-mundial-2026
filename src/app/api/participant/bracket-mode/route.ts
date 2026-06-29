@@ -67,18 +67,19 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Pasarse a Resultados Oficiales ─────────────────────────────────────
-    // El modo oficial corre desde la próxima fase que TODAVÍA no empezó.
-    // Las fases ya empezadas/terminadas se respetan con sus puntos clásicos.
-    const { nextUnstartedBracketPhase } = await getTournamentPhaseState();
-    if (!nextUnstartedBracketPhase) {
+    // El modo oficial corre desde la primera fase que TODAVÍA no terminó: incluye
+    // la fase en curso (16vos ya sorteado), cuyos cruces reales ya están definidos.
+    // Las fases ya terminadas se respetan con sus puntos clásicos.
+    const { firstUnfinishedBracketPhase } = await getTournamentPhaseState();
+    if (!firstUnfinishedBracketPhase) {
       return NextResponse.json(
-        { error: "El torneo ya está muy avanzado y no quedan fases por delante para el modo oficial." },
+        { error: "El torneo ya terminó: no quedan fases para el modo oficial." },
         { status: 409 }
       );
     }
 
     const fromIdx = BRACKET_PHASE_ORDER.indexOf(
-      nextUnstartedBracketPhase as (typeof BRACKET_PHASE_ORDER)[number]
+      firstUnfinishedBracketPhase as (typeof BRACKET_PHASE_ORDER)[number]
     );
     const futurePhases = BRACKET_PHASE_ORDER.slice(Math.max(0, fromIdx));
 
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
         where: { id: auth.userId },
         data: {
           bracketMode: "OFFICIAL",
-          officialFromPhase: nextUnstartedBracketPhase,
+          officialFromPhase: firstUnfinishedBracketPhase,
           bracketModeChosenAt: now,
         },
       }),
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       bracketMode: "OFFICIAL",
-      officialFromPhase: nextUnstartedBracketPhase,
+      officialFromPhase: firstUnfinishedBracketPhase,
       bracketModeChosenAt: now,
     });
   } catch (error) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getUserFromCookies } from "@/lib/cookies";
+import { earlierBracketPhase, getTournamentPhaseState } from "@/lib/tournament-phase";
 
 export async function GET() {
   try {
@@ -40,6 +41,17 @@ export async function GET() {
     }
 
     const { passwordHash, ...profile } = user;
+
+    // Modo OFICIAL: el modo corre desde la fase más temprana entre la guardada y
+    // la primera fase del torneo todavía no terminada. Esto autocorrige cuentas
+    // que quedaron con un officialFromPhase posterior al que corresponde.
+    if (user.bracketMode === "OFFICIAL") {
+      const { firstUnfinishedBracketPhase } = await getTournamentPhaseState();
+      profile.officialFromPhase = earlierBracketPhase(
+        user.officialFromPhase,
+        firstUnfinishedBracketPhase
+      );
+    }
 
     // Check if user is eligible for early bird (registered before any raffle's cutoff) but hasn't claimed yet
     let earlyBirdEligible = false;

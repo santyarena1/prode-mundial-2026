@@ -34,8 +34,19 @@ interface Participant {
   emailVerified?: boolean;
   referredById?: string | null;
   createdAt: string;
+  bracketMode?: string | null;
+  officialFromPhase?: string | null;
   _count?: { predictions: number };
   squadMemberships?: { role: string; squad: { id: string; name: string } }[];
+}
+
+/** Etiqueta legible del modo de llaves elegido por el usuario. */
+function bracketModeLabel(mode?: string | null): { text: string; className: string } {
+  if (mode === "OFFICIAL")
+    return { text: "Resultados Oficiales", className: "bg-yellow-500/15 text-yellow-400 border border-yellow-500/30" };
+  if (mode === "CLASSIC")
+    return { text: "Clásico", className: "bg-blue-500/15 text-blue-300 border border-blue-500/30" };
+  return { text: "Sin elegir", className: "bg-white/5 text-gray-500 border border-white/10" };
 }
 
 type PredictionResetType = "matches" | "groups" | "bracket";
@@ -367,6 +378,7 @@ export default function AdminParticipantsPage() {
                 { label: "Puntaje / Preds.", field: "points" as SortField },
                 { label: "Grupos", field: null },
                 { label: "Estado", field: "status" as SortField },
+                { label: "Modo", field: null },
                 { label: "Acciones", field: null },
               ]).map(({ label, field }) => (
                 <th
@@ -452,6 +464,18 @@ export default function AdminParticipantsPage() {
                   <div className="text-gray-700 text-[10px] mt-1">
                     {new Date(p.createdAt).toLocaleDateString("es-AR")}
                   </div>
+                </td>
+
+                {/* Modo de llaves */}
+                <td className="px-4 py-3 whitespace-nowrap">
+                  {(() => {
+                    const m = bracketModeLabel(p.bracketMode);
+                    return (
+                      <span className={`inline-block text-[10px] font-bold px-2 py-1 rounded-full ${m.className}`}>
+                        {m.text}
+                      </span>
+                    );
+                  })()}
                 </td>
 
                 {/* Acciones */}

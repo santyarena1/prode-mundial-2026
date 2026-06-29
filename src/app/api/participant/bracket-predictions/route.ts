@@ -16,13 +16,12 @@ import { BRACKET_PHASE_ORDER } from "@/lib/tournament-phase";
  * cascada de predicciones del usuario.
  */
 async function validateOfficialBracketPick(
-  phase: string,
   matchSlot: string,
   teamId: string
 ): Promise<{ valid: boolean; error?: string }> {
-  const matchCode = phase === "CHAMPION" ? "103" : matchSlot;
+  // En oficial, matchSlot es el matchCode real del partido (incluida la final).
   const match = await prisma.match.findUnique({
-    where: { matchCode },
+    where: { matchCode: matchSlot },
     select: { homeTeamId: true, awayTeamId: true },
   });
   if (!match || !match.homeTeamId || !match.awayTeamId) {
@@ -74,8 +73,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Validation error", details: parsed.error.issues }, { status: 400 });
     }
 
-    let { phase, matchSlot, predictedTeamId, assignedThirdTeamId, predictedHomeScore, predictedAwayScore } = parsed.data;
-    matchSlot = normalizeMatchSlot(phase, matchSlot);
+    const { phase, predictedTeamId, assignedThirdTeamId, predictedHomeScore, predictedAwayScore } = parsed.data;
+    const matchSlot = normalizeMatchSlot(phase, parsed.data.matchSlot);
 
     // ¿Está este usuario en modo OFICIAL para esta fase?
     const modeUser = await prisma.user.findUnique({
@@ -117,7 +116,7 @@ export async function POST(request: NextRequest) {
 
     if (predictedTeamId) {
       const validation = isOfficialPhase
-        ? await validateOfficialBracketPick(phase, matchSlot, predictedTeamId)
+        ? await validateOfficialBracketPick(matchSlot, predictedTeamId)
         : await validateBracketPickForUser(
             auth.userId,
             phase,

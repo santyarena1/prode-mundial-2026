@@ -49,6 +49,8 @@ export async function GET() {
           createdAt: true,
           emailVerified: true,
           referredById: true,
+          bracketMode: true,
+          officialFromPhase: true,
           _count: {
             select: {
               predictions: true,

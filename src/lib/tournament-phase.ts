@@ -28,6 +28,20 @@ export const BRACKET_PHASE_ORDER = [
   "CHAMPION",
 ] as const;
 
+/** Devuelve la fase MÁS TEMPRANA del torneo entre dos (la de menor índice). */
+export function earlierBracketPhase(
+  a: string | null | undefined,
+  b: string | null | undefined
+): string | null {
+  if (!a) return b ?? null;
+  if (!b) return a ?? null;
+  const ia = BRACKET_PHASE_ORDER.indexOf(a as (typeof BRACKET_PHASE_ORDER)[number]);
+  const ib = BRACKET_PHASE_ORDER.indexOf(b as (typeof BRACKET_PHASE_ORDER)[number]);
+  if (ia < 0) return b;
+  if (ib < 0) return a;
+  return ia <= ib ? a : b;
+}
+
 export interface PhaseProgress {
   started: boolean;
   finished: boolean;
@@ -41,6 +55,13 @@ export interface TournamentPhaseState {
   phases: TournamentPhaseMap;
   /** Primera fase (16vos→final) que TODAVÍA no empezó, o null si ya empezaron todas. */
   nextUnstartedBracketPhase: string | null;
+  /**
+   * Primera fase (16vos→final) que TODAVÍA no terminó. Es desde donde corre el
+   * modo OFICIAL: incluye la fase en curso (p. ej. 16vos ya sorteado pero sin
+   * jugarse del todo), porque sus cruces reales ya están definidos y se pueden
+   * predecir. Las fases ya terminadas se respetan con sus puntos clásicos.
+   */
+  firstUnfinishedBracketPhase: string | null;
 }
 
 function computeProgress(
@@ -87,5 +108,13 @@ export async function getTournamentPhaseState(
     }
   }
 
-  return { phases, nextUnstartedBracketPhase };
+  let firstUnfinishedBracketPhase: string | null = null;
+  for (const key of BRACKET_PHASE_ORDER) {
+    if (!phases[key].finished) {
+      firstUnfinishedBracketPhase = key;
+      break;
+    }
+  }
+
+  return { phases, nextUnstartedBracketPhase, firstUnfinishedBracketPhase };
 }

@@ -1,5 +1,5 @@
 import prisma from "./db";
-import { BRACKET_PHASE_ORDER } from "./tournament-phase";
+import { BRACKET_PHASE_ORDER, earlierBracketPhase, getTournamentPhaseState } from "./tournament-phase";
 
 export const DEFAULT_POINT_RULES = {
   GROUP_SIGN:       { label: "Acertar resultado (ganador/perdedor)",       points: 500 },
@@ -281,12 +281,17 @@ export async function calculateUserPoints(userId: string): Promise<number> {
     where: { id: userId },
     select: { bracketMode: true, officialFromPhase: true },
   });
-  const officialFromIdx =
-    bracketModeUser?.bracketMode === "OFFICIAL" && bracketModeUser.officialFromPhase
-      ? BRACKET_PHASE_ORDER.indexOf(
-          bracketModeUser.officialFromPhase as (typeof BRACKET_PHASE_ORDER)[number]
-        )
+  let officialFromIdx = -1;
+  if (bracketModeUser?.bracketMode === "OFFICIAL") {
+    const { firstUnfinishedBracketPhase } = await getTournamentPhaseState();
+    const effective = earlierBracketPhase(
+      bracketModeUser.officialFromPhase,
+      firstUnfinishedBracketPhase
+    );
+    officialFromIdx = effective
+      ? BRACKET_PHASE_ORDER.indexOf(effective as (typeof BRACKET_PHASE_ORDER)[number])
       : -1;
+  }
 
   // Pre-fetch all finished matches indexed by matchCode to avoid N+1
   const finishedMatches = await prisma.match.findMany({
@@ -315,8 +320,13 @@ export async function calculateUserPoints(userId: string): Promise<number> {
       continue;
     }
 
-    // CHAMPION phase uses matchSlot "1" — map to the actual final match (103)
-    const lookupSlot = bp.phase === "CHAMPION" ? "103" : bp.matchSlot;
+    // Modo Resultados Oficiales: puntaje plano para las fases desde officialFromPhase.
+    const phaseIdx = BRACKET_PHASE_ORDER.indexOf(bp.phase as (typeof BRACKET_PHASE_ORDER)[number]);
+    const isOfficialPhase = officialFromIdx >= 0 && phaseIdx >= officialFromIdx;
+
+    // En oficial, matchSlot ya es el matchCode real del partido (incluida la final).
+    // En clásico, CHAMPION usa matchSlot "1" y se mapea al partido de la final (103).
+    const lookupSlot = isOfficialPhase ? bp.matchSlot : bp.phase === "CHAMPION" ? "103" : bp.matchSlot;
     const match = matchByCode.get(lookupSlot) ?? null;
 
     if (!match) {
@@ -325,10 +335,6 @@ export async function calculateUserPoints(userId: string): Promise<number> {
     }
 
     let earned = 0;
-
-    // Modo Resultados Oficiales: puntaje plano para las fases desde officialFromPhase.
-    const phaseIdx = BRACKET_PHASE_ORDER.indexOf(bp.phase as (typeof BRACKET_PHASE_ORDER)[number]);
-    const isOfficialPhase = officialFromIdx >= 0 && phaseIdx >= officialFromIdx;
 
     if (isOfficialPhase) {
       if (match.winnerTeamId) {
