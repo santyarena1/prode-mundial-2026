@@ -414,6 +414,14 @@ export class ApiFootballProvider implements FootballDataProvider {
         } else if (awayScore > homeScore) {
           realOutcome = "AWAY_WIN";
           winnerExternalId = String(teams.away.id);
+        } else if (teams.home?.winner === true) {
+          // Empate en el tiempo reglamentario definido por penales: api-football
+          // marca al ganador real con teams.{home,away}.winner === true.
+          realOutcome = "HOME_WIN";
+          winnerExternalId = String(teams.home.id);
+        } else if (teams.away?.winner === true) {
+          realOutcome = "AWAY_WIN";
+          winnerExternalId = String(teams.away.id);
         } else {
           realOutcome = "DRAW";
         }

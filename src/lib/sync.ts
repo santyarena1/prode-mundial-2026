@@ -188,12 +188,18 @@ export async function syncResults(): Promise<{ success: boolean; message: string
     // Only fetch results for matches that have already started (up to 12 hours ago).
     // 12h covers any match with delays, extra time, or timezone edge cases.
     // This avoids burning API quota on future matches while leaving plenty of margin.
-    const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+    const now = new Date();
+    const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
     const pending = await prisma.match.findMany({
       where: {
-        status: { not: "finished" },
         externalId: { not: null },
-        startDate: { lte: new Date(), gte: twelveHoursAgo },
+        OR: [
+          // Partidos que ya empezaron y no terminaron (ventana de 12h para ahorrar cuota).
+          { status: { not: "finished" }, startDate: { lte: now, gte: twelveHoursAgo } },
+          // Backfill: eliminatorias finalizadas SIN ganador cargado (definidas por
+          // penales). Se re-sincronizan hasta que la API devuelva el ganador real.
+          { status: "finished", winnerTeamId: null, phase: { not: "GROUP_STAGE" } },
+        ],
       },
     });
     let count = 0;
