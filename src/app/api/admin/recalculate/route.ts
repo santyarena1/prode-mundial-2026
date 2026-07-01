@@ -3,6 +3,8 @@ import prisma from "@/lib/db";
 import { getAdminFromCookies } from "@/lib/cookies";
 import { calculateUserPoints } from "@/lib/points";
 
+export const maxDuration = 300;
+
 const BATCH_SIZE = 10;
 
 export async function POST() {
