@@ -82,14 +82,41 @@ interface GroupData {
   }>;
 }
 
+interface BracketPred {
+  id: string;
+  phase: string;
+  matchSlot: string;
+  predictedTeamId?: string | null;
+  predictedTeam?: Team | null;
+  predictedHomeScore?: number | null;
+  predictedAwayScore?: number | null;
+  pointsEarned: number;
+  isLocked: boolean;
+}
+
+interface FixtureM {
+  matchCode: string;
+  status: string;
+  startDate?: string | null;
+  homeTeam?: Team | null;
+  awayTeam?: Team | null;
+  homeScore?: number | null;
+  awayScore?: number | null;
+  winnerTeamId?: string | null;
+}
+
 const phaseLabels: Record<string, string> = {
   GROUP_STAGE: "Fase de Grupos",
   ROUND_OF_32: "Ronda de 32",
   ROUND_OF_16: "Octavos de Final",
   QUARTER_FINALS: "Cuartos de Final",
   SEMI_FINALS: "Semifinales",
+  THIRD_PLACE: "Tercer puesto",
   FINAL: "Final",
+  CHAMPION: "Final / Campeón",
 };
+
+const BRACKET_PHASE_ORDER = ["ROUND_OF_32", "ROUND_OF_16", "QUARTER_FINALS", "SEMI_FINALS", "CHAMPION"];
 
 const outcomeLabel = (
   outcome: string,
@@ -362,6 +389,8 @@ export default function MyPredictionsPage() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [groupPredictions, setGroupPredictions] = useState<GroupPred[]>([]);
   const [groups, setGroups] = useState<GroupData[]>([]);
+  const [bracketPreds, setBracketPreds] = useState<BracketPred[]>([]);
+  const [fixtureByCode, setFixtureByCode] = useState<Record<string, FixtureM>>({});
   const [loadMore, setLoadMore] = useState<LoadMoreStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -373,13 +402,24 @@ export default function MyPredictionsPage() {
         return;
       }
 
-      const [predRes, groupsRes, groupPredRes, bracketPredRes] =
+      const [predRes, groupsRes, groupPredRes, bracketPredRes, fixtureRes] =
         await Promise.all([
           apiFetch("/api/participant/predictions"),
           fetch("/api/public/groups"),
           apiFetch("/api/participant/group-predictions"),
           apiFetch("/api/participant/bracket-predictions"),
+          fetch("/api/public/fixture"),
         ]);
+
+      if (fixtureRes.ok) {
+        const fx = await fixtureRes.json();
+        const byCode: Record<string, FixtureM> = {};
+        for (const block of fx.fixture || []) {
+          if (block.phase === "GROUP_STAGE") continue;
+          for (const m of block.matches || []) byCode[m.matchCode] = m;
+        }
+        setFixtureByCode(byCode);
+      }
 
       let preds: Prediction[] = [];
       if (predRes.ok) {
@@ -429,10 +469,9 @@ export default function MyPredictionsPage() {
       let hasBracketProgress = false;
       if (bracketPredRes.ok) {
         const bp = await bracketPredRes.json();
-        hasBracketProgress = (bp.bracketPredictions || []).some(
-          (p: { isLocked: boolean; predictedTeamId?: string }) =>
-            p.isLocked && p.predictedTeamId
-        );
+        const list: BracketPred[] = bp.bracketPredictions || [];
+        setBracketPreds(list.filter((p) => p.predictedTeamId));
+        hasBracketProgress = list.some((p) => p.isLocked && p.predictedTeamId);
       }
 
       const pendingGroups = Math.max(0, groupCount - lockedGroups);
@@ -719,6 +758,85 @@ export default function MyPredictionsPage() {
                         </div>
                       </div>
                     </Card>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── Eliminatorias (16vos en adelante) ─────────────────────────── */}
+        {bracketPreds.length > 0 && (() => {
+          const bracketPtsTotal = bracketPreds.reduce((s, p) => s + (p.pointsEarned || 0), 0);
+          return (
+            <div className="mt-10">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-black uppercase text-white tracking-tight">Eliminatorias</h2>
+                <span className="text-yellow-400 font-black text-sm">
+                  {bracketPtsTotal.toLocaleString("es-AR")} pts
+                </span>
+              </div>
+              <div className="space-y-6">
+                {BRACKET_PHASE_ORDER.map((phase) => {
+                  const picks = bracketPreds.filter((p) => p.phase === phase);
+                  if (picks.length === 0) return null;
+                  return (
+                    <div key={phase}>
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="text-[11px] font-black uppercase tracking-[0.2em] text-yellow-500">
+                          {phaseLabels[phase] ?? phase}
+                        </span>
+                        <div className="flex-1 h-px bg-gradient-to-r from-yellow-500/20 to-transparent" />
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {picks.map((p) => {
+                          const real = fixtureByCode[p.matchSlot];
+                          const finished = real?.status === "finished";
+                          const pick = p.predictedTeam;
+                          const won = finished && real?.winnerTeamId === p.predictedTeamId;
+                          return (
+                            <Card key={p.id} className="p-3">
+                              {real ? (
+                                <>
+                                  <div className="flex items-center justify-between gap-2 text-xs">
+                                    <span className={`font-bold truncate ${real.winnerTeamId === real.homeTeam?.id ? "text-white" : "text-gray-500"}`}>
+                                      {real.homeTeam?.name ?? "?"}
+                                    </span>
+                                    <span className="font-black text-white tabular-nums shrink-0">
+                                      {finished ? `${real.homeScore ?? 0} - ${real.awayScore ?? 0}` : "vs"}
+                                    </span>
+                                    <span className={`font-bold truncate text-right ${real.winnerTeamId === real.awayTeam?.id ? "text-white" : "text-gray-500"}`}>
+                                      {real.awayTeam?.name ?? "?"}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-[#1a1a1a]">
+                                    <span className="text-[11px] text-gray-400">
+                                      Tu elección: <span className="text-yellow-300 font-bold">{pick?.name ?? "?"}</span>
+                                    </span>
+                                    {finished ? (
+                                      p.pointsEarned > 0
+                                        ? <span className="text-green-400 text-[11px] font-black">✓ +{p.pointsEarned.toLocaleString("es-AR")}</span>
+                                        : <span className="text-red-500 text-[11px] font-bold">{won ? "✓" : "✗"}</span>
+                                    ) : (
+                                      <span className="text-gray-600 text-[10px]">Pendiente</span>
+                                    )}
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs text-gray-400">
+                                    Pasa: <span className="text-yellow-300 font-bold">{pick?.name ?? "?"}</span>
+                                  </span>
+                                  {p.pointsEarned > 0
+                                    ? <span className="text-green-400 text-[11px] font-black">+{p.pointsEarned.toLocaleString("es-AR")}</span>
+                                    : <span className="text-gray-600 text-[10px]">Pendiente</span>}
+                                </div>
+                              )}
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    </div>
                   );
                 })}
               </div>

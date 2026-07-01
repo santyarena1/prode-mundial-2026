@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Trophy, AlertTriangle, ArrowLeft, Loader2, Check } from "lucide-react";
+import { Trophy, AlertTriangle, ArrowLeft, Loader2, Check, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 type Mode = "CLASSIC" | "OFFICIAL";
@@ -16,6 +16,8 @@ interface BracketModeResult {
 interface Props {
   /** Se llama cuando el usuario elige y se guarda el modo. */
   onChosen: (mode: Mode, data: BracketModeResult) => void;
+  /** Si se pasa, el modal es descartable (para cambios voluntarios desde el panel). */
+  onClose?: () => void;
 }
 
 const COMPARISON_ROWS = [
@@ -69,7 +71,7 @@ function TrampaNote() {
   );
 }
 
-export function BracketModeModal({ onChosen }: Props) {
+export function BracketModeModal({ onChosen, onClose }: Props) {
   const [screen, setScreen] = useState<Screen>("intro");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,12 +99,26 @@ export function BracketModeModal({ onChosen }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"
+      onClick={onClose && !saving ? onClose : undefined}
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-2xl bg-[#121212] border border-white/10 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-2xl bg-[#121212] border border-white/10 shadow-2xl"
       >
+        {onClose && (
+          <button
+            onClick={onClose}
+            disabled={saving}
+            aria-label="Cerrar"
+            className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 disabled:opacity-50"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
         {/* ── Pantalla principal ─────────────────────────────────────────── */}
         {screen === "intro" && (
           <div className="p-5 sm:p-6 space-y-4">

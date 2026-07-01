@@ -289,11 +289,16 @@ export async function calculateUserPoints(userId: string): Promise<number> {
     ? BRACKET_PHASE_ORDER.indexOf(effectiveOfficialFrom as (typeof BRACKET_PHASE_ORDER)[number])
     : -1;
 
-  // Pre-fetch all finished matches indexed by matchCode to avoid N+1
+  // Pre-fetch all finished matches. Los partidos reales tienen matchCode tipo
+  // "API-...", NO el número de llave (73..103). Por eso indexamos de dos formas:
+  //   - matchByCode: para el modo OFICIAL (guarda el matchCode real).
+  //   - finishedByPhaseTeam: para el modo CLÁSICO (guarda el número de llave, así
+  //     que buscamos el partido real por fase + equipo elegido).
   const finishedMatches = await prisma.match.findMany({
     where: { status: "finished" },
     select: {
       matchCode: true,
+      phase: true,
       winnerTeamId: true,
       homeTeamId: true,
       awayTeamId: true,
@@ -302,6 +307,11 @@ export async function calculateUserPoints(userId: string): Promise<number> {
     },
   });
   const matchByCode = new Map(finishedMatches.map((m) => [m.matchCode, m]));
+  const finishedByPhaseTeam = new Map<string, (typeof finishedMatches)[number]>();
+  for (const m of finishedMatches) {
+    if (m.homeTeamId) finishedByPhaseTeam.set(`${m.phase}:${m.homeTeamId}`, m);
+    if (m.awayTeamId) finishedByPhaseTeam.set(`${m.phase}:${m.awayTeamId}`, m);
+  }
 
   const phaseRuleMap: Record<string, keyof typeof DEFAULT_POINT_RULES> = {
     ROUND_OF_32:    "ROUND_OF_32",
@@ -320,20 +330,12 @@ export async function calculateUserPoints(userId: string): Promise<number> {
     const phaseIdx = BRACKET_PHASE_ORDER.indexOf(bp.phase as (typeof BRACKET_PHASE_ORDER)[number]);
     const isOfficialPhase = officialFromIdx >= 0 && phaseIdx >= officialFromIdx;
 
-    // En oficial, matchSlot ya es el matchCode real del partido (incluida la final).
-    // En clásico, CHAMPION usa matchSlot "1" y se mapea al partido de la final (103).
-    const lookupSlot = isOfficialPhase ? bp.matchSlot : bp.phase === "CHAMPION" ? "103" : bp.matchSlot;
-    const match = matchByCode.get(lookupSlot) ?? null;
-
-    if (!match) {
-      if (bp.pointsEarned !== 0) await prisma.bracketPrediction.update({ where: { id: bp.id }, data: { pointsEarned: 0 } });
-      continue;
-    }
-
     let earned = 0;
 
     if (isOfficialPhase) {
-      if (match.winnerTeamId) {
+      // Oficial: matchSlot es el matchCode real del partido (incluida la final).
+      const match = matchByCode.get(bp.matchSlot) ?? null;
+      if (match?.winnerTeamId) {
         const exactScore =
           bp.predictedHomeScore != null &&
           bp.predictedAwayScore != null &&
@@ -346,18 +348,19 @@ export async function calculateUserPoints(userId: string): Promise<number> {
         } else if (bp.predictedTeamId === match.winnerTeamId) {
           earned = pts("OFFICIAL_WINNER");
         }
-        // Logro de cuartos: en oficial los cruces son reales, igual cuenta el acierto.
         if (earned > 0 && bp.phase === "QUARTER_FINALS") achievementStats.bracketQfCorrect++;
       }
-    } else if (bp.phase === "CHAMPION" && match.winnerTeamId) {
-      if (bp.predictedTeamId === match.winnerTeamId) {
-        earned = pts("CHAMPION");
-      }
     } else {
-      const ruleKey = phaseRuleMap[bp.phase];
-      if (ruleKey && match.winnerTeamId && bp.predictedTeamId === match.winnerTeamId) {
-        earned = pts(ruleKey);
-        if (bp.phase === "QUARTER_FINALS") achievementStats.bracketQfCorrect++;
+      // Clásico: se acierta si el equipo elegido ganó su partido REAL de esa fase.
+      const realPhase = bp.phase === "CHAMPION" ? "FINAL" : bp.phase;
+      const match = finishedByPhaseTeam.get(`${realPhase}:${bp.predictedTeamId}`) ?? null;
+      if (match && match.winnerTeamId === bp.predictedTeamId) {
+        if (bp.phase === "CHAMPION") {
+          earned = pts("CHAMPION");
+        } else if (phaseRuleMap[bp.phase]) {
+          earned = pts(phaseRuleMap[bp.phase]);
+          if (bp.phase === "QUARTER_FINALS") achievementStats.bracketQfCorrect++;
+        }
       }
     }
 

@@ -185,6 +185,7 @@ export default function DashboardPage() {
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [raffles, setRaffles] = useState<WeeklyRaffle[]>([]);
   const [showEarlyBird, setShowEarlyBird] = useState(false);
+  const [showModeSwitch, setShowModeSwitch] = useState(false);
   const [earlyBirdMode, setEarlyBirdMode] = useState<"claim" | "confirmed">("confirmed");
   const [selectedRaffle, setSelectedRaffle] = useState<WeeklyRaffle | null>(null);
   const [dashboardBanners, setDashboardBanners] = useState<SponsorBannerItem[]>([]);
@@ -390,6 +391,37 @@ export default function DashboardPage() {
       <Navbar />
 
       <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8">
+        {/* Alerta: pasarse a Resultados Oficiales (solo modo clásico) */}
+        {user?.bracketMode === "CLASSIC" && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 rounded-2xl border border-yellow-500/30 bg-gradient-to-r from-yellow-500/10 to-amber-500/5 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4"
+          >
+            <div className="flex items-start gap-3 flex-1">
+              <Trophy className="w-6 h-6 text-yellow-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-white font-black text-sm sm:text-base leading-tight">
+                  ¿Te está yendo mal en las llaves? Pasate a Resultados Oficiales
+                </p>
+                <p className="text-gray-300 text-xs sm:text-sm mt-1 leading-snug">
+                  Jugá con los cruces reales del Mundial y volvé a sumar desde 16vos.{" "}
+                  <span className="text-emerald-300 font-semibold">
+                    No perdés los puntos que ya ganaste ni nada de lo hecho.
+                  </span>{" "}
+                  Podés cambiarte cuando quieras.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowModeSwitch(true)}
+              className="shrink-0 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-black text-sm px-5 py-3 transition"
+            >
+              Ver el modo nuevo
+            </button>
+          </motion.div>
+        )}
+
         {/* Header */}
         <motion.div
           className="flex items-center justify-between gap-4 mb-6"
@@ -891,6 +923,20 @@ export default function DashboardPage() {
       {user && (user.bracketMode === null || user.bracketMode === undefined) && (
         <BracketModeModal
           onChosen={(mode, data) => {
+            setUser((u) =>
+              u ? { ...u, bracketMode: mode, officialFromPhase: data.officialFromPhase ?? null } : u
+            );
+            if (mode === "OFFICIAL") router.push("/predictions");
+          }}
+        />
+      )}
+
+      {/* Modal voluntario: cambiarse a Resultados Oficiales (descartable) */}
+      {showModeSwitch && (
+        <BracketModeModal
+          onClose={() => setShowModeSwitch(false)}
+          onChosen={(mode, data) => {
+            setShowModeSwitch(false);
             setUser((u) =>
               u ? { ...u, bracketMode: mode, officialFromPhase: data.officialFromPhase ?? null } : u
             );
